@@ -1,0 +1,20 @@
+{
+  "item.infection.antidote_syringe": "Шприц-антидот",
+  "item.infection.personal_note": "Записка",
+  "itemGroup.infection.main": "Заражение",
+  "key.categories.infection": "Заражение",
+  "key.infection.open_list": "Открыть список заражённых",
+  "key.infection.event_launch": "Запуск инвентика",
+  "key.infection.event_cancel": "Отмена инвентика",
+  "key.infection.event_smoke_hide": "Исчезнуть в дыму",
+  "key.infection.event_smoke_show": "Появиться из дыма",
+  "infection.gui.title": "КОНТРОЛЬ ЗАРАЖЕНИЯ",
+  "infection.gui.close": "Закрыть",
+  "infection.gui.infect": "Заразить",
+  "infection.gui.cure": "Вылечить",
+  "infection.gui.note": "Записка",
+  "infection.gui.add10": "+10%",
+  "infection.gui.sub10": "−10%",
+  "infection.gui.online": "Онлайн: %s",
+  "infection.gui.percent": "%s%%"
+}

@@ -1,0 +1,20 @@
+{
+  "item.infection.antidote_syringe": "Antidote Syringe",
+  "item.infection.personal_note": "Personal Note",
+  "itemGroup.infection.main": "Infection",
+  "key.categories.infection": "Infection",
+  "key.infection.open_list": "Open infection list",
+  "key.infection.event_launch": "Launch mini-event",
+  "key.infection.event_cancel": "Cancel mini-event",
+  "key.infection.event_smoke_hide": "Smoke: hide",
+  "key.infection.event_smoke_show": "Smoke: show",
+  "infection.gui.title": "INFECTION CONTROL",
+  "infection.gui.close": "Close",
+  "infection.gui.infect": "Infect",
+  "infection.gui.cure": "Cure",
+  "infection.gui.note": "Note",
+  "infection.gui.add10": "+10%",
+  "infection.gui.sub10": "-10%",
+  "infection.gui.online": "Online: %s",
+  "infection.gui.percent": "%s%%"
+}

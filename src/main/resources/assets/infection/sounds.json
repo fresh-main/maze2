@@ -1,0 +1,29 @@
+{
+  "infestation_ambience": {
+    "category": "ambient",
+    "sounds": [
+      {
+        "name": "infection:infestation_ambience",
+        "stream": true
+      }
+    ]
+  },
+  "heartbeat": {
+    "category": "ambient",
+    "sounds": [
+      {
+        "name": "infection:heartbeat",
+        "stream": false
+      }
+    ]
+  },
+  "jumpscare": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "infection:jumpscare",
+        "stream": false
+      }
+    ]
+  }
+}

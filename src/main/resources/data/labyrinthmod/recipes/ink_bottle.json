@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    { "item": "minecraft:glass_bottle" },
+    { "tag": "forge:dyes/black" }
+  ],
+  "result": {
+    "item": "labyrinthmod:ink_bottle",
+    "count": 1
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.labyrinthmod.client.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "labyrinthmod.refmap.json",
+  "mixins": [
+    "SlotAccessor",
+    "StorageContainerMenuBaseMixin",
+    "AbstractContainerMenuMixin",
+    "InventoryMenuMixin",
+    "InventoryMixin",
+    "FirstAidDamageablePartMixin"
+  ],
+  "client": [
+    "DebugOverlayMixin",
+    "MazeKeyboardHandlerMixin",
+    "StorageScreenBaseMixin",
+    "AbstractContainerScreenMixin",
+    "InventoryScreenMixin",
+    "EffectRenderingInventoryScreenMixin",
+    "ChestScreenMixin",
+    "ContainerScreenAccessor",
+    "DisconnectedScreenAccessor",
+    "GenericDirtMessageScreenMixin",
+    "LoadingScreenBackgroundMixin",
+    "ReceivingLevelScreenMixin",
+    "LocalPlayerFovMixin",
+    "SelectWorldScreenMixin",
+    "InventoryScreenNoteMixin",
+    "EntityInvisibleToMixin",
+    "LoadingOverlayMixin",
+    "LoadingScreenMixin",
+    "MixinShaderPackScreenPaper",
+    "ResultSlotMixin",
+    "CraftingMenuMixin",
+    "CreativeModeInventoryScreenMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

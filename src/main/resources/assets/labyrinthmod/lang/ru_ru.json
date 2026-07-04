@@ -1,0 +1,46 @@
+{
+  "itemGroup.labyrinthmod": "Лабиринт Мод",
+
+  "block.labyrinthmod.griver_spawner": "Спавнер Гривера",
+  "block.labyrinthmod.timed_block": "Блок-таймер",
+
+  "item.labyrinthmod.patrol_stick": "Патрульная Палка",
+  "item.labyrinthmod.zone_stick": "Палка Зон",
+  "item.labyrinthmod.bounds_stick": "Палка Границ",
+  "item.labyrinthmod.traitor_tablet": "Планшет Предателя",
+  "item.labyrinthmod.griver_spawner": "Спавнер Гривера",
+  "item.labyrinthmod.timed_block": "Блок-таймер",
+
+  "key.category.labyrinthmod": "Лабиринт Мод",
+  "key.labyrinthmod.possess_attack": "Атака при вселении",
+
+  "sounds.labyrinthmod.griver_run": "Гривер бежит",
+
+  "item.labyrinthmod.antidote_syringe": "Шприц-антидот",
+  "item.labyrinthmod.personal_note": "Записка",
+  "itemGroup.infection.main": "Заражение",
+  "key.categories.infection": "Заражение",
+  "key.infection.open_list": "Открыть список заражённых",
+  "key.infection.event_launch": "Запуск инвентика",
+  "key.infection.event_cancel": "Отмена инвентика",
+  "key.infection.event_smoke_hide": "Исчезнуть в дыму",
+  "key.infection.event_smoke_show": "Появиться из дыма",
+  "infection.gui.title": "КОНТРОЛЬ ЗАРАЖЕНИЯ",
+  "infection.gui.close": "Закрыть",
+  "infection.gui.infect": "Заразить",
+  "infection.gui.cure": "Вылечить",
+  "infection.gui.note": "Записка",
+  "infection.gui.add10": "+10%",
+  "infection.gui.sub10": "−10%",
+  "infection.gui.online": "Онлайн: %s",
+  "infection.gui.percent": "%s%%",
+
+  "item.labyrinthmod.personal_map": "Личная карта",
+  "item.labyrinthmod.ink_bottle": "Бутылёк чернил",
+  "key.labyrinthmod.open_map": "Открыть карту лабиринта",
+  "key.labyrinthmod.toggle_note": "Записка с картой (взять/передать)",
+  "key.labyrinthmod.hold_minimap": "Показать мини-карту (зажать)",
+  "key.categories.labyrinthmod": "Карта лабиринта",
+
+  "worldType.labyrinthmod.labyrinth": "Лабиринт"
+}

@@ -1,0 +1,12 @@
+{
+  "parent": "block/cube",
+  "textures": {
+    "particle": "labyrinthmod:block/timed_block_side_powered",
+    "down": "labyrinthmod:block/timed_block_bottom",
+    "up": "labyrinthmod:block/timed_block_top_powered",
+    "north": "labyrinthmod:block/timed_block_side_powered",
+    "south": "labyrinthmod:block/timed_block_side_powered",
+    "east": "labyrinthmod:block/timed_block_side_powered",
+    "west": "labyrinthmod:block/timed_block_side_powered"
+  }
+}

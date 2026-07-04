@@ -1,0 +1,87 @@
+{
+  "griver_run": {
+    "sounds": [
+      "labyrinthmod:griver/run"
+    ]
+  },
+  "griver_walk": {
+    "sounds": [
+      "labyrinthmod:griver/walk"
+    ]
+  },
+  "griver_attack": {
+    "sounds": [
+      "labyrinthmod:griver/attack"
+    ]
+  },
+  "griver_jump": {
+    "sounds": [
+      "labyrinthmod:griver/jump"
+    ]
+  },
+  "fraction_pechat": {
+    "sounds": [
+      {
+        "name": "labyrinthmod:griver/pechat",
+        "stream": false
+      }
+    ]
+  },
+  "page_flip": {
+    "category": "ambient",
+    "subtitle": "otbor.subtitle.page_flip",
+    "sounds": [
+      {
+        "name": "otbor:page_flip",
+        "stream": false
+      }
+    ]
+  },
+  "pencil": {
+    "category": "ambient",
+    "subtitle": "otbor.subtitle.pencil",
+    "sounds": [
+      {
+        "name": "otbor:pencil",
+        "stream": false
+      }
+    ]
+  },
+  "credits_theme": {
+    "category": "master",
+    "subtitle": "otbor.subtitle.credits_theme",
+    "sounds": [
+      {
+        "name": "otbor:credits_theme",
+        "stream": true
+      }
+    ]
+  },
+  "infestation_ambience": {
+    "category": "ambient",
+    "sounds": [
+      {
+        "name": "infection:infestation_ambience",
+        "stream": true
+      }
+    ]
+  },
+  "heartbeat": {
+    "category": "ambient",
+    "sounds": [
+      {
+        "name": "infection:heartbeat",
+        "stream": false
+      }
+    ]
+  },
+  "jumpscare": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "infection:jumpscare",
+        "stream": false
+      }
+    ]
+  }
+}

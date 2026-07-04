@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "powered=false": {
+      "model": "labyrinthmod:block/timed_block"
+    },
+    "powered=true": {
+      "model": "labyrinthmod:block/timed_block_powered"
+    }
+  }
+}

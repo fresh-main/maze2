@@ -1,0 +1,46 @@
+{
+  "itemGroup.labyrinthmod": "Labyrinth Mod",
+
+  "block.labyrinthmod.griver_spawner": "Griver Spawner",
+  "block.labyrinthmod.timed_block": "Timed Block",
+
+  "item.labyrinthmod.patrol_stick": "Patrol Stick",
+  "item.labyrinthmod.zone_stick": "Zone Stick",
+  "item.labyrinthmod.bounds_stick": "Bounds Stick",
+  "item.labyrinthmod.traitor_tablet": "Traitor's Tablet",
+  "item.labyrinthmod.griver_spawner": "Griver Spawner",
+  "item.labyrinthmod.timed_block": "Timed Block",
+
+  "key.category.labyrinthmod": "Labyrinth Mod",
+  "key.labyrinthmod.possess_attack": "Possess Attack",
+
+  "sounds.labyrinthmod.griver_run": "Griver runs",
+
+  "item.labyrinthmod.antidote_syringe": "Antidote Syringe",
+  "item.labyrinthmod.personal_note": "Personal Note",
+  "itemGroup.infection.main": "Infection",
+  "key.categories.infection": "Infection",
+  "key.infection.open_list": "Open infection list",
+  "key.infection.event_launch": "Launch mini-event",
+  "key.infection.event_cancel": "Cancel mini-event",
+  "key.infection.event_smoke_hide": "Smoke: hide",
+  "key.infection.event_smoke_show": "Smoke: show",
+  "infection.gui.title": "INFECTION CONTROL",
+  "infection.gui.close": "Close",
+  "infection.gui.infect": "Infect",
+  "infection.gui.cure": "Cure",
+  "infection.gui.note": "Note",
+  "infection.gui.add10": "+10%",
+  "infection.gui.sub10": "-10%",
+  "infection.gui.online": "Online: %s",
+  "infection.gui.percent": "%s%%",
+
+  "item.labyrinthmod.personal_map": "Personal Map",
+  "item.labyrinthmod.ink_bottle": "Ink Bottle",
+  "key.labyrinthmod.open_map": "Open Maze Map",
+  "key.labyrinthmod.toggle_note": "Map Note (hold/transfer)",
+  "key.labyrinthmod.hold_minimap": "Show Mini-Map (hold)",
+  "key.categories.labyrinthmod": "Maze Map",
+
+  "worldType.labyrinthmod.labyrinth": "Labyrinth"
+}

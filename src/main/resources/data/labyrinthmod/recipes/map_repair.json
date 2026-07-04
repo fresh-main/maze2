@@ -1,0 +1,7 @@
+{
+  "type": "labyrinthmod:map_repair",
+  "ingredients": [
+    { "item": "labyrinthmod:personal_map" },
+    { "item": "labyrinthmod:ink_bottle" }
+  ]
+}
