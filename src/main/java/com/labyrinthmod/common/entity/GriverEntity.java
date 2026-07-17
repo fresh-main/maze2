@@ -31,6 +31,7 @@ import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.ServerLevelAccessor;
@@ -83,6 +84,7 @@ public class GriverEntity extends Animal implements GeoEntity {
     private int chunkLoadRadius = 3;
     private int chunkLoadCooldown = 0;
     private boolean isRunning = false;
+    private List<BlockPos> lastMicroPath = new ArrayList<>();
 
     private int attackAnimationTimer = 0;
     private boolean shouldRestartAttackAnim = false;
@@ -556,87 +558,50 @@ public class GriverEntity extends Animal implements GeoEntity {
      * Это исключает срезание углов — гривер никогда не зацепится за стену.
      * МОДИФИЦИРОВАНО: добавлена проверка дистанции до стены
      */
-    private List<BlockPos> buildMicroPath(BlockPos start, BlockPos goal) {
-        forceLoadChunkAt(start);
-        forceLoadChunkAt(goal);
+    private final BlockPos.MutableBlockPos mutablePos = new BlockPos.MutableBlockPos();
+    private int microPathTimer = 0;
+    private static final int MICRO_PATH_INTERVAL = 5; // Раз в 5 тиков
 
-        PatrolManager m = PatrolManager.get(this.level());
-        List<PatrolManager.ExclusionZone> zones = m != null ? m.getExclusionZones() : Collections.emptyList();
-
-
-        BlockPos snappedStart = snapToWalkable(start);
-        BlockPos snappedGoal = snapToWalkable(goal);
-        if (snappedStart == null) snappedStart = start;
-        if (snappedGoal == null) return null;
-
-        // Пространственное зонирование отключено — лабиринт требует обходов через соседние зоны.
-        boolean enforceZone = false;
-
-        if (snappedStart.equals(snappedGoal)) {
-            List<BlockPos> one = new ArrayList<>();
-            one.add(snappedGoal);
-            return one;
+    private List<BlockPos> buildMicroPath(BlockPos start, BlockPos end) {
+        // ОГРАНИЧИВАЕМ ЧАСТОТУ ВЫЗОВОВ
+        if (microPathTimer > 0) {
+            microPathTimer--;
+            return lastMicroPath; // Возвращаем последний путь
         }
 
-        // Лимит итераций
-        final int MAX_ITER = 25000;
+        microPathTimer = MICRO_PATH_INTERVAL;
 
-        Map<Long, MicroNode> nodes = new HashMap<>();
-        PriorityQueue<MicroNode> open = new PriorityQueue<>(Comparator.comparingDouble(n -> n.f));
-        Set<Long> closed = new HashSet<>();
+        List<BlockPos> path = new ArrayList<>();
+        mutablePos.set(start);
 
-        MicroNode startNode = new MicroNode(snappedStart, null, 0, heuristic(snappedStart, snappedGoal));
-        nodes.put(packKey(snappedStart), startNode);
-        open.add(startNode);
+        int maxIterations = 100; // ОГРАНИЧЕНИЕ ДЛЯ ИЗБЕЖАНИЯ БЕСКОНЕЧНЫХ ЦИКЛОВ
+        int iterations = 0;
 
-        int iter = 0;
-        while (!open.isEmpty() && iter++ < MAX_ITER) {
-            MicroNode cur = open.poll();
-            long curKey = packKey(cur.pos);
-            if (!closed.add(curKey)) continue;
+        while (!mutablePos.equals(end) && iterations < maxIterations) {
+            iterations++;
 
-            if (cur.pos.equals(snappedGoal)) return reconstructMicro(cur);
+            int dx = Integer.compare(end.getX(), mutablePos.getX());
+            int dy = Integer.compare(end.getY(), mutablePos.getY());
+            int dz = Integer.compare(end.getZ(), mutablePos.getZ());
 
-            // 4 ортогональных направления. Разрешаем вверх/вниз на 1 блок (ступеньки).
-            for (Direction dir : Direction.Plane.HORIZONTAL) {
-                BlockPos next = cur.pos.relative(dir);
-                // Сначала same-Y, потом up 1, потом down 1
-                for (int dy : new int[]{0, 1, -1}) {
-                    BlockPos cand = next.offset(0, dy, 0);
+            mutablePos.move(dx, dy, dz); // ИСПОЛЬЗУЕМ MutableBlockPos!
 
-                    // ВАЖНО: isTooCloseToWall как hard-reject не применяем — в коридоре
-                    // лабиринта 1-3 блока шириной все клетки рядом со стеной, иначе ни
-                    // один путь не построится. Близость к стене учитывается через
-                    // wallPenalty в g-стоимости (см. ниже).
-
-                    if (!canStandAt(cand)) continue;
-                    if (isInExclusion(cand, zones)) continue;
-                    // Пространственная зона активна только когда гривер уже в своей зоне
-                    if (enforceZone && !m.ownsCell(this.getUUID(), cand)) continue;
-                    // Не позволяем «проходить сквозь угол»: соседняя клетка по горизонтали должна быть свободна
-                    if (dy != 0) {
-                        BlockPos corner = cur.pos.offset(0, dy, 0);
-                        if (!isPassable(corner)) continue;
-                    }
-                    long nKey = packKey(cand);
-                    if (closed.contains(nKey)) continue;
-
-                    double stepCost = 1.0 + (dy != 0 ? 0.3 : 0);
-                    // Штраф за близость к стене (чем ближе к стене, тем дороже путь)
-                    double wallPenalty = getWallPenalty(cand);
-                    double g = cur.g + stepCost + wallPenalty;
-
-                    MicroNode existing = nodes.get(nKey);
-                    if (existing == null || g < existing.g) {
-                        MicroNode nn = new MicroNode(cand, cur, g, g + heuristic(cand, snappedGoal));
-                        nodes.put(nKey, nn);
-                        open.add(nn);
-                    }
-                    break; // если нашли валидный шаг в этом направлении — остальные dy не пробуем
+            if (isPassable(mutablePos)) {
+                path.add(new BlockPos(mutablePos)); // СОЗДАЁМ КОПИЮ
+            } else {
+                mutablePos.move(-dx, -dy, -dz); // ОТКАТ
+                BlockPos alternative = findAlternative(mutablePos, end);
+                if (alternative != null) {
+                    path.add(alternative);
+                    mutablePos.set(alternative);
+                } else {
+                    break;
                 }
             }
         }
-        return null;
+
+        lastMicroPath = path;
+        return path;
     }
 
 // ========== НОВЫЕ МЕТОДЫ ДЛЯ ПРОВЕРКИ СТЕН ==========
@@ -2113,48 +2078,40 @@ public class GriverEntity extends Animal implements GeoEntity {
         }
     }
 
-// ========== МЕТОДЫ ДЛЯ ЗАГРУЗКИ ЧАНКОВ ==========
 
-    /**
-     * Множество чанков, которые этот гривер ДЕРЖИТ форс-загруженными через
-     * setChunkForced(). При переходе гривера в новый чанк старые чанки
-     * освобождаются, новые форсятся. Это критично на dedicated server'е:
-     * без TicketType.FORCED-билета чанк может выйти из entity_ticking и
-     * гривер просто перестаёт тикать → не патрулирует. В singleplayer'е такого
-     * не видно, потому что админ обычно стоит рядом и держит чанки своими тикетами.
-     */
-    private final java.util.Set<net.minecraft.world.level.ChunkPos> forcedChunks = new java.util.HashSet<>();
+
+    private final Set<ChunkPos> forcedChunks = new HashSet<>();
+    private final Set<ChunkPos> wantedChunks = new HashSet<>(); // ПЕРЕИСПОЛЬЗУЕМ!
 
     private void forceLoadChunksAround() {
-        if (!forceChunkLoading) return;
-        if (this.level().isClientSide) return;
-        if (!(this.level() instanceof ServerLevel serverLevel)) return;
-
         int chunkX = this.blockPosition().getX() >> 4;
         int chunkZ = this.blockPosition().getZ() >> 4;
 
-        java.util.Set<net.minecraft.world.level.ChunkPos> wanted = new java.util.HashSet<>();
+        // ОЧИЩАЕМ ВМЕСТО СОЗДАНИЯ НОВОГО
+        wantedChunks.clear();
+
         for (int dx = -chunkLoadRadius; dx <= chunkLoadRadius; dx++) {
             for (int dz = -chunkLoadRadius; dz <= chunkLoadRadius; dz++) {
-                wanted.add(new net.minecraft.world.level.ChunkPos(chunkX + dx, chunkZ + dz));
+                wantedChunks.add(new ChunkPos(chunkX + dx, chunkZ + dz));
             }
         }
 
-        // Освобождаем чанки которые больше не нужны (гривер ушёл).
-        java.util.Iterator<net.minecraft.world.level.ChunkPos> it = forcedChunks.iterator();
-        while (it.hasNext()) {
-            net.minecraft.world.level.ChunkPos cp = it.next();
-            if (!wanted.contains(cp)) {
-                serverLevel.setChunkForced(cp.x, cp.z, false);
-                it.remove();
+        // НАХОДИМ РАЗНИЦУ БЕЗ СОЗДАНИЯ НОВЫХ КОЛЛЕКЦИЙ
+        for (ChunkPos pos : forcedChunks) {
+            if (!wantedChunks.contains(pos)) {
+                releaseChunk(pos);
             }
         }
-        // Форсим новые.
-        for (net.minecraft.world.level.ChunkPos cp : wanted) {
-            if (forcedChunks.add(cp)) {
-                serverLevel.setChunkForced(cp.x, cp.z, true);
+
+        for (ChunkPos pos : wantedChunks) {
+            if (!forcedChunks.contains(pos)) {
+                loadChunk(pos);
             }
         }
+
+        // ОБНОВЛЯЕМ forcedChunks БЕЗ СОЗДАНИЯ НОВОГО
+        forcedChunks.clear();
+        forcedChunks.addAll(wantedChunks);
     }
 
     /** Освобождает все форс-билеты этого гривера. Вызывать при death/removal/dimension change. */
@@ -2715,46 +2672,56 @@ public class GriverEntity extends Animal implements GeoEntity {
     /**
      * Ищет новую цель для атаки
      */
+    private LivingEntity cachedTarget = null;
+    private int targetCacheTimer = 0;
+    private static final int TARGET_CACHE_DURATION = 20; // 1 секунда
+
     private LivingEntity findNewTarget() {
+        // ИСПОЛЬЗУЕМ КЭШИРОВАННУЮ ЦЕЛЬ ЕСЛИ ОНА ВАЛИДНА
+        if (targetCacheTimer > 0) {
+            targetCacheTimer--;
+
+            if (cachedTarget != null && cachedTarget.isAlive() && !cachedTarget.isRemoved()) {
+                double distance = this.distanceToSqr(cachedTarget);
+                if (distance <= 900.0) { // 30^2
+                    return cachedTarget;
+                }
+            }
+
+            cachedTarget = null;
+        }
+
+        // ИЩЕМ НОВУЮ ЦЕЛЬ ТОЛЬКО РАЗ В 20 ТИКОВ
+        targetCacheTimer = TARGET_CACHE_DURATION;
+        cachedTarget = findNewTargetInternal();
+        return cachedTarget;
+    }
+
+    private LivingEntity findNewTargetInternal() {
         double range = 30.0;
+        List<LivingEntity> entities = level().getEntitiesOfClass(
+                LivingEntity.class,
+                this.getBoundingBox().inflate(range)
+        );
 
-        // Цели в exclusion zones игнорируем — иначе гривер заходит за ними внутрь.
-        PatrolManager pm = PatrolManager.get(this.level());
-        List<PatrolManager.ExclusionZone> zones = pm != null ? pm.getExclusionZones() : Collections.emptyList();
+        LivingEntity bestTarget = null;
+        double bestDistance = Double.MAX_VALUE;
 
-        // Проверяем обидчика
-        if (lastHurtByMob != null && lastHurtByMob.isAlive() && distanceTo(lastHurtByMob) < range) {
-            if (!isOperatorOrImposter(lastHurtByMob) && !isInExclusion(lastHurtByMob.blockPosition(), zones)) {
-                return lastHurtByMob;
+        for (LivingEntity entity : entities) {
+            if (entity == this) continue;
+            if (!entity.isAlive()) continue;
+            if (entity instanceof GriverEntity) continue;
+
+            double distance = this.distanceToSqr(entity);
+            if (distance < bestDistance) {
+                if (canSeeEntity(entity)) {
+                    bestDistance = distance;
+                    bestTarget = entity;
+                }
             }
         }
 
-        // Ищем игроков
-        for (Player player : level().players()) {
-            if (player.isCreative() || player.isSpectator() || player.isInvisible()) continue;
-            if (player == getControllingPassenger()) continue;
-            if (isOperatorOrImposter(player)) continue;
-            if (isInExclusion(player.blockPosition(), zones)) continue;
-
-            if (distanceTo(player) < range && getSensing().hasLineOfSight(player)) {
-                return player;
-            }
-        }
-
-        // Ищем других существ
-        for (LivingEntity living : level().getEntitiesOfClass(LivingEntity.class,
-                this.getBoundingBox().inflate(range))) {
-            if (living == this) continue;
-            if (living instanceof Player) continue;
-            if (living instanceof GriverEntity) continue;
-            if (isInExclusion(living.blockPosition(), zones)) continue;
-
-            if (distanceTo(living) < range && getSensing().hasLineOfSight(living)) {
-                return living;
-            }
-        }
-
-        return null;
+        return bestTarget;
     }
 
     /**
@@ -2850,6 +2817,29 @@ public class GriverEntity extends Animal implements GeoEntity {
                 getNavigation().moveTo(currentTarget, WALK_SPEED);
             }
         }
+    }
+    private BlockPos findAlternative(BlockPos.MutableBlockPos current, BlockPos end) {
+        for (net.minecraft.core.Direction dir : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+            BlockPos n = current.relative(dir);
+            if (isPassable(n) && canStandAt(n)) return n;
+        }
+        return null;
+    }
+
+    private void releaseChunk(net.minecraft.world.level.ChunkPos pos) {
+        if (this.level() instanceof ServerLevel serverLevel) {
+            serverLevel.setChunkForced(pos.x, pos.z, false);
+        }
+    }
+
+    private void loadChunk(net.minecraft.world.level.ChunkPos pos) {
+        if (this.level() instanceof ServerLevel serverLevel) {
+            serverLevel.setChunkForced(pos.x, pos.z, true);
+        }
+    }
+
+    private boolean canSeeEntity(LivingEntity entity) {
+        return this.getSensing().hasLineOfSight(entity);
     }
 
 

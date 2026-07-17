@@ -266,42 +266,47 @@ public final class HallucinationOverlay implements IGuiOverlay {
 
     private void renderText(FloatingText ft, GuiGraphics gfx, Font font, float time, float envelope,
                             float globalShakeX, float globalShakeY, float beatScale) {
-        float jitterX = (float) Math.sin(time * 6.7f + ft.shakeSeed) * 1.6f
-                + (float) Math.sin(time * 13.1f + ft.shakeSeed * 0.5f) * 0.9f;
-        float jitterY = (float) Math.cos(time * 7.3f + ft.shakeSeed) * 1.6f
-                + (float) Math.cos(time * 15.7f + ft.shakeSeed * 0.3f) * 0.9f;
-        float wobbleAngle = ft.baseAngle + (float) Math.sin(time * 2.1f + ft.shakeSeed * 0.1f) * 0.05f;
+        float jitterX = (float) Math.sin(time * 6.7f + ft.shakeSeed()) * 1.6f
+                + (float) Math.sin(time * 13.1f + ft.shakeSeed() * 0.5f) * 0.9f;
+        float jitterY = (float) Math.cos(time * 7.3f + ft.shakeSeed()) * 1.6f
+                + (float) Math.cos(time * 15.7f + ft.shakeSeed() * 0.3f) * 0.9f;
+        float wobbleAngle = ft.baseAngle() + (float) Math.sin(time * 2.1f + ft.shakeSeed() * 0.1f) * 0.05f;
 
-        float x = ft.x + globalShakeX + jitterX;
-        float y = ft.y + globalShakeY + jitterY;
+        float x = ft.x() + globalShakeX + jitterX;
+        float y = ft.y() + globalShakeY + jitterY;
 
         gfx.pose().pushPose();
         gfx.pose().translate(x, y, 0);
         gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotation(wobbleAngle));
-        float effScale = ft.scale * beatScale;
+        float effScale = ft.scale() * beatScale;
         gfx.pose().scale(effScale, effScale, 1f);
 
         int alpha = (int) (255 * envelope);
-        int baseColor = (alpha << 24) | (ft.color & 0xFFFFFF);
-        // Хроматическая аберрация — три копии текста в R/G/B каналах со сдвигом.
-        int aberrA = (int) (170 * envelope);
-        int rChan = (aberrA << 24) | 0xFF2233;
-        int gChan = (aberrA << 24) | 0x33FF44;
-        int bChan = (aberrA << 24) | 0x3344FF;
-        int shadow = (int) (180 * envelope) << 24;
+        int baseColor = (alpha << 24) | (ft.color() & 0xFFFFFF);
 
-        int w = font.width(ft.text);
-        gfx.drawString(font, ft.text, -w / 2 + 2, 2, shadow | 0x000000, false);
-        gfx.drawString(font, ft.text, -w / 2 + 2, 0, rChan, false);
-        gfx.drawString(font, ft.text, -w / 2 - 2, 0, bChan, false);
-        gfx.drawString(font, ft.text, -w / 2, -1, gChan, false);
-        gfx.drawString(font, ft.text, -w / 2, 0, baseColor, false);
+        // КЭШИРУЕМ ШИРИНУ ТЕКСТА (оптимизация)
+        int w = font.width(ft.text());
+
+        // ОПТИМИЗАЦИЯ: Только тень и основной цвет (2 вызова вместо 5)
+        // Хроматическая аберрация убирается для слабых ПК
+        int shadow = (int) (180 * envelope) << 24;
+        gfx.drawString(font, ft.text(), -w / 2 + 2, 2, shadow | 0x000000, false);
+        gfx.drawString(font, ft.text(), -w / 2, 0, baseColor, false);
+
+        // Если нужна хроматическая аберрация, раскомментируйте:
+
+    int aberrA = (int) (170 * envelope);
+    int rChan = (aberrA << 24) | 0xFF2233;
+    int gChan = (aberrA << 24) | 0x33FF44;
+    int bChan = (aberrA << 24) | 0x3344FF;
+    gfx.drawString(font, ft.text(), -w / 2 + 2, 0, rChan, false);
+    gfx.drawString(font, ft.text(), -w / 2 - 2, 0, bChan, false);
+    gfx.drawString(font, ft.text(), -w / 2, -1, gChan, false);
+
 
         gfx.pose().popPose();
     }
 
-    private record FloatingText(String text, float x, float y, float baseAngle, float scale,
-                                float shakeSeed, int color) {}
 
     private static final class Attack {
         final long startTick;
@@ -316,6 +321,48 @@ public final class HallucinationOverlay implements IGuiOverlay {
             this.texts = texts;
             this.seed = seed;
             this.lastBeatTick = lastBeatTick - HEARTBEAT_INTERVAL_TICKS; // первый удар сразу
+        }
+    }
+    public class FloatingText {
+        String text;
+        float x;
+        float y;
+        float baseAngle;
+        float scale;
+        float shakeSeed;
+        int color;
+        float phase;
+
+        // НОВЫЕ ПОЛЯ ДЛЯ КЭШИРОВАНИЯ
+        private int cachedWidth = -1;
+        private Font lastFont = null;
+
+        // Добавляем конструктор, который ожидает код
+        public FloatingText(String text, float x, float y, float baseAngle, float scale, float shakeSeed, int color) {
+            this.text = text;
+            this.x = x;
+            this.y = y;
+            this.baseAngle = baseAngle;
+            this.scale = scale;
+            this.shakeSeed = shakeSeed;
+            this.color = color;
+        }
+
+        // Добавляем методы-геттеры, которые используются в renderText()
+        public String text() { return text; }
+        public float x() { return x; }
+        public float y() { return y; }
+        public float baseAngle() { return baseAngle; }
+        public float scale() { return scale; }
+        public float shakeSeed() { return shakeSeed; }
+        public int color() { return color; }
+
+        public int getWidth(Font font) {
+            if (cachedWidth == -1 || lastFont != font) {
+                cachedWidth = font.width(text);
+                lastFont = font;
+            }
+            return cachedWidth;
         }
     }
 }

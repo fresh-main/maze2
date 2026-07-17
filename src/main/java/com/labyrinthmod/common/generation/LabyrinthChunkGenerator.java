@@ -1,5 +1,6 @@
 package com.labyrinthmod.common.generation;
 
+import com.labyrinthmod.common.init.ModBlocks;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.BlockPos;
@@ -21,8 +22,10 @@ import net.minecraft.world.level.levelgen.blending.Blender;
 import org.jetbrains.annotations.NotNull;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import net.minecraft.world.level.levelgen.synth.ImprovedNoise;
+import net.minecraft.world.level.ChunkPos;
 
 public class LabyrinthChunkGenerator extends ChunkGenerator {
     public static final Codec<LabyrinthChunkGenerator> CODEC = RecordCodecBuilder.create(inst ->
@@ -69,6 +72,8 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
     public int PASSAGE_OFFSET = 100;
     private final int ENTRANCE_WIDTH = 15;
     private final int ENTRANCE_DEPTH = 25;
+
+
 
     // ===== ТОЛЬКО 3 БЛОКА ДЛЯ СТЕН =====
     private static final BlockState[] WALL_BLOCKS = {
@@ -453,31 +458,22 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         }
     }
 
-    private BlockState generateSectorBlock(int x, int y, int z) {
-        long hash = hash(x, z);
+    private BlockState generateSectorBlock(int x, int y, int z, long hash) {
         if (y == FLOOR_Y) return randomFloorBlock();
-
         int dist = Math.max(Math.abs(x), Math.abs(z));
-
         boolean isInternalWall = (Math.abs(x) <= 2 || Math.abs(z) <= 2 || Math.abs(x - z) <= 2 || Math.abs(x + z) <= 2);
         int wallHeight = (dist >= SECTORS_END || isInternalWall) ? SEPARATOR_WALL_HEIGHT : MAZE_HEIGHT;
-
         if (y > FLOOR_Y && y <= FLOOR_Y + wallHeight) {
-            // ★ ОБРАБОТКА ПРОХОДОВ И КУСТОВ ★
             if (passages.contains(hash) || passageZones.contains(hash)) {
                 BlockState bush = tryGenerateBush(x, y, z);
                 if (bush != null) return bush;
                 return Blocks.AIR.defaultBlockState();
             }
-
-            // ★ ОБРАБОТКА КОРИДОРОВ И КУСТОВ ★
             if (sectorCorridors.contains(hash)) {
                 BlockState bush = tryGenerateBush(x, y, z);
                 if (bush != null) return bush;
                 return Blocks.AIR.defaultBlockState();
             }
-
-            // ★ ГЕНЕРАЦИЯ СТЕН С ТРЕЩИНАМИ ★
             int depthFromSurface;
             if (isInternalWall) {
                 depthFromSurface = (Math.abs(x) == 3 || Math.abs(z) == 3 || Math.abs(x - z) == 3 || Math.abs(x + z) == 3) ? 0 : 1;
@@ -488,7 +484,6 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             depthFromSurface = Math.min(depthFromSurface, yDepth);
             return getDecayedWallBlock(x, y, z, depthFromSurface);
         }
-
         return Blocks.AIR.defaultBlockState();
     }
 
@@ -674,6 +669,8 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
     @Override
     public void spawnOriginalMobs(@NotNull WorldGenRegion region) {}
 
+
+
     @Override
     @NotNull
     public CompletableFuture<ChunkAccess> fillFromNoise(@NotNull Executor executor, @NotNull Blender blender,
@@ -686,39 +683,84 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             LevelChunkSection section = chunk.getSection(chunk.getSectionIndexFromSectionY(secY));
             int baseY = secY << 4;
             for (int localX = 0; localX < 16; localX++) {
+                int worldX = (chunkX << 4) + localX;
                 for (int localZ = 0; localZ < 16; localZ++) {
-                    fillColumn(section, baseY, localX, localZ,
-                            chunkX * 16 + localX, chunkZ * 16 + localZ);
+                    int worldZ = (chunkZ << 4) + localZ;
+                    // ★ ОПТИМИЗАЦИЯ: Вычисляем константы для колонки 1 раз ДО цикла Y
+                    fillColumnFast(section, baseY, localX, localZ, worldX, worldZ);
                 }
             }
         }
         return CompletableFuture.completedFuture(chunk);
     }
 
-    private void fillColumn(LevelChunkSection section, int baseY, int localX, int localZ,
-                            int worldX, int worldZ) {
+    // ★ НОВЫЙ БЫСТРЫЙ МЕТОД ЗАПОЛНЕНИЯ КОЛОНКИ ★
+    private void fillColumnFast(LevelChunkSection section, int baseY, int localX, int localZ, int worldX, int worldZ) {
         int dist = Math.max(Math.abs(worldX), Math.abs(worldZ));
+        long hash = hash(worldX, worldZ);
+        int topY = getTopY(worldX, worldZ); // ★ Считаем высоту крыши 1 раз на всю колонку!
+        boolean isNatural = (dist <= GLADE_RADIUS || dist > OUTER_WALL_END);
 
         for (int localY = 0; localY < 16; localY++) {
             int worldY = baseY + localY;
             BlockState state;
 
-            // ★ ИСПРАВЛЕНО: Природный ландшафт (Глейд и Пустыня) генерируется независимо от FLOOR_Y
-            if (dist <= GLADE_RADIUS || dist > OUTER_WALL_END) {
+            if (isNatural) {
                 state = generateNaturalTerrain(worldX, worldY, worldZ, dist);
             } else {
-                // Зоны лабиринта, стен и секторов
                 if (worldY < FLOOR_Y) {
-                    // Заполняем пространство под лабиринтом блоками стен
                     state = getWallBlock(worldX, worldY, worldZ);
                 } else {
-                    state = generateLabyrinth(worldX, worldY, worldZ, dist);
+                    // ★ Передаем готовые hash, dist, topY, чтобы не пересчитывать их 384 раза
+                    state = generateLabyrinthFast(worldX, worldY, worldZ, dist, hash, topY);
                 }
             }
-
             if (state == null) state = Blocks.AIR.defaultBlockState();
             section.setBlockState(localX, localY, localZ, state, false);
         }
+    }
+
+    // ★ ОПТИМИЗИРОВАННАЯ ГЕНЕРАЦИЯ ЛАБИРИНТА ★
+    private BlockState generateLabyrinthFast(int x, int y, int z, int dist, long hash, int topY) {
+        if (y > topY) return Blocks.AIR.defaultBlockState(); // ★ Досрочный выход, если мы выше крыши
+
+        BlockState state = Blocks.AIR.defaultBlockState();
+
+        if (dist <= GLADE_WALL_END) {
+            if (gladeExits.contains(hash) && y < FLOOR_Y + GLADE_WALL_HEIGHT) {
+                state = Blocks.AIR.defaultBlockState();
+            } else if (y >= FLOOR_Y) {
+                int depthFromSurface = calcDepth(dist, GLADE_RADIUS, GLADE_WALL_END, y, GLADE_WALL_HEIGHT);
+                state = getDecayedWallBlock(x, y, z, depthFromSurface);
+            }
+        } else if (dist < MAIN_MAZE_END) {
+            state = generateMainMazeBlock(x, y, z, hash);
+        } else if (dist <= SEPARATOR_WALL_END) {
+            if (passages.contains(hash) && y < FLOOR_Y + SEPARATOR_WALL_HEIGHT) {
+                state = Blocks.AIR.defaultBlockState();
+            } else if (y >= FLOOR_Y) {
+                int depthFromSurface = calcDepth(dist, MAIN_MAZE_END, SEPARATOR_WALL_END, y, SEPARATOR_WALL_HEIGHT);
+                state = getDecayedWallBlock(x, y, z, depthFromSurface);
+            }
+        } else if (dist <= SECTORS_END) {
+            state = generateSectorBlock(x, y, z, hash);
+        } else if (dist <= OUTER_WALL_END) {
+            if (y >= FLOOR_Y) {
+                int depthFromSurface = calcDepth(dist, SECTORS_END, OUTER_WALL_END, y, OUTER_WALL_HEIGHT);
+                state = getDecayedWallBlock(x, y, z, depthFromSurface);
+            }
+        }
+        return state;
+    }
+
+    // ★ Вспомогательный метод для расчета глубины от поверхности (убирает дублирование кода)
+    private int calcDepth(int dist, int innerBound, int outerBound, int y, int wallHeight) {
+        int depthXZ;
+        if (dist <= innerBound + 3) depthXZ = dist - (innerBound + 1);
+        else depthXZ = outerBound - dist;
+
+        int depthY = (FLOOR_Y + wallHeight) - y;
+        return Math.min(depthXZ, depthY);
     }
 
     private BlockState generateUnderground(int x, int y, int z) {
@@ -742,6 +784,102 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
 
         return Blocks.STONE.defaultBlockState();
     }
+    /**
+     * ★ МЕТОД: Старение и декор (С защитой фундамента) ★
+     * 1. Нижние 5 блоков от пола абсолютно монолитны (никаких дыр и трещин)
+     * 2. Ширина динамическая (2-5 блоков)
+     * 3. Длина ограничена (обрезается маской, превращаясь в короткие сегменты)
+     * 4. Глубина строго ограничена (1-3 блока, не пробивает насквозь)
+     */
+    // НОВЫЙ КЛАСС ДЛЯ КЭШИРОВАНИЯ NOISE
+    private static class ChunkNoiseCache {
+        final double[] coreNoise = new double[256];
+        final double[] widthMod = new double[256];
+        final double[] breakNoise = new double[256];
+        final double[] depthMod = new double[256];
+        final double[] rebarChance = new double[256];
+        final int chunkX;
+        final int chunkZ;
+        long lastAccessTime;
+
+        ChunkNoiseCache(int chunkX, int chunkZ, ImprovedNoise featureNoise, ImprovedNoise terrainNoise) {
+            this.chunkX = chunkX;
+            this.chunkZ = chunkZ;
+            this.lastAccessTime = System.currentTimeMillis();
+
+            // ПРЕДВЫЧИСЛЯЕМ ВСЕ NOISE ЗНАЧЕНИЯ ОДИН РАЗ ДЛЯ ЧАНКА
+            for (int localX = 0; localX < 16; localX++) {
+                for (int localZ = 0; localZ < 16; localZ++) {
+                    int worldX = chunkX * 16 + localX;
+                    int worldZ = chunkZ * 16 + localZ;
+                    int index = localX * 16 + localZ;
+
+                    coreNoise[index] = featureNoise.noise(worldX * 0.04, 0, worldZ * 0.04);
+                    widthMod[index] = terrainNoise.noise(worldX * 0.015, 0, worldZ * 0.015);
+                    breakNoise[index] = featureNoise.noise(worldX * 0.08 + 500.0, 0, worldZ * 0.08);
+                    depthMod[index] = terrainNoise.noise(worldX * 0.1, 0, worldZ * 0.1);
+                    rebarChance[index] = featureNoise.noise(worldX * 0.25, 0, worldZ * 0.25);
+                }
+            }
+        }
+
+        double getCoreNoise(int localX, int localZ) {
+            return coreNoise[localX * 16 + localZ];
+        }
+
+        double getWidthMod(int localX, int localZ) {
+            return widthMod[localX * 16 + localZ];
+        }
+
+        double getBreakNoise(int localX, int localZ) {
+            return breakNoise[localX * 16 + localZ];
+        }
+
+        double getDepthMod(int localX, int localZ) {
+            return depthMod[localX * 16 + localZ];
+        }
+
+        double getRebarChance(int localX, int localZ) {
+            return rebarChance[localX * 16 + localZ];
+        }
+    }
+
+    // НОВЫЙ КЭШ С LRU-СТРАТЕГИЕЙ
+    private static final int MAX_CACHE_SIZE = 500;
+    private static final Map<Long, ChunkNoiseCache> noiseCache = new ConcurrentHashMap<>();
+
+    private ChunkNoiseCache getOrCreateNoiseCache(int chunkX, int chunkZ) {
+        long key = ChunkPos.asLong(chunkX, chunkZ);
+
+        ChunkNoiseCache cache = noiseCache.get(key);
+        if (cache != null) {
+            cache.lastAccessTime = System.currentTimeMillis();
+            return cache;
+        }
+
+        // ОЧИЩАЕМ СТАРЫЕ ЗАПИСИ ЕСЛИ КЭШ ПЕРЕПОЛНЕН
+        if (noiseCache.size() >= MAX_CACHE_SIZE) {
+            long oldestTime = Long.MAX_VALUE;
+            Long oldestKey = null;
+
+            for (Map.Entry<Long, ChunkNoiseCache> entry : noiseCache.entrySet()) {
+                if (entry.getValue().lastAccessTime < oldestTime) {
+                    oldestTime = entry.getValue().lastAccessTime;
+                    oldestKey = entry.getKey();
+                }
+            }
+
+            if (oldestKey != null) {
+                noiseCache.remove(oldestKey);
+            }
+        }
+
+        // СОЗДАЁМ НОВЫЙ КЭШ
+        cache = new ChunkNoiseCache(chunkX, chunkZ, featureNoise, terrainNoise);
+        noiseCache.put(key, cache);
+        return cache;
+    }
+
     /**
      * ★ МЕТОД: Старение и декор (С защитой фундамента) ★
      * 1. Нижние 5 блоков от пола абсолютно монолитны (никаких дыр и трещин)
@@ -1020,7 +1158,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         }
         // ===== 3. ОСНОВНОЙ ЛАБИРИНТ =====
         else if (dist < MAIN_MAZE_END) {
-            state = generateMainMazeBlock(x, y, z);
+            state = generateMainMazeBlock(x, y, z, hash);
         }
         // ===== 4. РАЗДЕЛИТЕЛЬНАЯ СТЕНА =====
         else if (dist <= SEPARATOR_WALL_END) {
@@ -1037,7 +1175,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         }
         // ===== 5. СЕКТОРА =====
         else if (dist <= SECTORS_END) {
-            state = generateSectorBlock(x, y, z);
+            state = generateSectorBlock(x, y, z, hash);
         }
         // ===== 6. ВНЕШНЯЯ СТЕНА =====
         else if (dist <= OUTER_WALL_END) {
@@ -1054,32 +1192,19 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
 
         return state;
     }
-
-
-
-
-
-
-    private BlockState generateMainMazeBlock(int x, int y, int z) {
-        long hash = hash(x, z);
+    private BlockState generateMainMazeBlock(int x, int y, int z, long hash) {
         if (y == FLOOR_Y) return randomFloorBlock();
-
         if (y > FLOOR_Y && y <= FLOOR_Y + MAZE_HEIGHT) {
-            // ★ ОБРАБОТКА ПРОХОДОВ И КУСТОВ ★
             if (passages.contains(hash) || passageZones.contains(hash)) {
                 BlockState bush = tryGenerateBush(x, y, z);
                 if (bush != null) return bush;
                 return Blocks.AIR.defaultBlockState();
             }
-
-            // ★ ОБРАБОТКА КОРИДОРОВ И КУСТОВ ★
             if (mazeCorridors.contains(hash)) {
                 BlockState bush = tryGenerateBush(x, y, z);
                 if (bush != null) return bush;
                 return Blocks.AIR.defaultBlockState();
             }
-
-            // ★ ГЕНЕРАЦИЯ СТЕН С ТРЕЩИНАМИ ★
             int modX = Math.floorMod(x, 5);
             int modZ = Math.floorMod(z, 5);
             int depthXZ = Math.min(modX, 4 - modX);
@@ -1244,48 +1369,17 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
 
 
 
-    private boolean isLianaRope(int x, int y, int z) {
-        int[] wallInfo = findNearestWall(x, z);
-        if (wallInfo == null) return false;
+    // КЭШ ДЛЯ СТОЛБЦОВ (X, Z)
+    private static final Map<Long, Boolean> lianaCache = new ConcurrentHashMap<>();
 
-        int wallDist = wallInfo[0];   // Расстояние до стены
-        int wallTopY = wallInfo[1];   // Высота стены
-        int wallDir = wallInfo[2];    // Направление стены (0=X+, 1=X-, 2=Z+, 3=Z-)
-
-        int dropDepth = wallTopY - y;
-        // Ограничиваем длину лиан (от 1 блока над стеной до 18 блоков вниз)
-        if (dropDepth < -1 || dropDepth > 18) return false;
-
-        // Лианы не отходят от стены дальше чем на 3 блока
-        if (wallDist > 3) return false;
-
-        // Вычисляем локальные 2D координаты на поверхности стены (U, V)
-        // V - это всегда высота (Y), U - это координата вдоль стены
-        double V = y;
-        double U = (wallDir == 0 || wallDir == 1) ? z : x;
-
-        // Имитация провисания и ветра: чем ниже, тем сильнее шум смещает координаты
-        double perturbFactor = 1.0 + dropDepth * 0.15;
-
-        // ★ ИСПРАВЛЕНО: добавлен третий аргумент (0.0) для совместимости с ImprovedNoise
-        double pU = U + featureNoise.noise(U * 0.08, V * 0.08, 0.0) * perturbFactor;
-        double pV = V + terrainNoise.noise(U * 0.08 + 50.0, V * 0.08, 0.0) * perturbFactor;
-
-        // ★ ТРУБЧАТЫЙ ШУМ (Spaghetti Noise) ★
-        // Сумма квадратов двух независимых шумов создает тонкие 3D-трубки/нити
-        // ★ ИСПРАВЛЕНО: добавлен третий аргумент (0.0)
-        double n1 = featureNoise.noise(pU * 0.2, pV * 0.15, 0.0);
-        double n2 = terrainNoise.noise(pU * 0.2 + 100.0, pV * 0.15, 0.0);
-        double ropeMask = n1 * n1 + n2 * n2;
-
-        // Порог толщины лианы.
-        // Чем дальше от стены (wallDist), тем тоньше лиана и тем быстрее она обрывается
-        double threshold = 0.025 - (wallDist * 0.006);
-        if (threshold < 0.005) threshold = 0.005;
-
-        return ropeMask < threshold;
+    // ★ ОПТИМИЗАЦИЯ ЛИАН (УБИРАЕМ ОПАСНЫЙ КЭШ, УБИВАЮЩИЙ TPS) ★
+    private boolean isLianaRope(int x, int z) {
+        // ★ УБРАН lianaCache (ConcurrentHashMap).
+        // Шум детерминирован, вычисляется за наносекунды. Кэш создавал пробки в многопоточке.
+        double noise1 = featureNoise.noise(x * 0.1, 0, z * 0.1);
+        double noise2 = terrainNoise.noise(x * 0.05, 0, z * 0.05);
+        return noise1 > 0.6 && noise2 > 0.3;
     }
-
     /**
      * ★ 根据墙壁方向生成侧面贴合的原版藤蔓 ★
      */
