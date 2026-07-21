@@ -15,6 +15,7 @@ import com.labyrinthmod.common.event.GriverPossessionHandler;
 import com.labyrinthmod.common.generation.LabyrinthChunkGenerator;
 import com.labyrinthmod.common.generation.LabyrinthConfig;
 import com.labyrinthmod.common.init.ModCreativeTabs;
+import com.labyrinthmod.common.init.ModMenuTypes;
 import com.labyrinthmod.common.init.ModSounds;
 import com.labyrinthmod.common.network.NetworkHandler;
 import com.labyrinthmod.common.util.ModLogger;
@@ -247,10 +248,15 @@ public class LabyrinthMod {
             MinecraftForge.EVENT_BUS.register(new HudOverlayRenderer());
             MinecraftForge.EVENT_BUS.register(new MapHandRenderer());
 
-            net.minecraft.client.gui.screens.MenuScreens.register(
-                    ModMenuTypes.CRAFT_RESTRICTION_MENU.get(),
-                    com.labyrinthmod.client.gui.CraftRestrictionScreen::new
-            );
+            if (ModMenuTypes.CRAFT_RESTRICTION_MENU.isPresent()) {
+                net.minecraft.client.gui.screens.MenuScreens.register(
+                        ModMenuTypes.CRAFT_RESTRICTION_MENU.get(),
+                        com.labyrinthmod.client.gui.CraftRestrictionScreen::new
+                );
+                LOGGER.info("CraftRestrictionScreen registered successfully!");
+            } else {
+                LOGGER.warn("CraftRestrictionMenu not yet registered, skipping screen registration");
+            }
 
             LOGGER.info("Client-side setup completed!");
         });
