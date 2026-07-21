@@ -29,7 +29,6 @@
     "SelectWorldScreenMixin",
     "InventoryScreenNoteMixin",
     "EntityInvisibleToMixin",
-    "LoadingOverlayMixin",
     "LoadingScreenMixin",
     "MixinShaderPackScreenPaper",
     "ResultSlotMixin",

@@ -73,6 +73,9 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
     private final int ENTRANCE_WIDTH = 15;
     private final int ENTRANCE_DEPTH = 25;
 
+    private volatile boolean isGenerated = false;
+    private final Object generationLock = new Object();
+
 
 
     // ===== ТОЛЬКО 3 БЛОКА ДЛЯ СТЕН =====
@@ -105,43 +108,30 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         super(biomeSource);
         this.seed = seed;
 
-        // ★ ЧИТАЕМ ГЛОБАЛЬНЫЙ КОНФИГ ★
         LabyrinthConfig cfg = LabyrinthConfig.getInstance();
         this.config = cfg;
 
-        // Инициализация размеров из конфига.
-        // (Если в UI ты меняешь ползунки, они сохраняются в конфиг, и здесь подхватываются)
         this.GLADE_RADIUS = cfg.gleydRadius;
-        this.MAIN_MAZE_WIDTH = cfg.mainMazeWidth * 10; // Множитель для ширины лабиринта
-        this.SECTOR_WIDTH = cfg.sectorWidth * 12;      // Кратно 12 для сетки секторов
+        this.MAIN_MAZE_WIDTH = cfg.mainMazeWidth * 10;
+        this.SECTOR_WIDTH = cfg.sectorWidth * 12;
         this.MAZE_HEIGHT = cfg.mainMazeHeight;
-
         this.CELL_SIZE = CORRIDOR_WIDTH + WALL_THICKNESS;
-
         this.GLADE_WALL_HEIGHT = MAZE_HEIGHT + 10;
         this.SEPARATOR_WALL_HEIGHT = MAZE_HEIGHT + 20;
         this.OUTER_WALL_HEIGHT = MAZE_HEIGHT + 50;
 
-        // Динамический расчет границ
         this.GLADE_WALL_END = GLADE_RADIUS + GLADE_WALL_THICKNESS;
         this.MAIN_MAZE_END = GLADE_RADIUS + MAIN_MAZE_WIDTH;
         this.SEPARATOR_WALL_END = MAIN_MAZE_END + SEPARATOR_WALL_THICKNESS;
         this.SECTORS_END = SEPARATOR_WALL_END + SECTOR_WIDTH;
         this.OUTER_WALL_END = SECTORS_END + OUTER_WALL_THICKNESS;
-
         this.SECTOR_ENTRANCE_DISTANCE = GLADE_WALL_END + 50;
 
-        // Проходы теперь всегда ровно по центру кольца секторов
         this.PASSAGE_DISTANCE = SEPARATOR_WALL_END;
         this.PASSAGE_OFFSET = MAIN_MAZE_WIDTH;
 
         this.terrainNoise = new ImprovedNoise(new net.minecraft.world.level.levelgen.LegacyRandomSource(seed));
         this.featureNoise = new ImprovedNoise(new net.minecraft.world.level.levelgen.LegacyRandomSource(seed ^ 0x123456789ABCDEFL));
-
-        generateMaze();
-        generateSectors();
-        generatePassages();
-        validateAndFixRealPassages();
     }
 
     private void generateMaze() {
@@ -676,6 +666,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
     public CompletableFuture<ChunkAccess> fillFromNoise(@NotNull Executor executor, @NotNull Blender blender,
                                                         @NotNull RandomState random, @NotNull StructureManager structureManager,
                                                         @NotNull ChunkAccess chunk) {
+        ensureGenerated();
         int chunkX = chunk.getPos().x;
         int chunkZ = chunk.getPos().z;
 
@@ -1254,6 +1245,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
 
     @Override
     public void addDebugScreenInfo(@NotNull List<String> list, @NotNull RandomState random, @NotNull BlockPos pos) {
+        ensureGenerated();
         int dist = Math.max(Math.abs(pos.getX()), Math.abs(pos.getZ()));
         long hash = hash(pos.getX(), pos.getZ());
         list.add("Labyrinth Generator");
@@ -1475,14 +1467,20 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             sectorWalls.removeAll(sectorConflicts);
         }
 
-        // 4. Логирование результатов в консоль
-        if (fixedPassages > 0 || fixedMaze > 0 || fixedSectors > 0) {
-            System.out.println("[LabyrinthMod] ⚠️ Обнаружены и исправлены «замурованные» проходы:");
-            if (fixedPassages > 0) System.out.println("   - Проходы (Passages) блокировались стенами: " + fixedPassages + " блоков");
-            if (fixedMaze > 0) System.out.println("   - Конфликты в основном лабиринте: " + fixedMaze + " блоков");
-            if (fixedSectors > 0) System.out.println("   - Конфликты в секторах: " + fixedSectors + " блоков");
-        } else {
-            System.out.println("[LabyrinthMod] ✅ Проверка целостности проходов пройдена. Конфликтов не найдено.");
+    }
+
+    private void ensureGenerated() {
+        if (isGenerated) return;
+
+        synchronized (generationLock) {
+            if (isGenerated) return;
+
+            generateMaze();
+            generateSectors();
+            generatePassages();
+            validateAndFixRealPassages();
+
+            isGenerated = true;
         }
     }
 

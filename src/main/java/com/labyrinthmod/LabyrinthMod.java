@@ -211,18 +211,20 @@ public class LabyrinthMod {
         LOGGER.info("Labyrinth Mod (unified with MazeMap) initialized on {} side!", FMLEnvironment.dist);
     }
 
-    // ===== РЕГИСТРАЦИЯ CHUNK GENERATOR =====
     private void registerChunkGenerator(RegisterEvent event) {
-        event.register(
-                Registries.CHUNK_GENERATOR,
-                helper -> helper.register(
-                        ResourceLocation.fromNamespaceAndPath(MOD_ID, "labyrinth_chunk_generator"),
-                        LabyrinthChunkGenerator.CODEC
-                )
-        );
-        LOGGER.info("[LabyrinthMod] Registered LabyrinthChunkGenerator!");
+        // ПРОВЕРКА: выполняем код ТОЛЬКО когда Forge регистрирует генераторы чанков
+        if (event.getRegistryKey().equals(Registries.CHUNK_GENERATOR)) {
+            event.register(
+                    Registries.CHUNK_GENERATOR,
+                    helper -> helper.register(
+                            ResourceLocation.fromNamespaceAndPath(MOD_ID, "labyrinth_chunk_generator"),
+                            LabyrinthChunkGenerator.CODEC
+                    )
+            );
+            // Используем debug вместо info, чтобы не засорять лог в продакшене
+            LOGGER.debug("[LabyrinthMod] Registered LabyrinthChunkGenerator!");
+        }
     }
-    // ========================================
 
     // ==================== LabyrinthMod common/client setup ====================
     private void commonSetup(FMLCommonSetupEvent event) {
