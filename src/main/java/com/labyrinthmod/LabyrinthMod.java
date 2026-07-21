@@ -14,6 +14,7 @@ import com.labyrinthmod.common.event.FractionEvents;
 import com.labyrinthmod.common.event.GriverPossessionHandler;
 import com.labyrinthmod.common.generation.LabyrinthChunkGenerator;
 import com.labyrinthmod.common.generation.LabyrinthConfig;
+import com.labyrinthmod.common.init.ModBlocks;
 import com.labyrinthmod.common.init.ModCreativeTabs;
 import com.labyrinthmod.common.init.ModMenuTypes;
 import com.labyrinthmod.common.init.ModSounds;
@@ -170,10 +171,12 @@ public class LabyrinthMod {
 
         GriverEntityType.register(modEventBus);
 
-        ModItems.register(modEventBus);
+        // ИСПРАВЛЕНИЕ: явно указываем пакет labyrinthmod
+        com.labyrinthmod.common.init.ModItems.register(modEventBus);
         ModCreativeTabs.register(modEventBus);
         ModSounds.register(modEventBus);
 
+        ModBlocks.register(modEventBus);
 
         MinecraftForge.EVENT_BUS.register(this);
         MinecraftForge.EVENT_BUS.register(new FractionEvents());
@@ -199,7 +202,7 @@ public class LabyrinthMod {
         // ========== КОНЕЦ InfectionMod ==========
 
         // ========== MazeMap Mod регистрации ==========
-        ModItems.register(modEventBus);
+        com.mazemap.registry.ModItems.register(modEventBus);
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
             MazeMapKeyBindings.register(modEventBus);
