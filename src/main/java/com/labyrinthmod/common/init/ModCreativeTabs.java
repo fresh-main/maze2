@@ -1,6 +1,7 @@
 package com.labyrinthmod.common.init;
 
 import com.labyrinthmod.LabyrinthMod;
+import com.labyrinthmod.common.init.ModBlocks;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.CreativeModeTab;

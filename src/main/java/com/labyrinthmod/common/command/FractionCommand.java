@@ -3,7 +3,6 @@ package com.labyrinthmod.common.command;
 import com.labyrinthmod.common.capability.FractionProvider;
 import com.labyrinthmod.common.capability.FractionType;
 import com.labyrinthmod.common.event.FractionEvents;
-import com.labyrinthmod.common.init.ModBlocks;
 import com.labyrinthmod.common.item.ImposterTabletItem;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -13,7 +12,6 @@ import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.item.ItemStack;
 
 public class FractionCommand {
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {

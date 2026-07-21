@@ -1,5 +1,6 @@
 package com.labyrinthmod.gui;
 
+import com.labyrinthmod.common.init.ModMenuTypes;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
@@ -28,7 +29,7 @@ public class CraftRestrictionMenu extends AbstractContainerMenu {
     }
 
     public CraftRestrictionMenu(int containerId, Inventory playerInv, ItemStack target) {
-        super(com.labyrinthmod.common.init.ModMenuTypes.CRAFT_RESTRICTION_MENU.get(), containerId);
+        super(ModMenuTypes.CRAFT_RESTRICTION_MENU.get(), containerId);
         this.targetItem = target.isEmpty() ? ItemStack.EMPTY : target;
 
         // Слот для целевого предмета (Перенесен влево: x=45, y=45)

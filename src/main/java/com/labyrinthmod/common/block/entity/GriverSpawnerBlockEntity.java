@@ -1,13 +1,12 @@
 package com.labyrinthmod.common.block.entity;
 
-import com.labyrinthmod.common.block.GriverSpawnerBlock;
+import com.labyrinthmod.common.init.ModBlocks;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.UUID;
@@ -16,7 +15,7 @@ public class GriverSpawnerBlockEntity extends BlockEntity {
     private UUID griverUUID = null;
 
     public GriverSpawnerBlockEntity(BlockPos pos, BlockState state) {
-        super(com.labyrinthmod.common.init.ModBlocks.GRIVER_SPAWNER_BE.get(), pos, state);
+        super(ModBlocks.GRIVER_SPAWNER_BE.get(), pos, state);
     }
 
     public UUID getGriverUUID() {

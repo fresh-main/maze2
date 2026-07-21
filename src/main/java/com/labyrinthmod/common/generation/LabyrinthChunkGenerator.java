@@ -1,6 +1,5 @@
 package com.labyrinthmod.common.generation;
 
-import com.labyrinthmod.common.init.ModBlocks;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.BlockPos;

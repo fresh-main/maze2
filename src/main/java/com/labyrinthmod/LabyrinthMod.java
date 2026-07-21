@@ -14,9 +14,7 @@ import com.labyrinthmod.common.event.FractionEvents;
 import com.labyrinthmod.common.event.GriverPossessionHandler;
 import com.labyrinthmod.common.generation.LabyrinthChunkGenerator;
 import com.labyrinthmod.common.generation.LabyrinthConfig;
-import com.labyrinthmod.common.init.ModBlocks;
 import com.labyrinthmod.common.init.ModCreativeTabs;
-import com.labyrinthmod.common.init.ModMenuTypes;
 import com.labyrinthmod.common.init.ModSounds;
 import com.labyrinthmod.common.network.NetworkHandler;
 import com.labyrinthmod.common.util.ModLogger;
@@ -39,10 +37,8 @@ import com.infection.settings.InfectionSavedData;
 // MazeMap mod imports
 import com.mazemap.client.HudOverlayRenderer;
 import com.mazemap.client.render.MapHandRenderer;
-import com.mazemap.item.PersonalMapItem;
 import com.mazemap.network.MazeMapNetwork;
 import com.mazemap.registry.ModItems;
-import com.mazemap.scan.MapScanner;
 import com.mazemap.storage.MazeMapStorage;
 import com.mazemap.client.input.MazeMapKeyBindings;
 // Otbor mod imports
@@ -51,7 +47,6 @@ import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
@@ -160,6 +155,9 @@ public class LabyrinthMod {
             // Регистрируем клиентские события Otbor
             MinecraftForge.EVENT_BUS.register(new com.otbor.client.ClientEvents());
         }
+
+
+
         // ========== КОНЕЦ OtborMod ==========
 
         // ========== LabyrinthMod регистрации ==========
@@ -170,11 +168,11 @@ public class LabyrinthMod {
         }
 
         GriverEntityType.register(modEventBus);
-        ModBlocks.BLOCKS.register(modEventBus);
-        ModBlocks.ITEMS.register(modEventBus);
+
+        ModItems.register(modEventBus);
         ModCreativeTabs.register(modEventBus);
         ModSounds.register(modEventBus);
-        ModBlocks.BLOCK_ENTITIES.register(modEventBus);
+
 
         MinecraftForge.EVENT_BUS.register(this);
         MinecraftForge.EVENT_BUS.register(new FractionEvents());
@@ -187,7 +185,7 @@ public class LabyrinthMod {
         // ========== InfectionMod регистрации ==========
         com.infection.item.ModItems.ITEMS.register(modEventBus);
         com.infection.item.ModItems.TABS.register(modEventBus);
-        ModMenuTypes.register(modEventBus);
+
         InfectionModSounds.SOUNDS.register(modEventBus);
 
         modEventBus.addListener(this::onInfectionCommonSetup);
@@ -248,7 +246,7 @@ public class LabyrinthMod {
             MinecraftForge.EVENT_BUS.register(new MapHandRenderer());
 
             net.minecraft.client.gui.screens.MenuScreens.register(
-                    com.labyrinthmod.common.init.ModMenuTypes.CRAFT_RESTRICTION_MENU.get(),
+                    ModMenuTypes.CRAFT_RESTRICTION_MENU.get(),
                     com.labyrinthmod.client.gui.CraftRestrictionScreen::new
             );
 
