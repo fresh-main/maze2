@@ -14,6 +14,7 @@ import com.labyrinthmod.common.event.FractionEvents;
 import com.labyrinthmod.common.event.GriverPossessionHandler;
 import com.labyrinthmod.common.generation.LabyrinthChunkGenerator;
 import com.labyrinthmod.common.generation.LabyrinthConfig;
+import com.labyrinthmod.common.init.ModBlocks;
 import com.labyrinthmod.common.init.ModCreativeTabs;
 import com.labyrinthmod.common.init.ModMenuTypes;
 import com.labyrinthmod.common.init.ModSounds;
@@ -75,7 +76,6 @@ import net.minecraftforge.fml.loading.FMLPaths;
 import net.minecraftforge.registries.RegisterEvent;
 import net.minecraftforge.network.PacketDistributor;
 import org.slf4j.Logger;
-import com.labyrinthmod.common.init.ModBlocks;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -164,19 +164,9 @@ public class LabyrinthMod {
         }
 
         GriverEntityType.register(modEventBus);
-<<<<<<< Updated upstream
-
-        com.labyrinthmod.common.init.ModItems.register(modEventBus);
-        ModCreativeTabs.register(modEventBus);
-        ModSounds.register(modEventBus);
-        ModBlocks.register(modEventBus);
-
-
-=======
         ModBlocks.register(modEventBus); // Регистрирует BLOCKS, ITEMS и BLOCK_ENTITIES
         ModCreativeTabs.register(modEventBus);
         ModSounds.register(modEventBus);
->>>>>>> Stashed changes
 
         MinecraftForge.EVENT_BUS.register(this);
         MinecraftForge.EVENT_BUS.register(new FractionEvents());
