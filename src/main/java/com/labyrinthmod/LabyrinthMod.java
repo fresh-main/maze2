@@ -19,7 +19,7 @@ import com.labyrinthmod.common.init.ModMenuTypes;
 import com.labyrinthmod.common.init.ModSounds;
 import com.labyrinthmod.common.network.NetworkHandler;
 import com.labyrinthmod.common.util.ModLogger;
-// Infection mod imports
+
 import com.infection.capability.InfectionAttacher;
 import com.infection.capability.InfectionProvider;
 import com.infection.capability.InfectionData;
@@ -35,19 +35,22 @@ import com.infection.note.NoteTexts;
 import com.infection.sound.InfectionModSounds;
 import com.infection.network.packet.S2CSettingsSyncPacket;
 import com.infection.settings.InfectionSavedData;
-// MazeMap mod imports
+
 import com.mazemap.client.HudOverlayRenderer;
 import com.mazemap.client.render.MapHandRenderer;
+import com.mazemap.item.PersonalMapItem;
 import com.mazemap.network.MazeMapNetwork;
 import com.mazemap.registry.ModItems;
+import com.mazemap.scan.MapScanner;
 import com.mazemap.storage.MazeMapStorage;
 import com.mazemap.client.input.MazeMapKeyBindings;
-// Otbor mod imports
+
 import com.otbor.client.ClientEvents;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
@@ -88,13 +91,11 @@ public class LabyrinthMod {
     public static final int LOCKED_GUI_SCALE = 3;
     public static final String INFECTION_MOD_ID = "infection";
 
-    // ===== ГЛОБАЛЬНЫЙ КОНФИГ =====
     private static LabyrinthConfig config;
 
     public static LabyrinthConfig getConfig() {
         return config;
     }
-    // ==============================
 
     public static ResourceLocation id(String path) {
         return ResourceLocation.fromNamespaceAndPath(MOD_ID, path);
@@ -107,10 +108,7 @@ public class LabyrinthMod {
     public LabyrinthMod() {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
 
-        // ===== РЕГИСТРАЦИЯ CHUNK GENERATOR =====
-        // Используем событие RegisterEvent для правильной регистрации
         modEventBus.addListener(this::registerChunkGenerator);
-        // ========================================
 
         // ========== OtborMod логика ==========
         com.otbor.OtborSounds.register(modEventBus);
@@ -154,12 +152,8 @@ public class LabyrinthMod {
                     LOGGER.warn("[otbor] failed to apply client setup options", t);
                 }
             }));
-            // Регистрируем клиентские события Otbor
             MinecraftForge.EVENT_BUS.register(new com.otbor.client.ClientEvents());
         }
-
-
-
         // ========== КОНЕЦ OtborMod ==========
 
         // ========== LabyrinthMod регистрации ==========
@@ -170,6 +164,7 @@ public class LabyrinthMod {
         }
 
         GriverEntityType.register(modEventBus);
+<<<<<<< Updated upstream
 
         com.labyrinthmod.common.init.ModItems.register(modEventBus);
         ModCreativeTabs.register(modEventBus);
@@ -177,6 +172,11 @@ public class LabyrinthMod {
         ModBlocks.register(modEventBus);
 
 
+=======
+        ModBlocks.register(modEventBus); // Регистрирует BLOCKS, ITEMS и BLOCK_ENTITIES
+        ModCreativeTabs.register(modEventBus);
+        ModSounds.register(modEventBus);
+>>>>>>> Stashed changes
 
         MinecraftForge.EVENT_BUS.register(this);
         MinecraftForge.EVENT_BUS.register(new FractionEvents());
@@ -190,20 +190,20 @@ public class LabyrinthMod {
         com.infection.item.ModItems.ITEMS.register(modEventBus);
         com.infection.item.ModItems.TABS.register(modEventBus);
 
-        InfectionModSounds.SOUNDS.register(modEventBus);
+        // ВАЖНО: Регистрация меню (включая BULLETIN_BOARD_MENU)
+        ModMenuTypes.register(modEventBus);
 
+        InfectionModSounds.SOUNDS.register(modEventBus);
         modEventBus.addListener(this::onInfectionCommonSetup);
 
         MinecraftForge.EVENT_BUS.addGenericListener(
                 Entity.class,
                 (AttachCapabilitiesEvent<Entity> e) -> InfectionAttacher.onAttachEntity(e));
-
         MinecraftForge.EVENT_BUS.register(FirstAidUseHandler.class);
         // ========== КОНЕЦ InfectionMod ==========
 
         // ========== MazeMap Mod регистрации ==========
-        com.mazemap.registry.ModItems.register(modEventBus);
-
+        ModItems.register(modEventBus);
         if (FMLEnvironment.dist == Dist.CLIENT) {
             MazeMapKeyBindings.register(modEventBus);
             MinecraftForge.EVENT_BUS.register(MazeMapKeyBindings.class);
@@ -214,7 +214,6 @@ public class LabyrinthMod {
     }
 
     private void registerChunkGenerator(RegisterEvent event) {
-        // ПРОВЕРКА: выполняем код ТОЛЬКО когда Forge регистрирует генераторы чанков
         if (event.getRegistryKey().equals(Registries.CHUNK_GENERATOR)) {
             event.register(
                     Registries.CHUNK_GENERATOR,
@@ -223,18 +222,14 @@ public class LabyrinthMod {
                             LabyrinthChunkGenerator.CODEC
                     )
             );
-            // Используем debug вместо info, чтобы не засорять лог в продакшене
             LOGGER.debug("[LabyrinthMod] Registered LabyrinthChunkGenerator!");
         }
     }
 
-    // ==================== LabyrinthMod common/client setup ====================
     private void commonSetup(FMLCommonSetupEvent event) {
         event.enqueueWork(() -> {
-            // ===== ЗАГРУЗКА КОНФИГА =====
             config = LabyrinthConfig.load();
             LOGGER.info("[LabyrinthMod] Config loaded!");
-
             NetworkHandler.register();
             ModLogger.init();
             ModConfig.load();
@@ -246,8 +241,6 @@ public class LabyrinthMod {
     private void clientSetup(FMLClientSetupEvent event) {
         event.enqueueWork(() -> {
             Proxy.getInstance().registerClientListeners();
-
-            // Регистрируем клиентские рендереры здесь, когда Minecraft.getInstance() уже полностью готов
             MinecraftForge.EVENT_BUS.register(new HudOverlayRenderer());
             MinecraftForge.EVENT_BUS.register(new MapHandRenderer());
 
@@ -261,6 +254,16 @@ public class LabyrinthMod {
                 LOGGER.warn("CraftRestrictionMenu not yet registered, skipping screen registration");
             }
 
+            // ===== ДОБАВЛЕНО: Регистрация GUI доски объявлений =====
+            if (ModMenuTypes.BULLETIN_BOARD_MENU.isPresent()) {
+                net.minecraft.client.gui.screens.MenuScreens.register(
+                        ModMenuTypes.BULLETIN_BOARD_MENU.get(),
+                        com.labyrinthmod.client.screen.BulletinBoardScreen::new
+                );
+                LOGGER.info("BulletinBoardScreen registered successfully!");
+            }
+            // =======================================================
+
             LOGGER.info("Client-side setup completed!");
         });
     }
@@ -269,16 +272,12 @@ public class LabyrinthMod {
         var generator = event.getGenerator();
         var packOutput = generator.getPackOutput();
         var lookupProvider = event.getLookupProvider();
-        // Ваша датагенерация здесь
     }
-    // ========================================================================
 
-    // ==================== InfectionMod common setup ====================
     private void onInfectionCommonSetup(final FMLCommonSetupEvent e) {
         e.enqueueWork(Network::register);
     }
 
-    // ==================== Команды (объединённые) ====================
     @SubscribeEvent
     public void onRegisterCommands(RegisterCommandsEvent event) {
         LabyrinthCommand.register(event.getDispatcher());
@@ -292,7 +291,6 @@ public class LabyrinthMod {
         InfectionCommand.register(event.getDispatcher());
     }
 
-    // ==================== InfectionMod player events ====================
     @SubscribeEvent
     public void onInfectionLogin(PlayerEvent.PlayerLoggedInEvent e) {
         if (e.getEntity().level().isClientSide) return;
@@ -422,12 +420,10 @@ public class LabyrinthMod {
         MiniEventController.tick(sl);
     }
 
-    // ==================== MazeMapMod Server Events ====================
     @SubscribeEvent
     public void onServerStarted(ServerStartedEvent event) {
         MazeMapStorage.init(event.getServer());
         LOGGER.info("[MazeMap] storage initialized at {}", MazeMapStorage.getRoot());
-
         com.labyrinthmod.common.data.CraftRestrictionManager.load();
         LOGGER.info("[LabyrinthMod] Craft restrictions loaded from JSON!");
     }
@@ -437,7 +433,6 @@ public class LabyrinthMod {
         MazeMapStorage.flush();
     }
 
-    // ==================== Pre-seed language (из OtborMod) ====================
     private static void preSeedRussianLanguage() {
         try {
             Path optionsFile = FMLPaths.GAMEDIR.get().resolve("options.txt");
@@ -475,7 +470,6 @@ public class LabyrinthMod {
         }
     }
 
-    // ==================== Capability Handler (объединённый) ====================
     public static class CapabilityHandler {
         @SubscribeEvent
         public void attachCapabilities(AttachCapabilitiesEvent<Entity> event) {
@@ -492,5 +486,4 @@ public class LabyrinthMod {
             }
         }
     }
-
 }

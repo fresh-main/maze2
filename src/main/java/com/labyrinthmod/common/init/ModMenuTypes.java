@@ -12,24 +12,20 @@ import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
 
 public class ModMenuTypes {
-    public static final DeferredRegister<MenuType<?>> MENUS = DeferredRegister.create(ForgeRegistries.MENU_TYPES, LabyrinthMod.MOD_ID);
+    public static final DeferredRegister<MenuType<?>> MENUS =
+            DeferredRegister.create(ForgeRegistries.MENU_TYPES, LabyrinthMod.MOD_ID);
 
-    public static final RegistryObject<MenuType<CraftRestrictionMenu>> CRAFT_RESTRICTION_MENU = MENUS.register(
-            "craft_restriction",
-            () -> IForgeMenuType.create(CraftRestrictionMenu::new)
-    );
+    public static final RegistryObject<MenuType<CraftRestrictionMenu>> CRAFT_RESTRICTION_MENU =
+            MENUS.register("craft_restriction",
+                    () -> IForgeMenuType.create(CraftRestrictionMenu::new));
 
-    // Добавлено для доски объявлений
-    public static final RegistryObject<MenuType<BulletinBoardMenu>> BULLETIN_BOARD_MENU = MENUS.register(
-            "bulletin_board_menu",
-            () -> IForgeMenuType.create(BulletinBoardMenu::new)
-    );
+    public static final RegistryObject<MenuType<BulletinBoardMenu>> BULLETIN_BOARD_MENU =
+            MENUS.register("bulletin_board_menu",
+                    () -> IForgeMenuType.create(BulletinBoardMenu::new));
 
-    // Добавлено для создания заданий
-    public static final RegistryObject<MenuType<WritableTaskMenu>> WRITABLE_TASK_MENU = MENUS.register(
-            "writable_task_menu",
-            () -> IForgeMenuType.create(WritableTaskMenu::new)
-    );
+    public static final RegistryObject<MenuType<WritableTaskMenu>> WRITABLE_TASK_MENU =
+            MENUS.register("writable_task_menu",
+                    () -> IForgeMenuType.create(WritableTaskMenu::new));
 
     public static void register(IEventBus modEventBus) {
         MENUS.register(modEventBus);

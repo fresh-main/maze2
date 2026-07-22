@@ -10,12 +10,12 @@ import net.minecraft.world.item.ItemStack;
 public class TaskViewScreen extends Screen {
     private final ItemStack taskStack;
     private final TaskItem taskItem;
+    private final Runnable onTakeCallback;
     private Button takeButton;
     private Button backButton;
-    private final Runnable onTakeCallback;
 
     public TaskViewScreen(ItemStack taskStack, Runnable onTakeCallback) {
-        super(Component.translatable("gui.labyrinthmod.task_view"));
+        super(Component.literal("Просмотр задания"));
         this.taskStack = taskStack;
         this.taskItem = (TaskItem) taskStack.getItem();
         this.onTakeCallback = onTakeCallback;
@@ -28,14 +28,14 @@ public class TaskViewScreen extends Screen {
         int x = (this.width - 300) / 2;
         int y = (this.height - 250) / 2;
 
-        // Кнопка взять задание
-        takeButton = Button.builder(Component.translatable("gui.labyrinthmod.take_task"), btn -> takeTask())
+        // Кнопка "Взять задание"
+        takeButton = Button.builder(Component.literal("Взять задание"), btn -> takeTask())
                 .bounds(x + 10, y + 210, 135, 20)
                 .build();
         this.addWidget(takeButton);
 
-        // Кнопка назад
-        backButton = Button.builder(Component.translatable("gui.labyrinthmod.back"), btn -> this.onClose())
+        // Кнопка "Назад"
+        backButton = Button.builder(Component.literal("Назад"), btn -> this.onClose())
                 .bounds(x + 155, y + 210, 135, 20)
                 .build();
         this.addWidget(backButton);
@@ -48,14 +48,14 @@ public class TaskViewScreen extends Screen {
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        // Темный фон
+        // Тёмный фон
         this.renderBackground(guiGraphics);
 
         int x = (this.width - 300) / 2;
         int y = (this.height - 250) / 2;
 
         // Фон для текста
-        guiGraphics.fill(x, y, x + 300, y + 250, 0xDD1a1a1a);
+        guiGraphics.fill(x, y, x + 300, y + 250, 0xFF1a1a1a);
         guiGraphics.fill(x + 2, y + 2, x + 298, y + 248, 0xFF2d2d2d);
 
         // Заголовок
@@ -80,13 +80,11 @@ public class TaskViewScreen extends Screen {
 
         // Награда
         String reward = taskItem.getReward(taskStack);
-        String rewardText = "Награда: " + reward;
-        guiGraphics.drawString(this.font, rewardText, x + 15, rewardY + 10, 0x00FF00);
+        guiGraphics.drawString(this.font, "Награда: " + reward, x + 15, rewardY + 10, 0x00FF00);
 
         // Автор
         String author = taskItem.getAuthor(taskStack);
-        String authorText = "Автор: " + author;
-        guiGraphics.drawString(this.font, authorText, x + 15, rewardY + 25, 0xAAAAAA);
+        guiGraphics.drawString(this.font, "Автор: " + author, x + 15, rewardY + 25, 0xAAAAAA);
 
         super.render(guiGraphics, mouseX, mouseY, partialTick);
     }
@@ -116,11 +114,7 @@ public class TaskViewScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (keyCode == 256) { // ESC
-            this.onClose();
-            return true;
-        }
-        return super.keyPressed(keyCode, scanCode, modifiers);
+    public boolean isPauseScreen() {
+        return false;
     }
 }
