@@ -115,7 +115,7 @@ public class OtborInstructionScreen extends Screen {
 
     private static void openKeyBindsScreen(Screen parentScreen) {
         try {
-            Class<?> cls = Class.forName("com.otbor.client.OtborKeyBindsScreen ");
+            Class<?> cls = Class.forName("com.otbor.client.OtborKeyBindsScreen");
             Object screen = cls.getConstructor(Screen.class).newInstance(parentScreen);
             Minecraft.getInstance().setScreen((Screen) screen);
         } catch (Throwable t) {

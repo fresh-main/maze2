@@ -15,5 +15,4 @@ public interface DisconnectedScreenAccessor {
 
     @Accessor("reason")     Component otbor$getReason();
     @Accessor("parent")     Screen    otbor$getParent();
-    @Accessor("buttonText") Component otbor$getButtonText();
 }

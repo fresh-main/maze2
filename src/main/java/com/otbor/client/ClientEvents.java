@@ -149,8 +149,7 @@ public class ClientEvents {
             event.setNewScreen(new OtborInstructionScreen(parent != null ? parent : new OtborTitleScreen()));
             return;
         }
-        // Кикнуло с сервера / связь оборвана — заменяем ванильный DisconnectedScreen
-        // нашим бумажным «протоколом изъятия».
+
         if (next instanceof net.minecraft.client.gui.screens.DisconnectedScreen disc
                 && !(next instanceof OtborDisconnectedScreen)) {
             try {
@@ -158,7 +157,8 @@ public class ClientEvents {
                 Screen parent = acc.otbor$getParent();
                 Component title = disc.getTitle();
                 Component reason = acc.otbor$getReason();
-                Component buttonText = acc.otbor$getButtonText();
+                // В ванильном DisconnectedScreen нет поля buttonText, оно всегда равно GUI_BACK
+                Component buttonText = net.minecraft.network.chat.CommonComponents.GUI_BACK;
                 event.setNewScreen(new OtborDisconnectedScreen(parent, title, reason, buttonText));
                 return;
             } catch (Throwable t) {

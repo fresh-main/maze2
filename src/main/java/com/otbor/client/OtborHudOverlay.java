@@ -24,15 +24,17 @@ public final class OtborHudOverlay {
         Minecraft mc = Minecraft.getInstance();
         Player p = mc.player;
         if (p == null || p.isSpectator()) return;
-
         Font font = mc.font;
         int selected = p.getInventory().selected;
 
-        int totalW = CELL_W * 9 + GAP * 8;
+        boolean hasTenthSlot = isTenthSlotModLoaded();
+        int slotCount = hasTenthSlot ? 10 : 9;
+
+        int totalW = CELL_W * slotCount + GAP * (slotCount - 1);
         int startX = screenW / 2 - totalW / 2;
         int baseY = screenH - CELL_H - 6;
 
-        for (int i = 0; i < 9; i++) {
+        for (int i = 0; i < slotCount; i++) {
             int sx = startX + i * (CELL_W + GAP);
             boolean active = (i == selected);
             float rot = ((i * 37) % 9) - 4f;
@@ -83,7 +85,11 @@ public final class OtborHudOverlay {
         // renderItem не поддерживает вращённую pose корректно — рендерим вне локального поворота.
         gfx.pose().popPose();
 
-        ItemStack stack = p.getInventory().items.get(i);
+        ItemStack stack = ItemStack.EMPTY;
+        if (i < p.getInventory().items.size()) {
+            stack = p.getInventory().items.get(i);
+        }
+
         if (!stack.isEmpty()) {
             int ix = x + (CELL_W - 16) / 2;
             int iy = y + (CELL_H - 16) / 2;
@@ -203,5 +209,10 @@ public final class OtborHudOverlay {
             parcoolAvailable = false;
             return null;
         }
+    }
+    private static boolean isTenthSlotModLoaded() {
+
+        return net.minecraftforge.fml.ModList.get().isLoaded("haryxion");
+
     }
 }

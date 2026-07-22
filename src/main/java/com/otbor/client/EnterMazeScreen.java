@@ -4,7 +4,6 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import com.otbor.client.widgets.PaperRender;
-import com.otbor.client.widgets.PaperWidgets;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -18,6 +17,7 @@ import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets; // ★ ДОБАВЛЕНО для исправления кодировки
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
@@ -53,9 +53,9 @@ public class EnterMazeScreen extends Screen {
 
     private int btnBackX, btnBackY, btnBackW, btnBackH;
     private int btnAddX, btnAddY, btnAddW, btnAddH;
-    private boolean hoverBack = false, hoverAdd = false;
+    private int btnDirectX, btnDirectY, btnDirectW, btnDirectH; // ★ НОВАЯ КНОПКА
+    private boolean hoverBack = false, hoverAdd = false, hoverDirect = false; // ★ НОВАЯ ПЕРЕМЕННАЯ
 
-    // Кнопка "ВОЙТИ" теперь часть карточки
     private int btnEnterX, btnEnterY, btnEnterW, btnEnterH;
     private boolean hoverEnter = false;
 
@@ -101,25 +101,32 @@ public class EnterMazeScreen extends Screen {
         int leftX = cx - leftW - 18;
         int leftY = 70;
 
-        // Поле ввода (рендерится внутри карточки)
         nicknameBox = new EditBox(this.font, 0, 0, leftW - 32, 18, Component.literal("nickname"));
         nicknameBox.setValue(currentNickname);
         nicknameBox.setBordered(false);
         nicknameBox.setTextColor(PaperRender.INK_RED);
         nicknameBox.setMaxLength(20);
 
-        // Кнопка "ВОЙТИ" (параметры для рендера внутри карточки)
         btnEnterW = leftW - 32;
         btnEnterH = 24;
-        btnEnterX = 16; // Относительно карточки
-        btnEnterY = leftH - 78; // Относительно карточки
+        btnEnterX = 16;
+        btnEnterY = leftH - 78;
 
-        // Остальные кнопки
         btnBackW = 100; btnBackH = 22;
         btnBackX = 30; btnBackY = 30;
 
-        btnAddW = 260; btnAddH = 36;
-        btnAddX = cx - btnAddW / 2; btnAddY = this.height - btnAddH - 30;
+        // ★ ИЗМЕНЕНО: Две кнопки рядом по 130px с зазором 4px (в сумме 264px, центрированы)
+        int btnW = 130;
+        int btnH = 36;
+        int btnY = this.height - btnH - 30;
+
+        btnAddW = btnW; btnAddH = btnH;
+        btnAddX = cx - btnW - 2;
+        btnAddY = btnY;
+
+        btnDirectW = btnW; btnDirectH = btnH;
+        btnDirectX = cx + 2;
+        btnDirectY = btnY;
 
         arrowY = leftY + leftH / 2 - arrowSize / 2;
         arrowLeftX = leftX - 35;
@@ -137,9 +144,9 @@ public class EnterMazeScreen extends Screen {
         servers.clear();
         try {
             if (SERVERS_FILE.exists()) {
-                String json = new String(Files.readAllBytes(SERVERS_FILE.toPath()));
-                List<ServerEntry> loaded = new Gson().fromJson(json,
-                        new TypeToken<List<ServerEntry>>(){}.getType());
+                // ★ ИСПРАВЛЕНИЕ КОДИРОВКИ: Явное чтение как UTF-8
+                String json = new String(Files.readAllBytes(SERVERS_FILE.toPath()), StandardCharsets.UTF_8);
+                List<ServerEntry> loaded = new Gson().fromJson(json, new TypeToken<List<ServerEntry>>(){}.getType());
                 if (loaded != null && !loaded.isEmpty()) {
                     servers.addAll(loaded);
                 }
@@ -157,7 +164,8 @@ public class EnterMazeScreen extends Screen {
         try {
             SERVERS_FILE.getParentFile().mkdirs();
             String json = new GsonBuilder().setPrettyPrinting().create().toJson(servers);
-            Files.write(SERVERS_FILE.toPath(), json.getBytes("UTF-8"));
+            // ★ ИСПРАВЛЕНИЕ КОДИРОВКИ: Явная запись как UTF-8 (безопасный метод Java 11+)
+            Files.writeString(SERVERS_FILE.toPath(), json, StandardCharsets.UTF_8);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -234,6 +242,11 @@ public class EnterMazeScreen extends Screen {
         this.minecraft.setScreen(new AddLabyrinthScreen(this, (entry) -> {
             addServerAndSave(entry);
         }));
+    }
+
+    // ★ НОВЫЙ МЕТОД: Открытие экрана прямого подключения
+    private void openDirectConnectScreen() {
+        this.minecraft.setScreen(new DirectConnectMazeScreen(this));
     }
 
     private void flipServer(int direction) {
@@ -324,18 +337,17 @@ public class EnterMazeScreen extends Screen {
         int leftX = cx - leftW - 18;
         int leftY = 70;
 
-        // 1. Кнопки НАЗАД и ДОБАВИТЬ (под карточкой)
-        renderCustomButton(gfx, btnBackX, btnBackY, btnBackW, btnBackH, "  <- НАЗАД", hoverBack, PaperRender.INK_SOFT);
-        renderCustomButton(gfx, btnAddX, btnAddY, btnAddW, btnAddH, "+ ДОБАВИТЬ ЛАБИРИНТ", hoverAdd, PaperRender.INK_RED);
+        // ★ ИЗМЕНЕНО: Отрисовка двух кнопок рядом
+        renderCustomButton(gfx, btnBackX, btnBackY, btnBackW, btnBackH, " <- НАЗАД", hoverBack, PaperRender.INK_SOFT);
+        renderCustomButton(gfx, btnAddX, btnAddY, btnAddW, btnAddH, "+ ДОБАВИТЬ", hoverAdd, PaperRender.INK_RED);
+        renderCustomButton(gfx, btnDirectX, btnDirectY, btnDirectW, btnDirectH, "ВОЙТИ ПО IP", hoverDirect, PaperRender.INK_RED);
 
-        // 2. Памятка
         int rightW = 220;
         int rightH = 230;
         int rightX = cx + 18;
         int rightY = 90;
         renderRulesMemo(gfx, rightX, rightY, rightW, rightH);
 
-        // 3. Стрелки (под карточкой)
         if (servers.size() > 1) {
             hoverLeft = !isSliding
                     && mouseX >= arrowLeftX && mouseX <= arrowLeftX + arrowSize
@@ -348,7 +360,6 @@ public class EnterMazeScreen extends Screen {
             renderArrowButton(gfx, arrowRightX, arrowY, arrowSize, ">", hoverRight);
         }
 
-        // 4. Карточка сервера с анимацией (ПОВЕРХ стрелок)
         if (isSliding) {
             renderServerCardWithSlide(gfx, leftX, leftY, leftW, leftH,
                     currentServerIndex, 0f, 1f, mouseX, mouseY);
@@ -359,7 +370,6 @@ public class EnterMazeScreen extends Screen {
                     currentServerIndex, 0f, 1f, mouseX, mouseY);
         }
 
-        // 5. Индикатор
         if (!servers.isEmpty()) {
             String counter = (currentServerIndex + 1) + " / " + servers.size();
             int counterW = font.width(counter);
@@ -367,11 +377,13 @@ public class EnterMazeScreen extends Screen {
                     leftY + leftH + 8, PaperRender.INK_FADED, false);
         }
 
-        // Обновляем hover
+        // ★ ИЗМЕНЕНО: Обновление hover для всех трех кнопок
         hoverBack = mouseX >= btnBackX && mouseX <= btnBackX + btnBackW
                 && mouseY >= btnBackY && mouseY <= btnBackY + btnBackH;
         hoverAdd = mouseX >= btnAddX && mouseX <= btnAddX + btnAddW
                 && mouseY >= btnAddY && mouseY <= btnAddY + btnAddH;
+        hoverDirect = mouseX >= btnDirectX && mouseX <= btnDirectX + btnDirectW
+                && mouseY >= btnDirectY && mouseY <= btnDirectY + btnDirectH;
     }
 
     private void renderCustomButton(GuiGraphics gfx, int x, int y, int w, int h,
@@ -458,7 +470,6 @@ public class EnterMazeScreen extends Screen {
         PaperRender.drawHandDivider(gfx, 14, dy + 4, w - 28,
                 PaperRender.withAlpha(PaperRender.INK_SOFT, 0.8f));
 
-        // Поле ввода имени
         gfx.drawString(font, "твоё имя, бегущий:", 16, dy + 14, PaperRender.INK, false);
 
         int nickY = h - 62;
@@ -470,17 +481,15 @@ public class EnterMazeScreen extends Screen {
         nicknameBox.setY(nickY);
         nicknameBox.setWidth(nickW);
         nicknameBox.setValue(currentNickname);
-        nicknameBox.render(gfx, 0, 0, 0);
+        nicknameBox.render(gfx, mouseX, mouseY, 0); // ★ ИСПРАВЛЕНО: добавлены mouseX, mouseY для корректного рендера курсора
 
         gfx.fill(nickX, nickY + nickH, nickX + nickW, nickY + nickH + 1, PaperRender.INK);
 
-        // Кнопка "ВОЙТИ В ЛАБИРИНТ"
         int btnX = btnEnterX;
         int btnY = btnEnterY;
         int btnW = btnEnterW;
         int btnH = btnEnterH;
 
-        // Проверяем hover для кнопки
         boolean isCurrentCard = (serverIndex == currentServerIndex && !isSliding);
         hoverEnter = isCurrentCard && !isSliding
                 && mouseX >= (x + btnX) && mouseX <= (x + btnX + btnW)
@@ -589,6 +598,12 @@ public class EnterMazeScreen extends Screen {
             return true;
         }
 
+        // ★ ДОБАВЛЕНО: Обработка клика по новой кнопке
+        if (mx >= btnDirectX && mx <= btnDirectX + btnDirectW && my >= btnDirectY && my <= btnDirectY + btnDirectH) {
+            openDirectConnectScreen();
+            return true;
+        }
+
         if (!isSliding && servers.size() > 1) {
             if (hoverLeft) {
                 flipServer(-1);
@@ -600,13 +615,11 @@ public class EnterMazeScreen extends Screen {
             }
         }
 
-        // Клик по кнопке "ВОЙТИ" (она внутри карточки)
         if (hoverEnter && !isSliding) {
             connectToServer();
             return true;
         }
 
-        // Клик по полю ввода
         if (nicknameBox.isMouseOver(mx, my)) {
             nicknameBox.setFocused(true);
             nicknameBox.mouseClicked(mx, my, button);
