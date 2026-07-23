@@ -15,15 +15,14 @@ public class BulletinBoardScreen extends AbstractContainerScreen<BulletinBoardMe
     private static final int CARD_WIDTH = 80;
     private static final int CARD_HEIGHT = 100;
 
+    // Увеличенное расстояние между карточками
     private static final int[][] CARD_POSITIONS = {
-            {70, 60},
-            {190, 60},
-            {310, 60},
-            {130, 170},
-            {250, 170}
+            {35, 55},    // Верхняя левая
+            {170, 55},   // Верхняя центральная (было 155, стало 170)
+            {305, 55},   // Верхняя правая (было 275, стало 305)
+            {105, 160},  // Нижняя левая (было 95, стало 105)
+            {240, 160}   // Нижняя правая (было 215, стало 240)
     };
-
-    private static final int[] SLOT_INDICES = {0, 1, 2, 3, 4};
 
     private int hoveredCardIndex = -1;
 
@@ -46,50 +45,49 @@ public class BulletinBoardScreen extends AbstractContainerScreen<BulletinBoardMe
         int x = (this.width - this.imageWidth) / 2;
         int y = (this.height - this.imageHeight) / 2;
 
-        // Фон доски
         guiGraphics.fill(x, y, x + this.imageWidth, y + this.imageHeight, 0xFFE8DCC4);
         guiGraphics.renderOutline(x, y, this.imageWidth, this.imageHeight, 0xFF8B7355);
 
-        // Заголовок рисуем ТОЛЬКО здесь (один раз)
         guiGraphics.drawString(this.font, this.title, x + this.titleLabelX, y + this.titleLabelY, 0x333333, false);
     }
 
     @Override
     protected void renderLabels(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        // ПУСТО - заголовок уже нарисован в renderBg
     }
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         this.renderBackground(guiGraphics);
+        super.render(guiGraphics, mouseX, mouseY, partialTick);
 
         int guiX = (this.width - this.imageWidth) / 2;
         int guiY = (this.height - this.imageHeight) / 2;
-
-        renderBg(guiGraphics, partialTick, mouseX, mouseY);
         renderTaskCards(guiGraphics, guiX, guiY, mouseX, mouseY);
-
-        super.render(guiGraphics, mouseX, mouseY, partialTick);
     }
 
     private void renderTaskCards(GuiGraphics guiGraphics, int guiX, int guiY, int mouseX, int mouseY) {
         BulletinBoardBlockEntity blockEntity = this.menu.getBlockEntity();
-        if (blockEntity == null) return;
+
+        System.out.println("blockEntity in render: " + blockEntity);
 
         hoveredCardIndex = -1;
 
         for (int i = 0; i < CARD_POSITIONS.length; i++) {
             int cardX = guiX + CARD_POSITIONS[i][0];
             int cardY = guiY + CARD_POSITIONS[i][1];
-            int slotIndex = SLOT_INDICES[i];
 
-            ItemStack taskStack = blockEntity.getTask(slotIndex);
+            ItemStack taskStack = ItemStack.EMPTY;
+            if (blockEntity != null) {
+                taskStack = blockEntity.getTask(i);
+                System.out.println("Slot " + i + ": " + taskStack);
+            }
 
             boolean isHovered = mouseX >= cardX && mouseX < cardX + CARD_WIDTH &&
                     mouseY >= cardY && mouseY < cardY + CARD_HEIGHT;
 
             if (isHovered) {
                 hoveredCardIndex = i;
+                System.out.println("Hovered card: " + i);
             }
 
             drawTaskCard(guiGraphics, cardX, cardY, taskStack, isHovered);
@@ -101,47 +99,37 @@ public class BulletinBoardScreen extends AbstractContainerScreen<BulletinBoardMe
     }
 
     private void drawTaskCard(GuiGraphics guiGraphics, int x, int y, ItemStack stack, boolean isHovered) {
-        boolean isEmpty = stack.isEmpty();
+        guiGraphics.fill(x, y, x + CARD_WIDTH, y + CARD_HEIGHT, 0xFF808080);
 
-        int bgColor = isEmpty ? 0xFF808080 : 0xFF909090;
-        int highlightColor = isHovered ? 0xFFb0b0b0 : 0xFFa0a0a0;
-        int shadowColor = 0xFF606060;
+        guiGraphics.hLine(x, x + CARD_WIDTH - 1, y, 0xFFC0C0C0);
+        guiGraphics.vLine(x, y, y + CARD_HEIGHT - 1, 0xFFC0C0C0);
 
-        guiGraphics.fill(x, y, x + CARD_WIDTH, y + CARD_HEIGHT, bgColor);
+        guiGraphics.hLine(x, x + CARD_WIDTH - 1, y + CARD_HEIGHT - 1, 0xFF404040);
+        guiGraphics.vLine(x + CARD_WIDTH - 1, y, y + CARD_HEIGHT - 1, 0xFF404040);
 
-        int borderColor = isHovered ? 0xFFFFFFFF : 0xFFaaaaaa;
-        guiGraphics.renderOutline(x, y, CARD_WIDTH, CARD_HEIGHT, borderColor);
-
-        guiGraphics.hLine(x + 1, x + CARD_WIDTH - 2, y + 1, highlightColor);
-        guiGraphics.vLine(x + 1, y + 1, y + CARD_HEIGHT - 2, highlightColor);
-        guiGraphics.hLine(x + 1, x + CARD_WIDTH - 2, y + CARD_HEIGHT - 2, shadowColor);
-        guiGraphics.vLine(x + CARD_WIDTH - 2, y + 1, y + CARD_HEIGHT - 2, shadowColor);
-
-        if (!isEmpty && stack.getItem() instanceof TaskItem) {
-            guiGraphics.renderItem(stack, x + CARD_WIDTH / 2 - 8, y + CARD_HEIGHT / 2 - 8);
-
-            String title = ((TaskItem) stack.getItem()).getTitle(stack);
-            if (title != null && !title.isEmpty()) {
-                if (this.font.width(title) > CARD_WIDTH - 10) {
-                    title = this.font.plainSubstrByWidth(title, CARD_WIDTH - 10) + "...";
-                }
-                guiGraphics.drawString(this.font, title, x + (CARD_WIDTH - this.font.width(title)) / 2, y + CARD_HEIGHT - 15, 0x000000, false);
-            }
+        if (isHovered) {
+            guiGraphics.renderOutline(x - 1, y - 1, CARD_WIDTH + 2, CARD_HEIGHT + 2, 0xFFFFFFFF);
         }
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button == 0 && hoveredCardIndex >= 0) {
-            int slotIndex = SLOT_INDICES[hoveredCardIndex];
             BulletinBoardBlockEntity blockEntity = this.menu.getBlockEntity();
 
             if (blockEntity != null) {
-                ItemStack taskStack = blockEntity.getTask(slotIndex);
-                if (!taskStack.isEmpty()) {
-                    this.minecraft.setScreen(new TaskViewScreen(taskStack, () -> {}));
-                    return true;
-                }
+                ItemStack taskStack = blockEntity.getTask(hoveredCardIndex);
+
+                // Открываем TaskViewScreen всегда, даже если слот пустой
+                Runnable callback = () -> {
+                    if (!taskStack.isEmpty()) {
+                        blockEntity.takeTask(hoveredCardIndex, this.minecraft.player);
+                    }
+                };
+
+                TaskViewScreen taskScreen = new TaskViewScreen(taskStack, callback);
+                this.minecraft.setScreen(taskScreen);
+                return true;
             }
         }
         return super.mouseClicked(mouseX, mouseY, button);
@@ -149,6 +137,5 @@ public class BulletinBoardScreen extends AbstractContainerScreen<BulletinBoardMe
 
     @Override
     protected void renderTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        // Тултипы уже рисуются в renderTaskCards
     }
 }
