@@ -1,6 +1,7 @@
 package com.labyrinthmod.common.block;
 
 import com.labyrinthmod.common.blockentity.BulletinBoardBlockEntity;
+import com.labyrinthmod.common.init.ModBlockEntities;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
@@ -10,6 +11,8 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseEntityBlock;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
@@ -30,7 +33,6 @@ public class BulletinBoardBlock extends BaseEntityBlock {
         if (!level.isClientSide) {
             BlockEntity blockEntity = level.getBlockEntity(pos);
             if (blockEntity instanceof BulletinBoardBlockEntity board) {
-                // ВОТ ЗДЕСЬ БЫЛА ОШИБКА: нужно передавать координаты в буфер
                 NetworkHooks.openScreen((ServerPlayer) player, board, buf -> buf.writeBlockPos(pos));
             }
         }
@@ -58,5 +60,17 @@ public class BulletinBoardBlock extends BaseEntityBlock {
     @Override
     public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         return new BulletinBoardBlockEntity(pos, state);
+    }
+
+    @Override
+    public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> blockEntityType) {
+        if (level.isClientSide) {
+            return null;
+        }
+        return (lvl, pos, st, be) -> {
+            if (be instanceof BulletinBoardBlockEntity board) {
+                board.tick();
+            }
+        };
     }
 }

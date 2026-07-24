@@ -4,6 +4,7 @@ import com.labyrinthmod.common.blockentity.BulletinBoardBlockEntity;
 import com.labyrinthmod.common.item.TaskItem;
 import com.labyrinthmod.common.menu.BulletinBoardMenu;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
@@ -15,13 +16,12 @@ public class BulletinBoardScreen extends AbstractContainerScreen<BulletinBoardMe
     private static final int CARD_WIDTH = 80;
     private static final int CARD_HEIGHT = 100;
 
-    // Увеличенное расстояние между карточками
     private static final int[][] CARD_POSITIONS = {
-            {35, 55},    // Верхняя левая
-            {170, 55},   // Верхняя центральная (было 155, стало 170)
-            {305, 55},   // Верхняя правая (было 275, стало 305)
-            {105, 160},  // Нижняя левая (было 95, стало 105)
-            {240, 160}   // Нижняя правая (было 215, стало 240)
+            {35, 55},
+            {170, 55},
+            {305, 55},
+            {105, 160},
+            {240, 160}
     };
 
     private int hoveredCardIndex = -1;
@@ -38,6 +38,19 @@ public class BulletinBoardScreen extends AbstractContainerScreen<BulletinBoardMe
         this.titleLabelX = (this.imageWidth - this.font.width(this.title)) / 2;
         this.titleLabelY = 10;
         this.inventoryLabelY = this.imageHeight + 100;
+
+        // Кнопка открытия админки (правый верхний угол)
+        Button adminButton = Button.builder(
+                Component.literal("⚙"),
+                btn -> {
+                    BulletinBoardBlockEntity be = this.menu.getBlockEntity();
+                    if (be != null) {
+                        this.minecraft.setScreen(new BulletinBoardAdminScreen(be));
+                    }
+                }
+        ).bounds((this.width - this.imageWidth) / 2 + this.imageWidth - 30,
+                (this.height - this.imageHeight) / 2 + 5, 25, 20).build();
+        this.addRenderableWidget(adminButton);
     }
 
     @Override
@@ -68,8 +81,6 @@ public class BulletinBoardScreen extends AbstractContainerScreen<BulletinBoardMe
     private void renderTaskCards(GuiGraphics guiGraphics, int guiX, int guiY, int mouseX, int mouseY) {
         BulletinBoardBlockEntity blockEntity = this.menu.getBlockEntity();
 
-        System.out.println("blockEntity in render: " + blockEntity);
-
         hoveredCardIndex = -1;
 
         for (int i = 0; i < CARD_POSITIONS.length; i++) {
@@ -79,7 +90,6 @@ public class BulletinBoardScreen extends AbstractContainerScreen<BulletinBoardMe
             ItemStack taskStack = ItemStack.EMPTY;
             if (blockEntity != null) {
                 taskStack = blockEntity.getTask(i);
-                System.out.println("Slot " + i + ": " + taskStack);
             }
 
             boolean isHovered = mouseX >= cardX && mouseX < cardX + CARD_WIDTH &&
@@ -87,7 +97,6 @@ public class BulletinBoardScreen extends AbstractContainerScreen<BulletinBoardMe
 
             if (isHovered) {
                 hoveredCardIndex = i;
-                System.out.println("Hovered card: " + i);
             }
 
             drawTaskCard(guiGraphics, cardX, cardY, taskStack, isHovered);
@@ -120,7 +129,6 @@ public class BulletinBoardScreen extends AbstractContainerScreen<BulletinBoardMe
             if (blockEntity != null) {
                 ItemStack taskStack = blockEntity.getTask(hoveredCardIndex);
 
-                // Открываем TaskViewScreen всегда, даже если слот пустой
                 Runnable callback = () -> {
                     if (!taskStack.isEmpty()) {
                         blockEntity.takeTask(hoveredCardIndex, this.minecraft.player);

@@ -4,6 +4,7 @@ import com.labyrinthmod.common.item.TaskItem;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 
@@ -20,6 +21,23 @@ public class TaskViewScreen extends Screen {
         super(Component.literal("Просмотр задания"));
         this.taskStack = taskStack;
         this.onTakeCallback = onTakeCallback;
+
+        // ===== ОТЛАДКА =====
+        System.out.println("=== TaskViewScreen DEBUG ===");
+        System.out.println("taskStack.isEmpty: " + taskStack.isEmpty());
+        if (!taskStack.isEmpty()) {
+            System.out.println("Item: " + taskStack.getItem());
+            System.out.println("Has tag: " + taskStack.hasTag());
+            if (taskStack.hasTag()) {
+                CompoundTag tag = taskStack.getTag();
+                System.out.println("Tag Title: " + tag.getString("Title"));
+                System.out.println("Tag Description: " + tag.getString("Description"));
+                System.out.println("Tag Reward: " + tag.getString("Reward"));
+                System.out.println("Tag Author: " + tag.getString("Author"));
+            }
+        }
+        System.out.println("===========================");
+        // ====================
     }
 
     @Override
@@ -29,7 +47,6 @@ public class TaskViewScreen extends Screen {
         int x = (this.width - SCREEN_WIDTH) / 2;
         int y = (this.height - SCREEN_HEIGHT) / 2;
 
-        // Кнопка "Взять задание" (только если предмет не пустой)
         if (!taskStack.isEmpty()) {
             takeButton = Button.builder(
                     Component.literal("Взять задание"),
@@ -38,7 +55,6 @@ public class TaskViewScreen extends Screen {
             this.addRenderableWidget(takeButton);
         }
 
-        // Кнопка "Назад"
         backButton = Button.builder(
                 Component.literal("Назад"),
                 btn -> this.onClose()
@@ -63,7 +79,6 @@ public class TaskViewScreen extends Screen {
         guiGraphics.fill(x, y, x + SCREEN_WIDTH, y + SCREEN_HEIGHT, 0xFF2d2d2d);
         guiGraphics.renderOutline(x, y, SCREEN_WIDTH, SCREEN_HEIGHT, 0xFF555555);
 
-        // Если предмет пустой - показываем заглушку
         if (taskStack.isEmpty()) {
             String emptyText = "Пустое задание";
             int textWidth = this.font.width(emptyText);
@@ -72,16 +87,39 @@ public class TaskViewScreen extends Screen {
             guiGraphics.hLine(x + 20, x + SCREEN_WIDTH - 20, y + 40, 0xFF555555);
             guiGraphics.drawString(this.font, "Здесь пока нет задания", x + 20, y + 55, 0xAAAAAA);
         } else {
-            // Предмет есть - показываем данные задания
-            TaskItem taskItem = (TaskItem) taskStack.getItem();
+            // Пробуем получить данные напрямую из NBT
+            String title = "";
+            String description = "";
+            String reward = "";
+            String author = "";
 
-            String title = taskItem.getTitle(taskStack);
+            if (taskStack.hasTag()) {
+                CompoundTag tag = taskStack.getTag();
+                title = tag.getString("Title");
+                description = tag.getString("Description");
+                reward = tag.getString("Reward");
+                author = tag.getString("Author");
+            }
+
+            // Если через NBT не получилось - пробуем через TaskItem
+            if (title.isEmpty() && taskStack.getItem() instanceof TaskItem taskItem) {
+                title = taskItem.getTitle(taskStack);
+                description = taskItem.getDescription(taskStack);
+                reward = taskItem.getReward(taskStack);
+                author = taskItem.getAuthor(taskStack);
+            }
+
+            // Если всё ещё пусто - используем дефолтные значения
+            if (title.isEmpty()) title = "Без названия";
+            if (description.isEmpty()) description = "Нет описания";
+            if (reward.isEmpty()) reward = "Нет награды";
+            if (author.isEmpty()) author = "Неизвестно";
+
             int titleWidth = this.font.width(title);
             guiGraphics.drawString(this.font, title, x + (SCREEN_WIDTH - titleWidth) / 2, y + 15, 0xFFD700, true);
 
             guiGraphics.hLine(x + 20, x + SCREEN_WIDTH - 20, y + 40, 0xFFD700);
 
-            String description = taskItem.getDescription(taskStack);
             String[] descLines = wrapText(description, 45);
             int descY = y + 55;
             for (String line : descLines) {
@@ -92,10 +130,7 @@ public class TaskViewScreen extends Screen {
             int rewardY = descY + 15;
             guiGraphics.hLine(x + 20, x + SCREEN_WIDTH - 20, rewardY, 0xFFD700);
 
-            String reward = taskItem.getReward(taskStack);
             guiGraphics.drawString(this.font, "Награда: " + reward, x + 20, rewardY + 10, 0x00FF00);
-
-            String author = taskItem.getAuthor(taskStack);
             guiGraphics.drawString(this.font, "Автор: " + author, x + 20, rewardY + 25, 0xAAAAAA);
         }
 
