@@ -13,8 +13,9 @@ public class ModBlockEntities {
             DeferredRegister.create(ForgeRegistries.BLOCK_ENTITY_TYPES, LabyrinthMod.MOD_ID);
 
     public static final RegistryObject<BlockEntityType<BulletinBoardBlockEntity>> BULLETIN_BOARD_BE =
-            BLOCK_ENTITIES.register("bulletin_board",
-                    () -> BlockEntityType.Builder.of(BulletinBoardBlockEntity::new, ModBlocks.BULLETIN_BOARD.get()).build(null));
+            BLOCK_ENTITIES.register("bulletin_board", () ->
+                    BlockEntityType.Builder.of(BulletinBoardBlockEntity::new, ModBlocks.BULLETIN_BOARD.get()).build(null)
+            );
 
     public static void register(IEventBus modEventBus) {
         BLOCK_ENTITIES.register(modEventBus);

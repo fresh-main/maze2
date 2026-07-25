@@ -64,9 +64,8 @@ public class BulletinBoardBlock extends BaseEntityBlock {
 
     @Override
     public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> blockEntityType) {
-        if (level.isClientSide) {
-            return null;
-        }
+        System.out.println("[BB] getTicker called, isClient=" + level.isClientSide);
+        if (level.isClientSide) return null;
         return (lvl, pos, st, be) -> {
             if (be instanceof BulletinBoardBlockEntity board) {
                 board.tick();

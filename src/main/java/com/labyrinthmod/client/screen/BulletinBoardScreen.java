@@ -1,8 +1,9 @@
 package com.labyrinthmod.client.screen;
 
 import com.labyrinthmod.common.blockentity.BulletinBoardBlockEntity;
-import com.labyrinthmod.common.item.TaskItem;
 import com.labyrinthmod.common.menu.BulletinBoardMenu;
+import com.labyrinthmod.common.network.NetworkHandler;
+import com.labyrinthmod.common.network.packet.TakeTaskPacket;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -17,11 +18,7 @@ public class BulletinBoardScreen extends AbstractContainerScreen<BulletinBoardMe
     private static final int CARD_HEIGHT = 100;
 
     private static final int[][] CARD_POSITIONS = {
-            {35, 55},
-            {170, 55},
-            {305, 55},
-            {105, 160},
-            {240, 160}
+            {35, 55}, {170, 55}, {305, 55}, {105, 160}, {240, 160}
     };
 
     private int hoveredCardIndex = -1;
@@ -39,7 +36,7 @@ public class BulletinBoardScreen extends AbstractContainerScreen<BulletinBoardMe
         this.titleLabelY = 10;
         this.inventoryLabelY = this.imageHeight + 100;
 
-        // Кнопка открытия админки (правый верхний угол)
+        // Кнопка открытия админки
         Button adminButton = Button.builder(
                 Component.literal("⚙"),
                 btn -> {
@@ -60,13 +57,11 @@ public class BulletinBoardScreen extends AbstractContainerScreen<BulletinBoardMe
 
         guiGraphics.fill(x, y, x + this.imageWidth, y + this.imageHeight, 0xFFE8DCC4);
         guiGraphics.renderOutline(x, y, this.imageWidth, this.imageHeight, 0xFF8B7355);
-
         guiGraphics.drawString(this.font, this.title, x + this.titleLabelX, y + this.titleLabelY, 0x333333, false);
     }
 
     @Override
-    protected void renderLabels(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-    }
+    protected void renderLabels(GuiGraphics guiGraphics, int mouseX, int mouseY) {}
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
@@ -80,39 +75,35 @@ public class BulletinBoardScreen extends AbstractContainerScreen<BulletinBoardMe
 
     private void renderTaskCards(GuiGraphics guiGraphics, int guiX, int guiY, int mouseX, int mouseY) {
         BulletinBoardBlockEntity blockEntity = this.menu.getBlockEntity();
-
         hoveredCardIndex = -1;
 
         for (int i = 0; i < CARD_POSITIONS.length; i++) {
             int cardX = guiX + CARD_POSITIONS[i][0];
             int cardY = guiY + CARD_POSITIONS[i][1];
 
-            ItemStack taskStack = ItemStack.EMPTY;
-            if (blockEntity != null) {
-                taskStack = blockEntity.getTask(i);
-            }
+            // Читаем из BlockEntity
+            ItemStack taskStack = blockEntity != null ? blockEntity.getTask(i) : ItemStack.EMPTY;
 
-            boolean isHovered = mouseX >= cardX && mouseX < cardX + CARD_WIDTH &&
-                    mouseY >= cardY && mouseY < cardY + CARD_HEIGHT;
+            // Рисуем карточку ТОЛЬКО если есть задание
+            if (!taskStack.isEmpty()) {
+                boolean isHovered = mouseX >= cardX && mouseX < cardX + CARD_WIDTH &&
+                        mouseY >= cardY && mouseY < cardY + CARD_HEIGHT;
 
-            if (isHovered) {
-                hoveredCardIndex = i;
-            }
+                if (isHovered) hoveredCardIndex = i;
 
-            drawTaskCard(guiGraphics, cardX, cardY, taskStack, isHovered);
+                drawTaskCard(guiGraphics, cardX, cardY, taskStack, isHovered);
 
-            if (isHovered && !taskStack.isEmpty()) {
-                guiGraphics.renderTooltip(this.font, taskStack, mouseX, mouseY);
+                if (isHovered) {
+                    guiGraphics.renderTooltip(this.font, taskStack, mouseX, mouseY);
+                }
             }
         }
     }
 
     private void drawTaskCard(GuiGraphics guiGraphics, int x, int y, ItemStack stack, boolean isHovered) {
         guiGraphics.fill(x, y, x + CARD_WIDTH, y + CARD_HEIGHT, 0xFF808080);
-
         guiGraphics.hLine(x, x + CARD_WIDTH - 1, y, 0xFFC0C0C0);
         guiGraphics.vLine(x, y, y + CARD_HEIGHT - 1, 0xFFC0C0C0);
-
         guiGraphics.hLine(x, x + CARD_WIDTH - 1, y + CARD_HEIGHT - 1, 0xFF404040);
         guiGraphics.vLine(x + CARD_WIDTH - 1, y, y + CARD_HEIGHT - 1, 0xFF404040);
 
@@ -129,21 +120,20 @@ public class BulletinBoardScreen extends AbstractContainerScreen<BulletinBoardMe
             if (blockEntity != null) {
                 ItemStack taskStack = blockEntity.getTask(hoveredCardIndex);
 
-                Runnable callback = () -> {
-                    if (!taskStack.isEmpty()) {
-                        blockEntity.takeTask(hoveredCardIndex, this.minecraft.player);
-                    }
-                };
-
-                TaskViewScreen taskScreen = new TaskViewScreen(taskStack, callback);
-                this.minecraft.setScreen(taskScreen);
-                return true;
+                if (!taskStack.isEmpty()) {
+                    final int slotIndex = hoveredCardIndex;
+                    Runnable callback = () -> {
+                        NetworkHandler.CHANNEL.sendToServer(new TakeTaskPacket(blockEntity.getBlockPos(), slotIndex));
+                    };
+                    TaskViewScreen taskScreen = new TaskViewScreen(taskStack, callback, slotIndex);
+                    this.minecraft.setScreen(taskScreen);
+                    return true;
+                }
             }
         }
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
-    protected void renderTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-    }
+    protected void renderTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY) {}
 }

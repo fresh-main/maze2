@@ -19,18 +19,91 @@ public class NetworkHandler {
     private static int id = 0;
 
     public static void register() {
-        // Клиент -> сервер
+
+
+        // 0. SpawnTaskPacket (Клиент -> Сервер) - ДОБАВЛЕНО С id++
+        CHANNEL.messageBuilder(SpawnTaskPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(SpawnTaskPacket::encode)
+                .decoder(SpawnTaskPacket::decode)
+                .consumerMainThread(SpawnTaskPacket::handle)
+                .add();
+
+        // AddTaskPacket (Клиент -> Сервер)
+        CHANNEL.messageBuilder(AddTaskPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(AddTaskPacket::encode)
+                .decoder(AddTaskPacket::decode)
+                .consumerMainThread(AddTaskPacket::handle)
+                .add();
+
+        // RequestTimerUpdatePacket (Клиент -> Сервер)
+        CHANNEL.messageBuilder(RequestTimerUpdatePacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(RequestTimerUpdatePacket::encode)
+                .decoder(RequestTimerUpdatePacket::decode)
+                .consumerMainThread(RequestTimerUpdatePacket::handle)
+                .add();
+
+        // ResetTimerPacket (Клиент -> Сервер)
+        CHANNEL.messageBuilder(ResetTimerPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(ResetTimerPacket::encode)
+                .decoder(ResetTimerPacket::decode)
+                .consumerMainThread(ResetTimerPacket::handle)
+                .add();
+
+        // SpawnSpecificTaskPacket (Клиент -> Сервер)
+        CHANNEL.messageBuilder(SpawnSpecificTaskPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(SpawnSpecificTaskPacket::encode)
+                .decoder(SpawnSpecificTaskPacket::decode)
+                .consumerMainThread(SpawnSpecificTaskPacket::handle)
+                .add();
+
+        // TakeTaskPacket (Клиент -> Сервер)
+        CHANNEL.messageBuilder(TakeTaskPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(TakeTaskPacket::encode)
+                .decoder(TakeTaskPacket::decode)
+                .consumerMainThread(TakeTaskPacket::handle)
+                .add();
+
+        // SyncBoardDataPacket (Сервер -> Клиент)
+        CHANNEL.messageBuilder(SyncBoardDataPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncBoardDataPacket::encode)
+                .decoder(SyncBoardDataPacket::decode)
+                .consumerMainThread(SyncBoardDataPacket::handle)
+                .add();
+
+// RemoveTaskPacket (Клиент -> Сервер)
+        CHANNEL.messageBuilder(RemoveTaskPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(RemoveTaskPacket::encode)
+                .decoder(RemoveTaskPacket::decode)
+                .consumerMainThread(RemoveTaskPacket::handle)
+                .add();
+        // SyncTasksPacket (Сервер -> Клиент)
+        CHANNEL.messageBuilder(SyncTasksPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SyncTasksPacket::encode)
+                .decoder(SyncTasksPacket::decode)
+                .consumerMainThread(SyncTasksPacket::handle)
+                .add();
+
+        // SetSpawnIntervalPacket (Клиент -> Сервер)
+        CHANNEL.messageBuilder(SetSpawnIntervalPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(SetSpawnIntervalPacket::encode)
+                .decoder(SetSpawnIntervalPacket::decode)
+                .consumerMainThread(SetSpawnIntervalPacket::handle)
+                .add();
+
+        // 1. Клиент -> сервер
         CHANNEL.messageBuilder(AdminActionPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
                 .encoder(AdminActionPacket::encode)
                 .decoder(AdminActionPacket::decode)
                 .consumerMainThread(AdminActionPacket::handle)
                 .add();
+
         CHANNEL.messageBuilder(C2SSaveCraftRestrictionsPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
                 .encoder(C2SSaveCraftRestrictionsPacket::encode)
                 .decoder(C2SSaveCraftRestrictionsPacket::decode)
                 .consumerMainThread(C2SSaveCraftRestrictionsPacket::handle)
                 .add();
 
+        // 2. Сервер -> клиент
         CHANNEL.messageBuilder(S2CSyncCraftRestrictionsPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
                 .encoder(S2CSyncCraftRestrictionsPacket::encode)
                 .decoder(S2CSyncCraftRestrictionsPacket::decode)
@@ -55,9 +128,7 @@ public class NetworkHandler {
                 .consumerMainThread(ImposterAttackPacket::handle)
                 .add();
 
-        // Сервер -> клиент. Регистрируем НА ОБЕИХ сторонах: серверу нужна
-        // регистрация, чтобы кодировать пакеты при отправке. Сами handle-методы
-        // защищены проверкой FMLEnvironment.dist == Dist.CLIENT / прокси.
+        // Сервер -> клиент
         CHANNEL.messageBuilder(OpenAdminMenuPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
                 .encoder(OpenAdminMenuPacket::encode)
                 .decoder(OpenAdminMenuPacket::decode)
@@ -94,7 +165,7 @@ public class NetworkHandler {
                 .consumerMainThread(SyncConfigPacket::handle)
                 .add();
 
-        // Доступ фракций в лабиринт.
+        // Доступ фракций в лабиринт
         CHANNEL.messageBuilder(C2SRequestFractionAccessPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
                 .encoder(C2SRequestFractionAccessPacket::encode)
                 .decoder(C2SRequestFractionAccessPacket::decode)
@@ -113,9 +184,11 @@ public class NetworkHandler {
                 .consumerMainThread(S2CFractionAccessSyncPacket::handle)
                 .add();
 
-        CHANNEL.registerMessage(id++, SwitchFractionPacket.class,
-                SwitchFractionPacket::encode,
-                SwitchFractionPacket::decode,
-                SwitchFractionPacket::handle);
+        // SwitchFractionPacket
+        CHANNEL.messageBuilder(SwitchFractionPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(SwitchFractionPacket::encode)
+                .decoder(SwitchFractionPacket::decode)
+                .consumerMainThread(SwitchFractionPacket::handle)
+                .add();
     }
 }

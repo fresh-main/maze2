@@ -84,7 +84,9 @@ import java.nio.file.StandardOpenOption;
 import java.util.List;
 
 @Mod(LabyrinthMod.MOD_ID)
+
 public class LabyrinthMod {
+
     public static final String MOD_ID = "labyrinthmod";
     public static final String MAZEMAP_MOD_ID = "mazemap";
     public static final Logger LOGGER = LogUtils.getLogger();
@@ -107,6 +109,7 @@ public class LabyrinthMod {
 
     public LabyrinthMod() {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
+
 
         modEventBus.addListener(this::registerChunkGenerator);
 
@@ -168,12 +171,22 @@ public class LabyrinthMod {
         ModCreativeTabs.register(modEventBus);
         ModSounds.register(modEventBus);
 
+        com.labyrinthmod.common.item.TaskItem.register(modEventBus);
+        // Регистрация свитка задания
+        com.labyrinthmod.common.item.TaskScrollItem.register(modEventBus);
+
         MinecraftForge.EVENT_BUS.register(this);
         MinecraftForge.EVENT_BUS.register(new FractionEvents());
         MinecraftForge.EVENT_BUS.register(new GriverPossessionHandler());
         MinecraftForge.EVENT_BUS.register(new DebugStickHandler());
         MinecraftForge.EVENT_BUS.register(new CapabilityHandler());
         MinecraftForge.EVENT_BUS.register(new ChatDisableHandler());
+
+
+
+        // ===== ДОБАВЛЕНО: Обработчик тиков для доски объявлений =====
+        MinecraftForge.EVENT_BUS.register(new com.labyrinthmod.common.event.BulletinBoardTickHandler());
+        // ============================================================
         // ========== КОНЕЦ LabyrinthMod ==========
 
         // ========== InfectionMod регистрации ==========
@@ -204,6 +217,7 @@ public class LabyrinthMod {
     }
 
     private void registerChunkGenerator(RegisterEvent event) {
+
         if (event.getRegistryKey().equals(Registries.CHUNK_GENERATOR)) {
             event.register(
                     Registries.CHUNK_GENERATOR,
@@ -243,6 +257,7 @@ public class LabyrinthMod {
             } else {
                 LOGGER.warn("CraftRestrictionMenu not yet registered, skipping screen registration");
             }
+
 
             // ===== ДОБАВЛЕНО: Регистрация GUI доски объявлений =====
             if (ModMenuTypes.BULLETIN_BOARD_MENU.isPresent()) {
@@ -298,6 +313,8 @@ public class LabyrinthMod {
         Network.CHANNEL.send(PacketDistributor.PLAYER.with(() -> sp), new S2CSettingsSyncPacket(settings));
         ensureNoteInInventory(sp);
     }
+
+
 
     @SubscribeEvent
     public void onInfectionLogout(PlayerEvent.PlayerLoggedOutEvent e) {

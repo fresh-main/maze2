@@ -3,9 +3,11 @@ package com.labyrinthmod.common.menu;
 import com.labyrinthmod.common.blockentity.BulletinBoardBlockEntity;
 import com.labyrinthmod.common.init.ModMenuTypes;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
@@ -28,7 +30,10 @@ public class BulletinBoardMenu extends AbstractContainerMenu {
         this.blockEntity = blockEntity;
         this.player = playerInventory.player;
 
-        // НЕ добавляем слоты - они не нужны, всё рисуем вручную
+        // Добавляем слоты для синхронизации
+        for (int i = 0; i < 5; i++) {
+            this.addSlot(new Slot(new SimpleContainer(1), 0, -999, -999));
+        }
     }
 
     @Override
