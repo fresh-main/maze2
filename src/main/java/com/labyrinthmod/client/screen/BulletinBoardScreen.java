@@ -81,10 +81,8 @@ public class BulletinBoardScreen extends AbstractContainerScreen<BulletinBoardMe
             int cardX = guiX + CARD_POSITIONS[i][0];
             int cardY = guiY + CARD_POSITIONS[i][1];
 
-            // Читаем из BlockEntity
             ItemStack taskStack = blockEntity != null ? blockEntity.getTask(i) : ItemStack.EMPTY;
 
-            // Рисуем карточку ТОЛЬКО если есть задание
             if (!taskStack.isEmpty()) {
                 boolean isHovered = mouseX >= cardX && mouseX < cardX + CARD_WIDTH &&
                         mouseY >= cardY && mouseY < cardY + CARD_HEIGHT;
@@ -122,6 +120,7 @@ public class BulletinBoardScreen extends AbstractContainerScreen<BulletinBoardMe
 
                 if (!taskStack.isEmpty()) {
                     final int slotIndex = hoveredCardIndex;
+                    // Открываем экран задания с callback для принятия
                     Runnable callback = () -> {
                         NetworkHandler.CHANNEL.sendToServer(new TakeTaskPacket(blockEntity.getBlockPos(), slotIndex));
                     };

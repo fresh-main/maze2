@@ -13,21 +13,26 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class BulletinBoardAdminScreen extends Screen {
     private final BulletinBoardBlockEntity blockEntity;
 
     private EditBox intervalInput;
-    private Button saveButton;
-
     private EditBox titleInput;
     private EditBox descriptionInput;
     private EditBox rewardInput;
     private EditBox authorInput;
-    private Button addTaskButton;
+
+    // Поля для требуемых предметов
+    private EditBox requiredItemInput;
+    private EditBox requiredCountInput;
+    private List<RequiredItemInfo> requiredItems = new ArrayList<>();
 
     private Button removeTaskButton;
     private Button spawnSelectedButton;
@@ -38,6 +43,15 @@ public class BulletinBoardAdminScreen extends Screen {
     private int selectedTaskIndex = -1;
     private int displaySecondsLeft = 0;
 
+    private static class RequiredItemInfo {
+        String itemId;
+        int count;
+        RequiredItemInfo(String itemId, int count) {
+            this.itemId = itemId;
+            this.count = count;
+        }
+    }
+
     public BulletinBoardAdminScreen(BulletinBoardBlockEntity blockEntity) {
         super(Component.literal("Настройка доски объявлений"));
         this.blockEntity = blockEntity;
@@ -46,44 +60,30 @@ public class BulletinBoardAdminScreen extends Screen {
     @Override
     protected void init() {
         super.init();
-
         int x = (this.width - SCREEN_WIDTH) / 2;
         int y = (this.height - SCREEN_HEIGHT) / 2;
 
-        // ========== ЛЕВАЯ ЧАСТЬ ==========
-
-        // Поле интервала
+        // Интервал
         intervalInput = new EditBox(this.font, x + 10, y + 30, 70, 20, Component.literal("Интервал"));
         intervalInput.setValue(String.valueOf(blockEntity.getSpawnIntervalSeconds()));
         intervalInput.setMaxLength(10);
         this.addWidget(intervalInput);
 
-        saveButton = Button.builder(
-                Component.literal("Сохранить"),
-                btn -> {
-                    try {
-                        int seconds = Integer.parseInt(intervalInput.getValue());
-                        NetworkHandler.CHANNEL.sendToServer(new SetSpawnIntervalPacket(blockEntity.getBlockPos(), seconds));
-                    } catch (NumberFormatException e) {}
-                }
-        ).bounds(x + 85, y + 30, 65, 20).build();
-        this.addRenderableWidget(saveButton);
+        this.addRenderableWidget(Button.builder(Component.literal("Сохранить"), btn -> {
+            try { NetworkHandler.CHANNEL.sendToServer(new SetSpawnIntervalPacket(blockEntity.getBlockPos(), Integer.parseInt(intervalInput.getValue()))); }
+            catch (NumberFormatException e) {}
+        }).bounds(x + 85, y + 30, 65, 20).build());
 
-        Button refreshTimerButton = Button.builder(
-                Component.literal("🔄"),
-                btn -> NetworkHandler.CHANNEL.sendToServer(new RequestTimerUpdatePacket(blockEntity.getBlockPos()))
-        ).bounds(x + 155, y + 30, 45, 20).build();
-        this.addRenderableWidget(refreshTimerButton);
+        this.addRenderableWidget(Button.builder(Component.literal("🔄"), btn ->
+                NetworkHandler.CHANNEL.sendToServer(new RequestTimerUpdatePacket(blockEntity.getBlockPos()))
+        ).bounds(x + 155, y + 30, 45, 20).build());
 
-        Button resetTimerButton = Button.builder(
-                Component.literal("Сбросить таймер"),
-                btn -> NetworkHandler.CHANNEL.sendToServer(new ResetTimerPacket(blockEntity.getBlockPos()))
-        ).bounds(x + 10, y + 60, 190, 20).build();
-        this.addRenderableWidget(resetTimerButton);
+        this.addRenderableWidget(Button.builder(Component.literal("Сбросить таймер"), btn ->
+                NetworkHandler.CHANNEL.sendToServer(new ResetTimerPacket(blockEntity.getBlockPos()))
+        ).bounds(x + 10, y + 60, 190, 20).build());
 
-        // Поля создания задания
-        int createY = y + 100;
-
+        // Создание задания
+        int createY = y + 95;
         titleInput = new EditBox(this.font, x + 10, createY, 190, 20, Component.literal("Название"));
         titleInput.setHint(Component.literal("Название задания"));
         this.addWidget(titleInput);
@@ -102,34 +102,42 @@ public class BulletinBoardAdminScreen extends Screen {
         authorInput = new EditBox(this.font, x + 10, createY, 190, 20, Component.literal("Автор"));
         authorInput.setHint(Component.literal("Автор"));
         this.addWidget(authorInput);
-        createY += 30;
+        createY += 25;
 
-        addTaskButton = Button.builder(
-                Component.literal("Добавить задание"),
-                btn -> addTask()
-        ).bounds(x + 10, createY, 190, 20).build();
-        this.addRenderableWidget(addTaskButton);
+        // Ввод требуемых предметов
+        requiredItemInput = new EditBox(this.font, x + 10, createY, 120, 20, Component.literal("Предмет"));
+        requiredItemInput.setHint(Component.literal("minecraft:diamond"));
+        this.addWidget(requiredItemInput);
 
-        // ========== ПРАВАЯ ЧАСТЬ ==========
+        requiredCountInput = new EditBox(this.font, x + 135, createY, 65, 20, Component.literal("Кол-во"));
+        requiredCountInput.setHint(Component.literal("1"));
+        this.addWidget(requiredCountInput);
+        createY += 25;
+
+        this.addRenderableWidget(Button.builder(Component.literal("Добавить предмет"), btn -> {
+            String itemId = requiredItemInput.getValue().trim();
+            String countStr = requiredCountInput.getValue().trim();
+            if (!itemId.isEmpty()) {
+                int count = 1;
+                try { count = Integer.parseInt(countStr); if (count < 1) count = 1; } catch (NumberFormatException e) {}
+                requiredItems.add(new RequiredItemInfo(itemId, count));
+                requiredItemInput.setValue("");
+                requiredCountInput.setValue("");
+            }
+        }).bounds(x + 10, createY, 190, 20).build());
+        createY += 25;
+
+        this.addRenderableWidget(Button.builder(Component.literal("Добавить задание"), btn -> addTask())
+                .bounds(x + 10, createY, 190, 20).build());
+
+        // Правая часть
         int rightX = x + 210;
-
-        removeTaskButton = Button.builder(
-                Component.literal("Удалить выбранное"),
-                btn -> removeTask()
-        ).bounds(rightX, y + 25, 220, 20).build();
-        this.addRenderableWidget(removeTaskButton);
-
-        spawnSelectedButton = Button.builder(
-                Component.literal("Спавн выбранное"),
-                btn -> spawnSelectedTask()
-        ).bounds(rightX, y + 50, 220, 20).build();
-        this.addRenderableWidget(spawnSelectedButton);
-
-        backButton = Button.builder(
-                Component.literal("Назад"),
-                btn -> this.onClose()
-        ).bounds(rightX, y + SCREEN_HEIGHT - 45, 220, 20).build();
-        this.addRenderableWidget(backButton);
+        this.addRenderableWidget(Button.builder(Component.literal("Удалить выбранное"), btn -> removeTask())
+                .bounds(rightX, y + 25, 220, 20).build());
+        this.addRenderableWidget(Button.builder(Component.literal("Спавн выбранное"), btn -> spawnSelectedTask())
+                .bounds(rightX, y + 50, 220, 20).build());
+        this.addRenderableWidget(Button.builder(Component.literal("Назад"), btn -> this.onClose())
+                .bounds(rightX, y + SCREEN_HEIGHT - 45, 220, 20).build());
     }
 
     @Override
@@ -152,6 +160,17 @@ public class BulletinBoardAdminScreen extends Screen {
         tag.putString("Description", description);
         tag.putString("Reward", reward);
         tag.putString("Author", author);
+
+        if (!requiredItems.isEmpty()) {
+            ListTag itemsTag = new ListTag();
+            for (RequiredItemInfo item : requiredItems) {
+                CompoundTag itemTag = new CompoundTag();
+                itemTag.putString("ItemId", item.itemId);
+                itemTag.putInt("Count", item.count);
+                itemsTag.add(itemTag);
+            }
+            tag.put("RequiredItems", itemsTag);
+        }
         taskData.put("tag", tag);
 
         NetworkHandler.CHANNEL.sendToServer(new AddTaskPacket(blockEntity.getBlockPos(), taskData));
@@ -160,6 +179,7 @@ public class BulletinBoardAdminScreen extends Screen {
         descriptionInput.setValue("");
         rewardInput.setValue("");
         authorInput.setValue("");
+        requiredItems.clear();
     }
 
     private void removeTask() {
@@ -178,32 +198,22 @@ public class BulletinBoardAdminScreen extends Screen {
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         this.renderBackground(guiGraphics);
-
         int x = (this.width - SCREEN_WIDTH) / 2;
         int y = (this.height - SCREEN_HEIGHT) / 2;
 
-        // Фон
         guiGraphics.fill(x, y, x + SCREEN_WIDTH, y + SCREEN_HEIGHT, 0xFF2d2d2d);
         guiGraphics.renderOutline(x, y, SCREEN_WIDTH, SCREEN_HEIGHT, 0xFF555555);
 
-        // Заголовок
         String title = "Настройка доски объявлений";
         guiGraphics.drawString(this.font, title, x + (SCREEN_WIDTH - this.font.width(title)) / 2, y + 10, 0xFFD700, true);
 
-        // ===== ПОДПИСИ СЛЕВА =====
         guiGraphics.drawString(this.font, "Интервал (сек):", x + 10, y + 15, 0xFFFFFF);
-        guiGraphics.drawString(this.font, "Создание задания:", x + 10, y + 85, 0xFFD700);
-
-        // ===== ПОДПИСЬ СПРАВА =====
+        guiGraphics.drawString(this.font, "Создание задания:", x + 10, y + 80, 0xFFD700);
         guiGraphics.drawString(this.font, "Предзагруженные задания:", x + 210, y + 10, 0xFFD700);
 
-        // ===== СПИСОК ЗАДАНИЙ =====
-        List<CompoundTag> preloaded = blockEntity.getPreloadedTasks();
-        int listX = x + 210;
-        int listY = y + 80; // Список начинается ПОСЛЕ кнопок
-        int listHeight = SCREEN_HEIGHT - 130;
-
-        // Фон списка
+        // Список заданий
+        var preloaded = blockEntity.getPreloadedTasks();
+        int listX = x + 210, listY = y + 80, listHeight = SCREEN_HEIGHT - 130;
         guiGraphics.fill(listX - 5, listY - 5, listX + 240, listY + listHeight, 0xFF1a1a1a);
         guiGraphics.renderOutline(listX - 5, listY - 5, 245, listHeight + 10, 0xFF444444);
 
@@ -214,29 +224,36 @@ public class BulletinBoardAdminScreen extends Screen {
                 CompoundTag taskData = preloaded.get(i);
                 String taskTitle = taskData.getCompound("tag").getString("Title");
                 String taskAuthor = taskData.getCompound("tag").getString("Author");
-
                 int color = (i == selectedTaskIndex) ? 0xFFFF00 : 0xAAAAAA;
-                boolean hover = mouseX >= listX - 5 && mouseX < listX + 240 &&
-                        mouseY >= listY + i * 26 && mouseY < listY + i * 26 + 24;
+                boolean hover = mouseX >= listX - 5 && mouseX < listX + 240 && mouseY >= listY + i * 26 && mouseY < listY + i * 26 + 24;
                 if (hover) color = 0xFFFFFF;
-
                 guiGraphics.drawString(this.font, (i + 1) + ". " + taskTitle, listX, listY + i * 26, color);
                 guiGraphics.drawString(this.font, "§8Автор: " + taskAuthor, listX, listY + i * 26 + 12, 0x888888);
             }
         }
 
-        // ===== ПОЛЯ ВВОДА =====
+        // Отображение добавляемых предметов
+        if (!requiredItems.isEmpty()) {
+            int reqY = y + 235;
+            guiGraphics.drawString(this.font, "Требуется:", x + 10, reqY, 0xFFD700);
+            reqY += 12;
+            for (int i = 0; i < requiredItems.size() && i < 3; i++) {
+                RequiredItemInfo item = requiredItems.get(i);
+                guiGraphics.drawString(this.font, item.count + "x " + item.itemId, x + 10, reqY, 0xAAAAAA);
+                reqY += 10;
+            }
+        }
+
         intervalInput.render(guiGraphics, mouseX, mouseY, partialTick);
         titleInput.render(guiGraphics, mouseX, mouseY, partialTick);
         descriptionInput.render(guiGraphics, mouseX, mouseY, partialTick);
         rewardInput.render(guiGraphics, mouseX, mouseY, partialTick);
         authorInput.render(guiGraphics, mouseX, mouseY, partialTick);
+        requiredItemInput.render(guiGraphics, mouseX, mouseY, partialTick);
+        requiredCountInput.render(guiGraphics, mouseX, mouseY, partialTick);
 
-        // ===== ТАЙМЕР ВНИЗУ СЛЕВА =====
-        guiGraphics.drawString(this.font, "До следующего задания: " + displaySecondsLeft + " сек",
-                x + 10, y + SCREEN_HEIGHT - 50, 0x00FF00);
-        guiGraphics.drawString(this.font, "Очередь: " + preloaded.size() + " заданий",
-                x + 10, y + SCREEN_HEIGHT - 35, 0xAAAAAA);
+        guiGraphics.drawString(this.font, "До следующего задания: " + displaySecondsLeft + " сек", x + 10, y + SCREEN_HEIGHT - 50, 0x00FF00);
+        guiGraphics.drawString(this.font, "Очередь: " + preloaded.size() + " заданий", x + 10, y + SCREEN_HEIGHT - 35, 0xAAAAAA);
 
         super.render(guiGraphics, mouseX, mouseY, partialTick);
     }
@@ -246,13 +263,10 @@ public class BulletinBoardAdminScreen extends Screen {
         if (button == 0) {
             int x = (this.width - SCREEN_WIDTH) / 2;
             int y = (this.height - SCREEN_HEIGHT) / 2;
-            int listX = x + 210;
-            int listY = y + 80;
-            List<CompoundTag> preloaded = blockEntity.getPreloadedTasks();
-
+            int listX = x + 210, listY = y + 80;
+            var preloaded = blockEntity.getPreloadedTasks();
             for (int i = 0; i < preloaded.size() && i < 8; i++) {
-                if (mouseX >= listX - 5 && mouseX < listX + 240 &&
-                        mouseY >= listY + i * 26 && mouseY < listY + i * 26 + 24) {
+                if (mouseX >= listX - 5 && mouseX < listX + 240 && mouseY >= listY + i * 26 && mouseY < listY + i * 26 + 24) {
                     selectedTaskIndex = i;
                     return true;
                 }
@@ -262,7 +276,5 @@ public class BulletinBoardAdminScreen extends Screen {
     }
 
     @Override
-    public boolean isPauseScreen() {
-        return false;
-    }
+    public boolean isPauseScreen() { return false; }
 }

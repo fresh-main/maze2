@@ -49,6 +49,14 @@ public class NetworkHandler {
                 .consumerMainThread(ResetTimerPacket::handle)
                 .add();
 
+
+        // PlaceItemPacket (Клиент -> Сервер)
+        CHANNEL.messageBuilder(PlaceItemPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(PlaceItemPacket::encode)
+                .decoder(PlaceItemPacket::decode)
+                .consumerMainThread(PlaceItemPacket::handle)
+                .add();
+
         // SpawnSpecificTaskPacket (Клиент -> Сервер)
         CHANNEL.messageBuilder(SpawnSpecificTaskPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
                 .encoder(SpawnSpecificTaskPacket::encode)

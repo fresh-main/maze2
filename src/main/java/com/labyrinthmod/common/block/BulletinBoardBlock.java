@@ -2,11 +2,14 @@ package com.labyrinthmod.common.block;
 
 import com.labyrinthmod.common.blockentity.BulletinBoardBlockEntity;
 import com.labyrinthmod.common.init.ModBlockEntities;
+import com.labyrinthmod.common.network.NetworkHandler;
+import com.labyrinthmod.common.network.packet.PlaceItemPacket;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseEntityBlock;
 import net.minecraft.world.level.block.RenderShape;
@@ -33,6 +36,15 @@ public class BulletinBoardBlock extends BaseEntityBlock {
         if (!level.isClientSide) {
             BlockEntity blockEntity = level.getBlockEntity(pos);
             if (blockEntity instanceof BulletinBoardBlockEntity board) {
+                ItemStack heldItem = player.getItemInHand(hand);
+
+                // Если держит предмет — пытаемся выполнить задание
+                if (!heldItem.isEmpty()) {
+                    NetworkHandler.CHANNEL.sendToServer(new PlaceItemPacket(pos));
+                    return InteractionResult.SUCCESS;
+                }
+
+                // Иначе открываем GUI
                 NetworkHooks.openScreen((ServerPlayer) player, board, buf -> buf.writeBlockPos(pos));
             }
         }
@@ -64,7 +76,6 @@ public class BulletinBoardBlock extends BaseEntityBlock {
 
     @Override
     public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> blockEntityType) {
-        System.out.println("[BB] getTicker called, isClient=" + level.isClientSide);
         if (level.isClientSide) return null;
         return (lvl, pos, st, be) -> {
             if (be instanceof BulletinBoardBlockEntity board) {
