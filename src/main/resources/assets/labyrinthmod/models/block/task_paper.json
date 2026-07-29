@@ -1,0 +1,16 @@
+{
+  "textures": {
+    "layer0": "labyrinthmod:item/texture_list",
+    "particle": "labyrinthmod:item/texture_list"
+  },
+  "elements": [
+    {
+      "from": [0, 0, 7.9],
+      "to": [4, 4, 8.1],
+      "faces": {
+        "north": {"uv": [0, 0, 16, 16], "texture": "#layer0"},
+        "south": {"uv": [0, 0, 16, 16], "texture": "#layer0"}
+      }
+    }
+  ]
+}

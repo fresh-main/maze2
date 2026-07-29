@@ -8,6 +8,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 
@@ -19,6 +20,15 @@ public class BulletinBoardScreen extends AbstractContainerScreen<BulletinBoardMe
 
     private static final int[][] CARD_POSITIONS = {
             {35, 55}, {170, 55}, {305, 55}, {105, 160}, {240, 160}
+    };
+
+    // Пути к текстурам карточек разных цветов
+    private static final ResourceLocation[] CARD_TEXTURES = {
+            ResourceLocation.fromNamespaceAndPath("labyrinthmod", "textures/gui/card_burgundy.png"),
+            ResourceLocation.fromNamespaceAndPath("labyrinthmod", "textures/gui/card_blue.png"),
+            ResourceLocation.fromNamespaceAndPath("labyrinthmod", "textures/gui/card_green.png"),
+            ResourceLocation.fromNamespaceAndPath("labyrinthmod", "textures/gui/card_white.png"),
+            ResourceLocation.fromNamespaceAndPath("labyrinthmod", "textures/gui/card_yellow.png")
     };
 
     private int hoveredCardIndex = -1;
@@ -36,7 +46,6 @@ public class BulletinBoardScreen extends AbstractContainerScreen<BulletinBoardMe
         this.titleLabelY = 10;
         this.inventoryLabelY = this.imageHeight + 100;
 
-        // Кнопка открытия админки
         Button adminButton = Button.builder(
                 Component.literal("⚙"),
                 btn -> {
@@ -89,24 +98,22 @@ public class BulletinBoardScreen extends AbstractContainerScreen<BulletinBoardMe
 
                 if (isHovered) hoveredCardIndex = i;
 
-                drawTaskCard(guiGraphics, cardX, cardY, taskStack, isHovered);
+                // Выбираем текстуру по индексу карточки
+                ResourceLocation texture = CARD_TEXTURES[i % CARD_TEXTURES.length];
+
+                // Рисуем текстуру карточки
+                guiGraphics.blit(texture, cardX, cardY, 0, 0, CARD_WIDTH, CARD_HEIGHT, CARD_WIDTH, CARD_HEIGHT);
+
+                // Подсветка при наведении
+                if (isHovered) {
+                    guiGraphics.fill(cardX, cardY, cardX + CARD_WIDTH, cardY + CARD_HEIGHT, 0x40FFFFFF);
+                    guiGraphics.renderOutline(cardX - 2, cardY - 2, CARD_WIDTH + 4, CARD_HEIGHT + 4, 0xFFFFFFFF);
+                }
 
                 if (isHovered) {
                     guiGraphics.renderTooltip(this.font, taskStack, mouseX, mouseY);
                 }
             }
-        }
-    }
-
-    private void drawTaskCard(GuiGraphics guiGraphics, int x, int y, ItemStack stack, boolean isHovered) {
-        guiGraphics.fill(x, y, x + CARD_WIDTH, y + CARD_HEIGHT, 0xFF808080);
-        guiGraphics.hLine(x, x + CARD_WIDTH - 1, y, 0xFFC0C0C0);
-        guiGraphics.vLine(x, y, y + CARD_HEIGHT - 1, 0xFFC0C0C0);
-        guiGraphics.hLine(x, x + CARD_WIDTH - 1, y + CARD_HEIGHT - 1, 0xFF404040);
-        guiGraphics.vLine(x + CARD_WIDTH - 1, y, y + CARD_HEIGHT - 1, 0xFF404040);
-
-        if (isHovered) {
-            guiGraphics.renderOutline(x - 1, y - 1, CARD_WIDTH + 2, CARD_HEIGHT + 2, 0xFFFFFFFF);
         }
     }
 
@@ -120,7 +127,6 @@ public class BulletinBoardScreen extends AbstractContainerScreen<BulletinBoardMe
 
                 if (!taskStack.isEmpty()) {
                     final int slotIndex = hoveredCardIndex;
-                    // Открываем экран задания с callback для принятия
                     Runnable callback = () -> {
                         NetworkHandler.CHANNEL.sendToServer(new TakeTaskPacket(blockEntity.getBlockPos(), slotIndex));
                     };

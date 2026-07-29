@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": {"model": "labyrinthmod:block/bulletin_board"},
+    "facing=east": {"model": "labyrinthmod:block/bulletin_board", "y": 90},
+    "facing=south": {"model": "labyrinthmod:block/bulletin_board", "y": 180},
+    "facing=west": {"model": "labyrinthmod:block/bulletin_board", "y": 270}
+  }
+}
