@@ -20,10 +20,10 @@ public class ModCreativeTabs {
                     .title(Component.translatable("itemGroup.labyrinthmod"))
                     .icon(() -> new ItemStack(ModBlocks.GRIVER_SPAWNER.get()))
                     .displayItems((parameters, output) -> {
-                        // Добавляем все предметы мода в вкладку
 
                         // Блоки
                         output.accept(ModBlocks.GRIVER_SPAWNER.get());
+                        output.accept(ModBlocks.NAMEABLE_SIGNAL_BLOCK_ITEM.get());
 
                         // Предметы (не блоки)
                         output.accept(ModBlocks.PATROL_STICK.get());

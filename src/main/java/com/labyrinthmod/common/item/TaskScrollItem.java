@@ -2,6 +2,8 @@ package com.labyrinthmod.common.item;
 
 import com.labyrinthmod.LabyrinthMod;
 import com.labyrinthmod.client.screen.TaskViewScreen;
+import com.labyrinthmod.common.network.NetworkHandler;
+import com.labyrinthmod.common.network.packet.CompleteTaskPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -38,9 +40,27 @@ public class TaskScrollItem extends Item {
         if (!level.isClientSide) return InteractionResultHolder.pass(stack);
 
         if (stack.hasTag()) {
-            Minecraft.getInstance().setScreen(new TaskViewScreen(stack));
+            // Находим индекс слота, в котором находится свиток
+            int slotIndex = -1;
+            for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+                if (player.getInventory().getItem(i) == stack) {
+                    slotIndex = i;
+                    break;
+                }
+            }
+
+            final int finalSlotIndex = slotIndex;
+
+            // Коллбэк, который сработает при нажатии кнопки "Принять задание"
+            Runnable callback = () -> {
+                NetworkHandler.CHANNEL.sendToServer(new CompleteTaskPacket(finalSlotIndex));
+            };
+
+            // Передаем stack, callback и slotIndex, чтобы кнопка отобразилась
+            Minecraft.getInstance().setScreen(new TaskViewScreen(stack, callback, finalSlotIndex));
             return InteractionResultHolder.success(stack);
         }
+
         return InteractionResultHolder.pass(stack);
     }
 

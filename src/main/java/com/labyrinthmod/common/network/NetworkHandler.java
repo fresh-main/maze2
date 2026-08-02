@@ -198,5 +198,15 @@ public class NetworkHandler {
                 .decoder(SwitchFractionPacket::decode)
                 .consumerMainThread(SwitchFractionPacket::handle)
                 .add();
+        CHANNEL.messageBuilder(CompleteTaskPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(CompleteTaskPacket::encode)
+                .decoder(CompleteTaskPacket::decode)
+                .consumerMainThread(CompleteTaskPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(UpdateBlockNamePacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(UpdateBlockNamePacket::encode)
+                .decoder(UpdateBlockNamePacket::decode)
+                .consumerMainThread(UpdateBlockNamePacket::handle)
+                .add();
     }
 }

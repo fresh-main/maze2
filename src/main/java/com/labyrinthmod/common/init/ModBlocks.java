@@ -3,6 +3,8 @@ package com.labyrinthmod.common.init;
 import com.labyrinthmod.LabyrinthMod;
 import com.labyrinthmod.common.block.BulletinBoardBlock; // <-- ДОБАВЛЕНО
 import com.labyrinthmod.common.block.GriverSpawnerBlock;
+import com.labyrinthmod.common.block.NameableSignalBlock;
+import com.labyrinthmod.common.block.entity.NameableSignalBlockEntity;
 import com.labyrinthmod.common.blockentity.BulletinBoardBlockEntity; // <-- ДОБАВЛЕНО
 import com.labyrinthmod.common.block.entity.GriverSpawnerBlockEntity;
 import com.labyrinthmod.common.item.BoundsStickItem;
@@ -68,11 +70,11 @@ public class ModBlocks {
 
     public static final RegistryObject<Item> IMPOSTER_TABLET = ITEMS.register("traitor_tablet",
             ImposterTabletItem::new);
+    public static final RegistryObject<Block> NAMEABLE_SIGNAL_BLOCK = BLOCKS.register("nameable_signal_block",
+            () -> new NameableSignalBlock(BlockBehaviour.Properties.of().strength(2.0f).requiresCorrectToolForDrops()));
+    public static final RegistryObject<Item> NAMEABLE_SIGNAL_BLOCK_ITEM = ITEMS.register("nameable_signal_block",
+            () -> new BlockItem(NAMEABLE_SIGNAL_BLOCK.get(), new Item.Properties()));
 
-
-    // ==========================================
-    // Block Entities
-    // ==========================================
     public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES =
             DeferredRegister.create(ForgeRegistries.BLOCK_ENTITY_TYPES, LabyrinthMod.MOD_ID);
 
@@ -80,10 +82,12 @@ public class ModBlocks {
             BLOCK_ENTITIES.register("griver_spawner", () ->
                     BlockEntityType.Builder.of(GriverSpawnerBlockEntity::new, GRIVER_SPAWNER.get()).build(null));
 
-    // --- ДОБАВЛЕНО: Доска объявлений (Block Entity) ---
     public static final RegistryObject<BlockEntityType<BulletinBoardBlockEntity>> BULLETIN_BOARD_BE =
             BLOCK_ENTITIES.register("bulletin_board", () ->
                     BlockEntityType.Builder.of(BulletinBoardBlockEntity::new, BULLETIN_BOARD.get()).build(null));
+    public static final RegistryObject<BlockEntityType<NameableSignalBlockEntity>> NAMEABLE_SIGNAL_BE =
+            BLOCK_ENTITIES.register("nameable_signal_be", () ->
+                    BlockEntityType.Builder.of(NameableSignalBlockEntity::new, ModBlocks.NAMEABLE_SIGNAL_BLOCK.get()).build(null));
     // --------------------------------------------------
 
 

@@ -48,10 +48,13 @@ public class WritableTaskMenu extends AbstractContainerMenu {
         return true;
     }
 
-    public void saveAndConvert(String title, String description, String reward) {
+    public void saveAndConvert(String title, String description, int xpReward) {
         if (!writableTask.isEmpty()) {
-            ItemStack taskStack = WritableTaskItem.convertToTask(writableTask, title, description, reward, player.getName().getString());
-            player.getInventory().add(taskStack);
+            ItemStack taskStack = WritableTaskItem.convertToTask(writableTask, title, description, xpReward, player.getName().getString());
+
+            // Заменяем черновик на готовое задание в выбранном слоте инвентаря
+            int slot = player.getInventory().selected;
+            player.getInventory().setItem(slot, taskStack);
         }
     }
 }

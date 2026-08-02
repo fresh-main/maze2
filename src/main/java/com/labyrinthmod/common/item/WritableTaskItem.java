@@ -42,13 +42,16 @@ public class WritableTaskItem extends Item {
         return stack;
     }
 
-    public static ItemStack convertToTask(ItemStack writableStack, String title, String description, String reward, String author) {
-        ItemStack taskStack = new ItemStack(ModItems.TASK.get());
+    public static ItemStack convertToTask(ItemStack writableStack, String title, String description, int xpReward, String author) {
+        ItemStack taskStack = new ItemStack(ModItems.TASK.get()); // Убедитесь, что имя регистра правильное (TASK или TASK_SCROLL)
         CompoundTag tag = new CompoundTag();
-        tag.putString("TaskTitle", title);
-        tag.putString("TaskDescription", description);
-        tag.putString("TaskReward", reward);
+
+        // Исправленные ключи, которые ожидает TaskViewScreen
+        tag.putString("Title", title);
+        tag.putString("Description", description);
+        tag.putInt("XpReward", xpReward); // Сохраняем награду как количество уровней опыта
         tag.putString("Author", author);
+
         taskStack.setTag(tag);
         return taskStack;
     }

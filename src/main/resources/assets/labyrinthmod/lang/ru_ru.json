@@ -41,6 +41,9 @@
   "key.labyrinthmod.toggle_note": "Записка с картой (взять/передать)",
   "key.labyrinthmod.hold_minimap": "Показать мини-карту (зажать)",
   "key.categories.labyrinthmod": "Карта лабиринта",
+  "item.labyrinthmod.task_scroll": "Задание",
+  "block.labyrinthmod.bulletin_board": "Доска Заданий",
 
-  "worldType.labyrinthmod.labyrinth": "Лабиринт"
+  "worldType.labyrinthmod.labyrinth": "Лабиринт",
+  "block.nameable_signal_block": "Блок-Условие"
 }

@@ -294,6 +294,7 @@ public class LabyrinthMod {
         ImposterCommand.register(event.getDispatcher());
         WindZoneCommand.register(event.getDispatcher());
         InfectionCommand.register(event.getDispatcher());
+        LiftCommand.register(event.getDispatcher());
     }
 
     @SubscribeEvent
@@ -338,6 +339,7 @@ public class LabyrinthMod {
             }
         }
     }
+
 
     @SubscribeEvent
     public void onInfectionPlayerTick(TickEvent.PlayerTickEvent e) {

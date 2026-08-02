@@ -1,6 +1,7 @@
 package com.labyrinthmod.common.init;
 
 import com.labyrinthmod.LabyrinthMod;
+import com.labyrinthmod.common.block.entity.NameableSignalBlockEntity;
 import com.labyrinthmod.common.blockentity.BulletinBoardBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -16,6 +17,9 @@ public class ModBlockEntities {
             BLOCK_ENTITIES.register("bulletin_board", () ->
                     BlockEntityType.Builder.of(BulletinBoardBlockEntity::new, ModBlocks.BULLETIN_BOARD.get()).build(null)
             );
+    public static final RegistryObject<BlockEntityType<NameableSignalBlockEntity>> NAMEABLE_SIGNAL_BE =
+            BLOCK_ENTITIES.register("nameable_signal_be", () ->
+                    BlockEntityType.Builder.of(NameableSignalBlockEntity::new, ModBlocks.NAMEABLE_SIGNAL_BLOCK.get()).build(null));
 
     public static void register(IEventBus modEventBus) {
         BLOCK_ENTITIES.register(modEventBus);
