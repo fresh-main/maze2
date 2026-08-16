@@ -12,6 +12,7 @@ import com.labyrinthmod.common.event.ChatDisableHandler;
 import com.labyrinthmod.common.event.DebugStickHandler;
 import com.labyrinthmod.common.event.FractionEvents;
 import com.labyrinthmod.common.event.GriverPossessionHandler;
+import com.labyrinthmod.common.generation.LabyrinthBiomeSource;
 import com.labyrinthmod.common.generation.LabyrinthChunkGenerator;
 import com.labyrinthmod.common.generation.LabyrinthConfig;
 import com.labyrinthmod.common.init.ModBlocks;
@@ -46,9 +47,11 @@ import com.mazemap.scan.MapScanner;
 import com.mazemap.storage.MazeMapStorage;
 import com.mazemap.client.input.MazeMapKeyBindings;
 
+import com.mojang.serialization.Codec;
 import com.otbor.client.ClientEvents;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
+import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -56,6 +59,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.AttachCapabilitiesEvent;
@@ -73,8 +77,10 @@ import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.fml.loading.FMLEnvironment;
 import net.minecraftforge.fml.loading.FMLPaths;
+import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.RegisterEvent;
 import net.minecraftforge.network.PacketDistributor;
+import net.minecraftforge.registries.RegistryObject;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -82,6 +88,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.List;
+import net.minecraft.core.registries.Registries;
 
 @Mod(LabyrinthMod.MOD_ID)
 
@@ -108,6 +115,8 @@ public class LabyrinthMod {
     }
 
     public LabyrinthMod() {
+        BIOME_SOURCES.register(FMLJavaModLoadingContext.get().getModEventBus());
+
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
 
 
@@ -495,4 +504,9 @@ public class LabyrinthMod {
             }
         }
     }
+    public static final DeferredRegister<Codec<? extends BiomeSource>> BIOME_SOURCES =
+            DeferredRegister.create(Registries.BIOME_SOURCE, "labyrinthmod");
+
+    public static final RegistryObject<Codec<LabyrinthBiomeSource>> LABYRINTH_BIOME_SOURCE =
+            BIOME_SOURCES.register("labyrinth_biome_source", () -> LabyrinthBiomeSource.CODEC);
 }

@@ -1,36 +1,49 @@
 package com.labyrinthmod.common.command;
 
-import com.labyrinthmod.common.block.entity.NamedBlockManager;
+import com.labyrinthmod.common.block.entity.NameableSignalBlockEntity;
 import com.mojang.brigadier.CommandDispatcher;
-import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.entity.BlockEntity;
+
+import java.util.List;
 
 public class LiftCommand {
-
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-        dispatcher.register(Commands.literal("labyrinth")
-                .then(Commands.literal("lift")
-                        .executes(LiftCommand::activateLift)
+        dispatcher.register(Commands.literal("lift")
+                .then(Commands.argument("name", StringArgumentType.word())
+                        .executes(context -> {
+                            CommandSourceStack source = context.getSource();
+                            String targetName = StringArgumentType.getString(context, "name");
+                            ServerLevel level = source.getLevel();
+
+                            int activatedCount = 0;
+
+                            List<BlockPos> positions = NameableSignalBlockEntity.getPositionsByName(targetName);
+
+                            for (BlockPos pos : positions) {
+                                BlockEntity be = level.getBlockEntity(pos);
+                                if (be instanceof NameableSignalBlockEntity signalBe) {
+                                    signalBe.setPowered(true);
+                                    activatedCount++;
+                                }
+                            }
+
+                            // ★ ИСПРАВЛЕНО: создаём финальную копию для лямбды ★
+                            final int finalCount = activatedCount;
+
+                            if (activatedCount > 0) {
+                                source.sendSuccess(() -> Component.literal("Активировано блоков с именем '" + targetName + "': " + finalCount), true);
+                            } else {
+                                source.sendFailure(Component.literal("Не найдено блоков с именем '" + targetName + "'"));
+                            }
+                            return 1;
+                        })
                 )
         );
-    }
-
-    private static int activateLift(CommandContext<CommandSourceStack> context) {
-        ServerLevel level = context.getSource().getLevel();
-
-        // Одна строка кода, которая гарантированно найдет все блоки
-        int activatedCount = NamedBlockManager.activateByName(level, "lift");
-
-        if (activatedCount > 0) {
-            context.getSource().sendSuccess(() ->
-                    Component.literal("§aСигнал подан на " + activatedCount + " блок(а) с именем 'lift'."), true);
-        } else {
-            context.getSource().sendFailure(Component.literal("§cБлоки с именем 'lift' не найдены."));
-        }
-
-        return activatedCount;
     }
 }

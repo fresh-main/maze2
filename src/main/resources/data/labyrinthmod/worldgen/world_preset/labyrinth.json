@@ -5,31 +5,12 @@
       "generator": {
         "type": "labyrinthmod:labyrinth_chunk_generator",
         "biome_source": {
-          "type": "minecraft:fixed",
-          "biome": "minecraft:plains"
-        },
-        "seed": 0
-      }
-    },
-    "minecraft:the_nether": {
-      "type": "minecraft:the_nether",
-      "generator": {
-        "type": "minecraft:noise",
-        "settings": "minecraft:nether",
-        "biome_source": {
-          "type": "minecraft:multi_noise",
-          "preset": "minecraft:nether"
-        },
-        "seed": 0
-      }
-    },
-    "minecraft:the_end": {
-      "type": "minecraft:the_end",
-      "generator": {
-        "type": "minecraft:noise",
-        "settings": "minecraft:end",
-        "biome_source": {
-          "type": "minecraft:the_end"
+          "type": "labyrinthmod:labyrinth_biome_source",
+          "base_biome_source": {
+            "type": "minecraft:fixed",
+            "biome": "minecraft:plains"
+          },
+          "seed": 0
         },
         "seed": 0
       }
