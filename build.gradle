@@ -65,6 +65,17 @@ sourceSets.main.resources { srcDir 'src/generated/resources' }
 
 repositories {
     mavenCentral()
+
+    // ★ ДОБАВЛЕНО: Репозитории для Create, Ponder, Flywheel и Registrate ★
+    maven {
+        name = "Create"
+        url = "https://maven.createmod.net"
+    }
+    maven {
+        name = "Registrate"
+        url = "https://maven.ithundxr.dev/mirror"
+    }
+
     maven {
         name = "Illusive Soulworks (Curios)"
         url = "https://maven.theillusivec4.top/"
@@ -94,11 +105,20 @@ dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 
+    // ★ ДОБАВЛЕНО: Сам мод Create (slim-версия без лишних транзитивных зависимостей) ★
+    implementation fg.deobf("com.simibubi.create:create-${minecraft_version}:${create_version}:slim") { transitive = false }
+
+    // Зависимости Create
+    implementation fg.deobf("net.createmod.ponder:Ponder-Forge-${minecraft_version}:${ponder_version}")
+    compileOnly fg.deobf("dev.engine-room.flywheel:flywheel-forge-api-${minecraft_version}:${flywheel_version}")
+    runtimeOnly fg.deobf("dev.engine-room.flywheel:flywheel-forge-${minecraft_version}:${flywheel_version}")
+    implementation fg.deobf("com.tterrag.registrate:Registrate:${registrate_version}")
+
     // Curios
     compileOnly fg.deobf("top.theillusivec4.curios:curios-forge:5.4.0+1.20.1:api")
     runtimeOnly fg.deobf("top.theillusivec4.curios:curios-forge:5.4.0+1.20.1")
 
-    // JEI (Обновлено до версии, которую требует Sophisticated Core)
+    // JEI
     compileOnly fg.deobf("mezz.jei:jei-1.20.1-forge:15.20.0.129")
     runtimeOnly fg.deobf("mezz.jei:jei-1.20.1-forge:15.20.0.129")
 
@@ -108,10 +128,8 @@ dependencies {
     // Остальные моды
     implementation fg.deobf("curse.maven:creativecore-257814:7649757")
     implementation fg.deobf("curse.maven:playerrevive-266890:6048921")
-
     implementation fg.deobf("curse.maven:sophisticated-core-618298:7916595")
     implementation fg.deobf("curse.maven:sophisticated-backpacks-422301:7916619")
-
     implementation fg.deobf("curse.maven:first-aid-276837:5531834")
     implementation fg.deobf("org.embeddedt:embeddium-1.20.1:0.3.31-beta.53+mc1.20.1")
     implementation fg.deobf("curse.maven:oculus-581495:6020952")

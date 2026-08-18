@@ -696,7 +696,6 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         int topY = getTopY(worldX, worldZ);
         boolean isNatural = (dist <= GLADE_RADIUS || dist > OUTER_WALL_END);
 
-        // ★ Расстояние до кривой реки (один раз на колонку) ★
         double riverDist = -1;
         if (isNatural && dist <= GLADE_RADIUS) {
             riverDist = distanceToRiverCurve(worldX, worldZ);
@@ -705,7 +704,6 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         for (int localY = 0; localY < 16; localY++) {
             int worldY = baseY + localY;
             BlockState state;
-
             if (isNatural) {
                 state = generateNaturalTerrain(worldX, worldY, worldZ, dist, riverDist);
             } else {
@@ -1120,6 +1118,11 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
                 double smoothBlend = passageBlend * passageBlend * (3.0 - 2.0 * passageBlend);
                 int targetHeight = FLOOR_Y;
                 terrainHeight = (int)(terrainHeight * (1.0 - smoothBlend) + targetHeight * smoothBlend);
+            }
+            double structureBlend = getStructureBlendFactor(x, z);
+            if (structureBlend > 0.0) {
+                double smoothBlend = structureBlend * structureBlend * (3.0 - 2.0 * structureBlend);
+                terrainHeight = (int)(terrainHeight * (1.0 - smoothBlend) + FLOOR_Y * smoothBlend);
             }
 
             // ★ РЕКА через расстояние до кривой Безье ★
@@ -1728,7 +1731,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
     @Override
     public void applyBiomeDecoration(WorldGenLevel level, ChunkAccess chunk, StructureManager structureManager) {
         // ★ РАЗМЕЩЕНИЕ NBT СТРУКТУР ★
-        StructureGenerator.placeStructures(level, structureManager, chunk.getPos().x, chunk.getPos().z);
+        StructureGenerator.placeStructuresInChunk(level, chunk);
         ChunkPos chunkPos = chunk.getPos();
         int minX = chunkPos.getMinBlockX();
         int minZ = chunkPos.getMinBlockZ();
@@ -1748,13 +1751,13 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
                 if (dist > GLADE_RADIUS - 5) continue;
 
                 // ★ ДЕРЕВЬЯ: сетка 4×4, минимальное расстояние 3 блока ★
-                int treeGridX = Math.floorDiv(x, 4);
-                int treeGridZ = Math.floorDiv(z, 4);
+                int treeGridX = Math.floorDiv(x, 3);
+                int treeGridZ = Math.floorDiv(z, 3);
                 long treeGridSeed = ((long) treeGridX * 73856093L) ^ ((long) treeGridZ * 19349663L) ^ this.seed;
                 Random treeGridRand = new Random(treeGridSeed);
                 // Случайная позиция внутри центральных 2×2 блоков ячейки
-                int chosenTreeX = treeGridX * 4 + 1 + treeGridRand.nextInt(2);
-                int chosenTreeZ = treeGridZ * 4 + 1 + treeGridRand.nextInt(2);
+                int chosenTreeX = treeGridX * 3 + 1 + treeGridRand.nextInt(2);
+                int chosenTreeZ = treeGridZ * 3 + 1 + treeGridRand.nextInt(2);
 
                 if (x == chosenTreeX && z == chosenTreeZ && treeGridRand.nextDouble() < 0.40) {
                     double noise = terrainNoise.noise(x * 0.04, 0, z * 0.04);
@@ -1770,9 +1773,9 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
                     // Перемешанные типы: 40% дуб, 35% высокая берёза, 25% обычная берёза
                     double typeRand = treeGridRand.nextDouble();
                     String featureName;
-                    if (typeRand < 0.40) {
+                    if (typeRand < 0.60) {
                         featureName = "minecraft:fancy_oak";
-                    } else if (typeRand < 0.75) {
+                    } else if (typeRand < 0.85) {
                         featureName = "minecraft:super_birch_bees";
                     } else {
                         featureName = "minecraft:birch";
@@ -1789,12 +1792,12 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
                 }
 
                 // ★ ПОВАЛЕННЫЕ ДЕРЕВЬЯ: сетка 8×8, максимум одно на ячейку ★
-                int fallenGridX = Math.floorDiv(x, 8);
-                int fallenGridZ = Math.floorDiv(z, 8);
+                int fallenGridX = Math.floorDiv(x, 6);
+                int fallenGridZ = Math.floorDiv(z, 6);
                 long fallenGridSeed = ((long) fallenGridX * 31337L) ^ ((long) fallenGridZ * 7919L) ^ this.seed;
                 Random fallenGridRand = new Random(fallenGridSeed);
-                int chosenFallenX = fallenGridX * 8 + fallenGridRand.nextInt(8);
-                int chosenFallenZ = fallenGridZ * 8 + fallenGridRand.nextInt(8);
+                int chosenFallenX = fallenGridX * 6 + fallenGridRand.nextInt(6);
+                int chosenFallenZ = fallenGridZ * 6 + fallenGridRand.nextInt(6);
 
                 if (x == chosenFallenX && z == chosenFallenZ && fallenGridRand.nextDouble() < 0.12) {
                     double noise = terrainNoise.noise(x * 0.04, 0, z * 0.04);
@@ -1912,7 +1915,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             default: return Blocks.POPPY.defaultBlockState();
         }
     }
-    // ★ КРИВАЯ РЕКИ (Квадратичная Безье) ★
+    // ★ КРИВАЯ РЕКИ: метод потенциальных полей (гарантированное соединение) ★
     private double[][] riverCurvePoints = null;
 
     private void ensureRiverCurve() {
@@ -1920,10 +1923,10 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
 
         long riverSeed = this.seed ^ 0x5EEDL;
         Random riverRand = new Random(riverSeed);
-
         int R = GLADE_RADIUS;
-        int startCorner = riverRand.nextInt(4);
 
+        // Определение начального угла
+        int startCorner = riverRand.nextInt(4);
         double startX, startZ, endX, endZ;
         switch (startCorner) {
             case 0: startX = -R; startZ = -R; break;
@@ -1932,6 +1935,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             default: startX = -R; startZ = R; break;
         }
 
+        // Противоположный угол со смещением 15 блоков
         int endCorner = (startCorner + 2) % 4;
         switch (endCorner) {
             case 0: endX = -R; endZ = -R; break;
@@ -1940,7 +1944,6 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             default: endX = -R; endZ = R; break;
         }
 
-        // ★ Смещение конечной точки на 15 блоков от входа ★
         double shiftDir = riverRand.nextBoolean() ? 1.0 : -1.0;
         if (endCorner == 0 || endCorner == 2) {
             endX += shiftDir * 15.0;
@@ -1948,30 +1951,98 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             endZ += shiftDir * 15.0;
         }
 
-        // ★ Контрольная точка: обход центра на 30 блоков ★
-        double dirX = endX - startX;
-        double dirZ = endZ - startZ;
-        double dirLen = Math.sqrt(dirX * dirX + dirZ * dirZ);
-        dirX /= dirLen;
-        dirZ /= dirLen;
-
-        double perpX = -dirZ;
-        double perpZ = dirX;
-
-        double bypassDir = riverRand.nextBoolean() ? 1.0 : -1.0;
-        double controlX = perpX * 40.0 * bypassDir;
-        double controlZ = perpZ * 40.0 * bypassDir;
-
-        // Генерация точек кривой
-        int pointCount = 50;
+        // ★ ПОСТРОЕНИЕ ПУТИ МЕТОДОМ ПОТЕНЦИАЛЬНЫХ ПОЛЕЙ ★
+        int pointCount = 60;
         riverCurvePoints = new double[pointCount][2];
 
+        double currentX = startX;
+        double currentZ = startZ;
+
+        // Параметры препятствий
+        double liftX = 0.0;
+        double liftZ = 0.0;
+        double liftAvoidRadius = 40.0;  // радиус обхода лифта
+        double centerAvoidRadius = 40.0; // радиус обхода центра
+        double wallMargin = 8.0;         // отступ от стен глейда
+
         for (int i = 0; i < pointCount; i++) {
-            double t = (double) i / (pointCount - 1);
-            double mt = 1.0 - t;
-            riverCurvePoints[i][0] = mt * mt * startX + 2 * mt * t * controlX + t * t * endX;
-            riverCurvePoints[i][1] = mt * mt * startZ + 2 * mt * t * controlZ + t * t * endZ;
+            riverCurvePoints[i][0] = currentX;
+            riverCurvePoints[i][1] = currentZ;
+
+            if (i == pointCount - 1) break;
+
+            // === 1. ПРИТЯЖЕНИЕ К ЦЕЛИ (гарантирует соединение) ===
+            double attractX = endX - currentX;
+            double attractZ = endZ - currentZ;
+            double attractDist = Math.sqrt(attractX * attractX + attractZ * attractZ);
+            if (attractDist > 0.001) {
+                attractX /= attractDist;
+                attractZ /= attractDist;
+            }
+
+            // === 2. ОТТАЛКИВАНИЕ ОТ ЛИФТА ===
+            double repelLiftX = 0, repelLiftZ = 0;
+            double dlx = currentX - liftX;
+            double dlz = currentZ - liftZ;
+            double liftDist = Math.sqrt(dlx * dlx + dlz * dlz);
+            if (liftDist < liftAvoidRadius && liftDist > 0.001) {
+                double t = 1.0 - liftDist / liftAvoidRadius;
+                double strength = t * t * 4.0; // квадратичное усиление
+                repelLiftX = (dlx / liftDist) * strength;
+                repelLiftZ = (dlz / liftDist) * strength;
+            }
+
+            // === 3. ОТТАЛКИВАНИЕ ОТ ЦЕНТРА ГЛЕЙДА ===
+            double repelCenterX = 0, repelCenterZ = 0;
+            double centerDist = Math.sqrt(currentX * currentX + currentZ * currentZ);
+            if (centerDist < centerAvoidRadius && centerDist > 0.001) {
+                double t = 1.0 - centerDist / centerAvoidRadius;
+                double strength = t * t * 3.0;
+                repelCenterX = (currentX / centerDist) * strength;
+                repelCenterZ = (currentZ / centerDist) * strength;
+            }
+
+            // === 4. ОТТАЛКИВАНИЕ ОТ СТЕН ГЛЕЙДА ===
+            double repelWallX = 0, repelWallZ = 0;
+            double distRight = R - currentX;
+            double distLeft = currentX + R;
+            double distUp = R - currentZ;
+            double distDown = currentZ + R;
+            double minWallDist = Math.min(Math.min(distRight, distLeft), Math.min(distUp, distDown));
+
+            if (minWallDist < wallMargin) {
+                double strength = (1.0 - minWallDist / wallMargin) * 2.5;
+                if (minWallDist == distRight) repelWallX = -strength;
+                else if (minWallDist == distLeft) repelWallX = strength;
+                else if (minWallDist == distUp) repelWallZ = -strength;
+                else repelWallZ = strength;
+            }
+
+            // === 5. РЕЗУЛЬТИРУЮЩАЯ СИЛА ===
+            double totalX = attractX * 1.0 + repelLiftX + repelCenterX + repelWallX;
+            double totalZ = attractZ * 1.0 + repelLiftZ + repelCenterZ + repelWallZ;
+
+            double totalDist = Math.sqrt(totalX * totalX + totalZ * totalZ);
+            if (totalDist > 0.001) {
+                totalX /= totalDist;
+                totalZ /= totalDist;
+            }
+
+            // === 6. ШАГ К ЦЕЛИ ===
+            double stepSize = attractDist / (pointCount - 1 - i);
+            stepSize = Math.min(stepSize, attractDist); // не перепрыгиваем цель
+
+            currentX += totalX * stepSize;
+            currentZ += totalZ * stepSize;
+
+            // Жёсткое ограничение: не выходим за глейд
+            currentX = Math.max(-R + 3, Math.min(R - 3, currentX));
+            currentZ = Math.max(-R + 3, Math.min(R - 3, currentZ));
         }
+
+        // Принудительно фиксируем конечную точку
+        riverCurvePoints[pointCount - 1][0] = endX;
+        riverCurvePoints[pointCount - 1][1] = endZ;
     }
 
     private double distanceToRiverCurve(double x, double z) {
@@ -2026,5 +2097,20 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
                 return Math.sqrt((double) dx * dx + (double) dz * dz);
             }
         }
+    }
+    // ★ СГЛАЖИВАНИЕ ЛАНДШАФТА ВОКРУГ СТРУКТУР ★
+    private double getStructureBlendFactor(int x, int z) {
+        // Центры структур (X, Z) — lift_1 и lift_2 имеют одинаковые координаты
+        int structX = 0;
+        int structZ = 0;
+
+        int blendRadius = 35; // радиус сглаживания
+
+        double dx = x - structX;
+        double dz = z - structZ;
+        double dist = Math.sqrt(dx * dx + dz * dz);
+
+        if (dist >= blendRadius) return 0.0;
+        return 1.0 - (dist / blendRadius);
     }
 }
