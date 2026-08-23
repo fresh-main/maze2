@@ -1,6 +1,7 @@
 package com.otbor.client;
 
 import com.otbor.client.widgets.PaperRender;
+import java.lang.reflect.Modifier;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -57,47 +58,68 @@ public final class LoadingScreenStyling {
     public static int paperY(Screen screen)      { return (screen.height - paperHeight(screen)) / 2; }
 
     // ===================== РЕАЛЬНЫЙ ПРОГРЕСС =====================
-
     private static float getRealProgress(Screen screen) {
         long now = System.currentTimeMillis();
 
-        try {
-            if (screen instanceof LevelLoadingScreen loading) {
-                // ★ ИСПРАВЛЕНИЕ: Получаем объект progressListener через рефлексию
-                Field listenerField = LevelLoadingScreen.class.getDeclaredField("progressListener");
-                listenerField.setAccessible(true);
-                Object listener = listenerField.get(loading);
-
+        // 1) LevelLoadingScreen: реальный прогресс
+        //    (в IDEA поле найдётся по имени, в лаунчере — по типу)
+        if (screen instanceof LevelLoadingScreen loading) {
+            try {
+                Object listener = findListener(loading);
                 if (listener != null) {
-                    // Вызываем метод getProgress() у listener, который возвращает int (0..100)
                     Method getProgressMethod = listener.getClass().getMethod("getProgress");
                     int progressInt = (int) getProgressMethod.invoke(listener);
-
-                    // Нормализуем в float (0.0 .. 1.0)
                     float val = Mth.clamp(progressInt, 0, 100) / 100f;
-                    if (val >= 0f && val <= 1f) {
-                        cachedProgress = val;
-                        lastProgressUpdate = now;
-                        return val;
-                    }
+                    cachedProgress = val;
+                    lastProgressUpdate = now;
+                    return val;
                 }
-            }
-        } catch (Exception ignored) {}
-
-        try {
-            if (screen instanceof ReceivingLevelScreen) {
-                long elapsed = now - firstRenderTime;
-                float simulated = Math.min(0.95f, elapsed / 8000f);
-                cachedProgress = simulated;
-                lastProgressUpdate = now;
-                return simulated;
-            }
-        } catch (Exception ignored) {}
-
-        if (now - lastProgressUpdate < 2000) {
-            return cachedProgress;
+            } catch (Exception ignored) {}
         }
-        return 0.5f;
+
+        // 2) Подключение к серверу — симуляция по времени
+        if (screen instanceof ReceivingLevelScreen) {
+            long elapsed = now - firstRenderTime;
+            float simulated = Math.min(0.95f, elapsed / 8000f);
+            cachedProgress = simulated;
+            lastProgressUpdate = now;
+            return simulated;
+        }
+
+        // 3) Рефлекция недоступна — ПЛАВНАЯ симуляция вместо застывших 50%
+        float simulated = simulateProgress();
+        cachedProgress = simulated;
+        lastProgressUpdate = now;
+        return simulated;
+    }
+
+    // Поиск progressListener: по имени в IDEA, по ТИПУ в лаунчере (имя обфусцировано)
+    private static Object findListener(LevelLoadingScreen loading) throws Exception {
+        try {
+            Field f = LevelLoadingScreen.class.getDeclaredField("progressListener");
+            f.setAccessible(true);
+            return f.get(loading);
+        } catch (NoSuchFieldException ignored) {}
+
+        // Имя поля обфусцировано — ищем нестатическое поле-интерфейс из net.minecraft
+        for (Field f : LevelLoadingScreen.class.getDeclaredFields()) {
+            if (Modifier.isStatic(f.getModifiers())) continue;
+            Class<?> type = f.getType();
+            if (type.isInterface() && type.getName().startsWith("net.minecraft")) {
+                f.setAccessible(true);
+                Object val = f.get(loading);
+                if (val != null) return val;
+            }
+        }
+        return null;
+    }
+
+    // Плавный прогресс "асимптота": быстро растёт в начале, медленнее к концу
+    private static float simulateProgress() {
+        long elapsed = System.currentTimeMillis() - firstRenderTime;
+        float t = elapsed / 1000f;
+        float sim = 1f - (float) Math.exp(-t / 5f);
+        return Math.min(0.95f, sim);
     }
 
     // ===================== АНИМАЦИЯ ОТОБРАЖАЕМОГО ПРОГРЕССА =====================

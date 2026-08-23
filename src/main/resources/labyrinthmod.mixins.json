@@ -13,6 +13,9 @@
     "FirstAidDamageablePartMixin"
   ],
   "client": [
+    "MixinShaderPackScreenPaper",
+    "MixinFirstAidPaperPanel",
+    "MixinFirstAidPaperButton",
     "DebugOverlayMixin",
     "MazeKeyboardHandlerMixin",
     "StorageScreenBaseMixin",

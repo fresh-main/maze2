@@ -20,6 +20,20 @@ public class NetworkHandler {
 
     public static void register() {
 
+        // Добавь регистрацию пакета
+        int packetId = 0;
+
+        // Только TimeSpeedPacket (для отправки значений слайдера на сервер)
+        CHANNEL.registerMessage(
+                packetId++,
+                TimeSpeedPacket.class,
+                TimeSpeedPacket::encode,
+                TimeSpeedPacket::new,
+                TimeSpeedPacket::handle
+        );
+
+
+
 
         // 0. SpawnTaskPacket (Клиент -> Сервер) - ДОБАВЛЕНО С id++
         CHANNEL.messageBuilder(SpawnTaskPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
