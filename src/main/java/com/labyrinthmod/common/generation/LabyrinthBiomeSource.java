@@ -23,9 +23,8 @@ public class LabyrinthBiomeSource extends BiomeSource {
 
     private final BiomeSource baseSource;
     private final long seed;
-
-    // ★ Кэш кривой реки ★
     private double[][] riverCurvePoints = null;
+    private static boolean debugPrinted = false; // для однократного вывода отладки
 
     public LabyrinthBiomeSource(BiomeSource baseSource, long seed) {
         this.baseSource = baseSource;
@@ -34,19 +33,32 @@ public class LabyrinthBiomeSource extends BiomeSource {
     }
 
     @Override
-    public Holder<Biome> getNoiseBiome(int x, int y, int z, Climate.Sampler sampler) {
-        if (isForestBiomeAt(x, z)) {
-            return getForestHolder();
-        }
-        if (isRiverBiomeAt(x, z)) {
-            return getRiverHolder();
-        }
-        return baseSource.getNoiseBiome(x, y, z, sampler);
+    protected Codec<? extends BiomeSource> codec() {
+        return CODEC;
     }
 
     @Override
-    protected Codec<? extends BiomeSource> codec() {
-        return CODEC;
+    public Holder<Biome> getNoiseBiome(int x, int y, int z, Climate.Sampler sampler) {
+        // ★★★ КРИТИЧЕСКИ ВАЖНО: координаты в getNoiseBiome ПОДЕЛЕНЫ НА 4 ★★★
+        int realX = x << 2; // то же что x * 4
+        int realZ = z << 2;
+
+        // Отладка: выводим первые несколько вызовов
+        if (!debugPrinted) {
+            debugPrinted = true;
+            System.out.println("[BiomeDebug] getNoiseBiome called: raw=(" + x + "," + y + "," + z
+                    + ") real=(" + realX + "," + realZ + ")");
+        }
+
+        if (isForestBiomeAt(realX, realZ)) {
+            Holder<Biome> forest = getForestHolder();
+            if (forest != null) return forest;
+        }
+        if (isRiverBiomeAt(realX, realZ)) {
+            Holder<Biome> river = getRiverHolder();
+            if (river != null) return river;
+        }
+        return baseSource.getNoiseBiome(x, y, z, sampler);
     }
 
     @Override
@@ -55,17 +67,13 @@ public class LabyrinthBiomeSource extends BiomeSource {
         Holder<Biome> river = getRiverHolder();
         Holder<Biome> forest = getForestHolder();
 
-        // ★ Защита от null: если реестр ещё не загружен ★
         if (plains == null || river == null || forest == null) {
+            System.err.println("[LabyrinthBiomeSource] WARNING: Some biome holders are null! "
+                    + "plains=" + plains + " river=" + river + " forest=" + forest);
             return Stream.empty();
         }
-
         return Stream.of(plains, river, forest);
     }
-
-    // ==========================================
-    // ★ ХОЛДЕРЫ БИОМОВ ★
-    // ==========================================
 
     private Holder<Biome> getRiverHolder() {
         return ForgeRegistries.BIOMES.getHolder(Biomes.RIVER.location()).orElse(null);
@@ -79,10 +87,7 @@ public class LabyrinthBiomeSource extends BiomeSource {
         return ForgeRegistries.BIOMES.getHolder(Biomes.FOREST.location()).orElse(null);
     }
 
-    // ==========================================
-    // ★ ЗОНА ЛЕСА: северная сторона, минимум 20 блоков от центра ★
-    // ==========================================
-
+    // ★ ЗОНА ЛЕСА: принимает РЕАЛЬНЫЕ координаты ★
     private boolean isForestBiomeAt(int x, int z) {
         int dist = Math.max(Math.abs(x), Math.abs(z));
         if (dist > 70) return false;
@@ -94,26 +99,17 @@ public class LabyrinthBiomeSource extends BiomeSource {
         return true;
     }
 
-    // ==========================================
-    // ★ ЗОНА РЕКИ: расстояние до кривой Безье ★
-    // ==========================================
-
+    // ★ ЗОНА РЕКИ: принимает РЕАЛЬНЫЕ координаты ★
     private boolean isRiverBiomeAt(int x, int z) {
         int dist = Math.max(Math.abs(x), Math.abs(z));
         if (dist > 70) return false;
 
         double riverDist = distanceToRiverCurve(x, z);
 
-        // ★ УВЕЛИЧЕННАЯ ШИРИНА И БЕРЕГ ★
         double waterHalfWidth = 8.5;
         double bankHalfWidth = 3.0;
-
         return riverDist < waterHalfWidth + bankHalfWidth;
     }
-
-    // ==========================================
-    // ★ КРИВАЯ РЕКИ (Квадратичная Безье) ★
-    // ==========================================
 
     private double distanceToRiverCurve(double x, double z) {
         ensureRiverCurve();
@@ -136,10 +132,8 @@ public class LabyrinthBiomeSource extends BiomeSource {
         Random riverRand = new Random(riverSeed);
         int R = 70;
 
-        // ★ Случайный начальный угол (вариативность) ★
         int startCorner = riverRand.nextInt(4);
         double startX, startZ, endX, endZ;
-
         switch (startCorner) {
             case 0: startX = -R; startZ = -R; break;
             case 1: startX = R; startZ = -R; break;
@@ -147,7 +141,6 @@ public class LabyrinthBiomeSource extends BiomeSource {
             default: startX = -R; startZ = R; break;
         }
 
-        // Противоположный угол
         int endCorner = (startCorner + 2) % 4;
         switch (endCorner) {
             case 0: endX = -R; endZ = -R; break;
@@ -156,7 +149,6 @@ public class LabyrinthBiomeSource extends BiomeSource {
             default: endX = -R; endZ = R; break;
         }
 
-        // ★ Смещение конечной точки на 15 блоков от входа ★
         double shiftDir = riverRand.nextBoolean() ? 1.0 : -1.0;
         if (endCorner == 0 || endCorner == 2) {
             endX += shiftDir * 15.0;
@@ -164,31 +156,87 @@ public class LabyrinthBiomeSource extends BiomeSource {
             endZ += shiftDir * 15.0;
         }
 
-        // ★ Контрольная точка: обход центра на 30 блоков ★
-        double dirX = endX - startX;
-        double dirZ = endZ - startZ;
-        double dirLen = Math.sqrt(dirX * dirX + dirZ * dirZ);
-        dirX /= dirLen;
-        dirZ /= dirLen;
-
-        // Перпендикуляр к диагонали
-        double perpX = -dirZ;
-        double perpZ = dirX;
-
-        // Направление обхода (по часовой или против)
-        double bypassDir = riverRand.nextBoolean() ? 1.0 : -1.0;
-        double controlX = perpX * 30.0 * bypassDir;
-        double controlZ = perpZ * 30.0 * bypassDir;
-
-        // Генерация точек кривой Безье
-        int pointCount = 50;
+        int pointCount = 60;
         riverCurvePoints = new double[pointCount][2];
 
+        double currentX = startX;
+        double currentZ = startZ;
+
+        double liftX = 0.0;
+        double liftZ = 0.0;
+        double liftAvoidRadius = 40.0;
+        double centerAvoidRadius = 40.0;
+        double wallMargin = 8.0;
+
         for (int i = 0; i < pointCount; i++) {
-            double t = (double) i / (pointCount - 1);
-            double mt = 1.0 - t;
-            riverCurvePoints[i][0] = mt * mt * startX + 2 * mt * t * controlX + t * t * endX;
-            riverCurvePoints[i][1] = mt * mt * startZ + 2 * mt * t * controlZ + t * t * endZ;
+            riverCurvePoints[i][0] = currentX;
+            riverCurvePoints[i][1] = currentZ;
+
+            if (i == pointCount - 1) break;
+
+            double attractX = endX - currentX;
+            double attractZ = endZ - currentZ;
+            double attractDist = Math.sqrt(attractX * attractX + attractZ * attractZ);
+            if (attractDist > 0.001) {
+                attractX /= attractDist;
+                attractZ /= attractDist;
+            }
+
+            double repelLiftX = 0, repelLiftZ = 0;
+            double dlx = currentX - liftX;
+            double dlz = currentZ - liftZ;
+            double liftDist = Math.sqrt(dlx * dlx + dlz * dlz);
+            if (liftDist < liftAvoidRadius && liftDist > 0.001) {
+                double t = 1.0 - liftDist / liftAvoidRadius;
+                double strength = t * t * 4.0;
+                repelLiftX = (dlx / liftDist) * strength;
+                repelLiftZ = (dlz / liftDist) * strength;
+            }
+
+            double repelCenterX = 0, repelCenterZ = 0;
+            double centerDist = Math.sqrt(currentX * currentX + currentZ * currentZ);
+            if (centerDist < centerAvoidRadius && centerDist > 0.001) {
+                double t = 1.0 - centerDist / centerAvoidRadius;
+                double strength = t * t * 3.0;
+                repelCenterX = (currentX / centerDist) * strength;
+                repelCenterZ = (currentZ / centerDist) * strength;
+            }
+
+            double repelWallX = 0, repelWallZ = 0;
+            double distRight = R - currentX;
+            double distLeft = currentX + R;
+            double distUp = R - currentZ;
+            double distDown = currentZ + R;
+            double minWallDist = Math.min(Math.min(distRight, distLeft), Math.min(distUp, distDown));
+
+            if (minWallDist < wallMargin) {
+                double strength = (1.0 - minWallDist / wallMargin) * 2.5;
+                if (minWallDist == distRight) repelWallX = -strength;
+                else if (minWallDist == distLeft) repelWallX = strength;
+                else if (minWallDist == distUp) repelWallZ = -strength;
+                else repelWallZ = strength;
+            }
+
+            double totalX = attractX + repelLiftX + repelCenterX + repelWallX;
+            double totalZ = attractZ + repelLiftZ + repelCenterZ + repelWallZ;
+
+            double totalDist = Math.sqrt(totalX * totalX + totalZ * totalZ);
+            if (totalDist > 0.001) {
+                totalX /= totalDist;
+                totalZ /= totalDist;
+            }
+
+            double stepSize = attractDist / (pointCount - 1 - i);
+            stepSize = Math.min(stepSize, attractDist);
+
+            currentX += totalX * stepSize;
+            currentZ += totalZ * stepSize;
+
+            currentX = Math.max(-R + 3, Math.min(R - 3, currentX));
+            currentZ = Math.max(-R + 3, Math.min(R - 3, currentZ));
         }
+
+        riverCurvePoints[pointCount - 1][0] = endX;
+        riverCurvePoints[pointCount - 1][1] = endZ;
     }
 }

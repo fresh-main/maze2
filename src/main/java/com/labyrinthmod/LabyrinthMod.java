@@ -115,7 +115,6 @@ public class LabyrinthMod {
     }
 
     public LabyrinthMod() {
-        BIOME_SOURCES.register(FMLJavaModLoadingContext.get().getModEventBus());
 
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
 
@@ -226,6 +225,17 @@ public class LabyrinthMod {
     }
 
     private void registerChunkGenerator(RegisterEvent event) {
+
+        if (event.getRegistryKey().equals(Registries.BIOME_SOURCE)) {
+            event.register(
+                    Registries.BIOME_SOURCE,
+                    helper -> helper.register(
+                            ResourceLocation.fromNamespaceAndPath(MOD_ID, "labyrinth_biome_source"),
+                            LabyrinthBiomeSource.CODEC
+                    )
+            );
+            LOGGER.debug("[LabyrinthMod] Registered LabyrinthBiomeSource!");
+        }
 
         if (event.getRegistryKey().equals(Registries.CHUNK_GENERATOR)) {
             event.register(
@@ -504,9 +514,5 @@ public class LabyrinthMod {
             }
         }
     }
-    public static final DeferredRegister<Codec<? extends BiomeSource>> BIOME_SOURCES =
-            DeferredRegister.create(Registries.BIOME_SOURCE, "labyrinthmod");
 
-    public static final RegistryObject<Codec<LabyrinthBiomeSource>> LABYRINTH_BIOME_SOURCE =
-            BIOME_SOURCES.register("labyrinth_biome_source", () -> LabyrinthBiomeSource.CODEC);
 }
