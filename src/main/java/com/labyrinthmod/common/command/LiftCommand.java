@@ -14,7 +14,7 @@ import java.util.List;
 
 public class LiftCommand {
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-        dispatcher.register(Commands.literal("lift")
+        dispatcher.register(Commands.literal("activate")
                 .then(Commands.argument("name", StringArgumentType.word())
                         .executes(context -> {
                             CommandSourceStack source = context.getSource();

@@ -376,8 +376,8 @@ public final class LoadingScreenStyling {
         if (screen instanceof ConnectScreen) return "ПОДКЛЮЧЕНИЕ";
         if (screen instanceof ReceivingLevelScreen) return "ВХОД В СТ-ЗОНУ";
         if (screen instanceof LevelLoadingScreen) return "ЗАГРУЗКА МИРА";
-        if (screen instanceof ProgressScreen) return "СОХРАНЕНИЕ";
-        return "ЗАГРУЗКА";
+        if (screen instanceof ProgressScreen) return "ЗАГРУЗКА";
+        return "СОХРАНЕНИЕ";
     }
 
 

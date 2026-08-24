@@ -10,7 +10,8 @@
     "AbstractContainerMenuMixin",
     "InventoryMenuMixin",
     "InventoryMixin",
-    "FirstAidDamageablePartMixin"
+    "FirstAidDamageablePartMixin",
+    "StructureBlockEntityMixin"
   ],
   "client": [
     "MixinShaderPackScreenPaper",
@@ -37,6 +38,7 @@
     "ResultSlotMixin",
     "CraftingMenuMixin",
     "CreativeModeInventoryScreenMixin"
+
   ],
   "injectors": {
     "defaultRequire": 1

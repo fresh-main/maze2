@@ -3,6 +3,7 @@ package com.labyrinthmod.common.network;
 import com.labyrinthmod.LabyrinthMod;
 import com.labyrinthmod.common.network.packet.*;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkDirection;
 import net.minecraftforge.network.NetworkRegistry;
 import net.minecraftforge.network.simple.SimpleChannel;
@@ -222,5 +223,13 @@ public class NetworkHandler {
                 .decoder(UpdateBlockNamePacket::decode)
                 .consumerMainThread(UpdateBlockNamePacket::handle)
                 .add();
+        CHANNEL.messageBuilder(S2CLiftLockPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(S2CLiftLockPacket::encode)
+                .decoder(S2CLiftLockPacket::decode)
+                .consumerMainThread(S2CLiftLockPacket::handle)
+                .add();
+    }
+    public static void sendToPlayer(ServerPlayer player, S2CLiftLockPacket packet) {
+        CHANNEL.sendTo(packet, player.connection.connection, NetworkDirection.PLAY_TO_CLIENT);
     }
 }

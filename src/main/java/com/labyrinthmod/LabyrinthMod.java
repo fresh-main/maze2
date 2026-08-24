@@ -7,11 +7,13 @@ import com.labyrinthmod.common.capability.PossessionData;
 import com.labyrinthmod.common.capability.PossessionProvider;
 import com.labyrinthmod.common.command.*;
 import com.labyrinthmod.common.config.ModConfig;
+import com.labyrinthmod.common.entity.GriverEntity;
 import com.labyrinthmod.common.entity.GriverEntityType;
 import com.labyrinthmod.common.event.ChatDisableHandler;
 import com.labyrinthmod.common.event.DebugStickHandler;
 import com.labyrinthmod.common.event.FractionEvents;
 import com.labyrinthmod.common.event.GriverPossessionHandler;
+import com.labyrinthmod.common.generation.BiomeDebugChat;
 import com.labyrinthmod.common.generation.LabyrinthBiomeSource;
 import com.labyrinthmod.common.generation.LabyrinthChunkGenerator;
 import com.labyrinthmod.common.generation.LabyrinthConfig;
@@ -65,6 +67,7 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.AttachCapabilitiesEvent;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.entity.EntityAttributeCreationEvent;
 import net.minecraftforge.event.entity.living.LivingHealEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.server.ServerStartedEvent;
@@ -220,6 +223,8 @@ public class LabyrinthMod {
             MinecraftForge.EVENT_BUS.register(MazeMapKeyBindings.class);
         }
         // ========== КОНЕЦ MazeMapMod ==========
+        MinecraftForge.EVENT_BUS.addListener(this::registerEntityAttributes);
+        modEventBus.addListener(this::registerEntityAttributes);
 
         LOGGER.info("Labyrinth Mod (unified with MazeMap) initialized on {} side!", FMLEnvironment.dist);
     }
@@ -234,7 +239,9 @@ public class LabyrinthMod {
                             LabyrinthBiomeSource.CODEC
                     )
             );
-            LOGGER.debug("[LabyrinthMod] Registered LabyrinthBiomeSource!");
+
+            BiomeDebugChat.raw("[Register] Зарегистрирован биомный источник: labyrinthmod:labyrinth_biome_source");
+            LOGGER.info("[LabyrinthMod] Registered LabyrinthBiomeSource!");
         }
 
         if (event.getRegistryKey().equals(Registries.CHUNK_GENERATOR)) {
@@ -314,6 +321,8 @@ public class LabyrinthMod {
         WindZoneCommand.register(event.getDispatcher());
         InfectionCommand.register(event.getDispatcher());
         LiftCommand.register(event.getDispatcher());
+        BiomeDebugCommand.register(event.getDispatcher());
+        SetBiomeCommand.register(event.getDispatcher());
     }
 
     @SubscribeEvent
@@ -450,14 +459,26 @@ public class LabyrinthMod {
 
     @SubscribeEvent
     public void onServerStarted(ServerStartedEvent event) {
+        BiomeDebugChat.setServer(event.getServer());
+
         MazeMapStorage.init(event.getServer());
         LOGGER.info("[MazeMap] storage initialized at {}", MazeMapStorage.getRoot());
+
         com.labyrinthmod.common.data.CraftRestrictionManager.load();
         LOGGER.info("[LabyrinthMod] Craft restrictions loaded from JSON!");
+
+        BiomeDebugChat.timed(
+                "server_started",
+                "[LabyrinthMod] Сервер запущен. Отладка биомов активна.",
+                5000
+        );
     }
 
     @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
+        BiomeDebugChat.setServer(null);
+        BiomeDebugChat.clear();
+
         MazeMapStorage.flush();
     }
 
@@ -513,6 +534,10 @@ public class LabyrinthMod {
                         new PossessionProvider(possessionData));
             }
         }
+    }
+    private void registerEntityAttributes(EntityAttributeCreationEvent event) {
+        // Связываем зарегистрированный тип сущности с её характеристиками
+        event.put(GriverEntityType.GRIVER.get(), GriverEntity.createAttributes().build());
     }
 
 }

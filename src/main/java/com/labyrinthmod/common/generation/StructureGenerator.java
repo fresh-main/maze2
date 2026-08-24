@@ -3,6 +3,7 @@ package com.labyrinthmod.common.generation;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
 import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
@@ -85,12 +86,6 @@ public class StructureGenerator {
                 new BlockPos(-16, 11, -12)
         ));
 
-        // ★ Пример: если нужна ломаемая структура — просто true (или без параметра):
-        // structures.add(new StructureData(
-        //         new StructurePlacement("decoration", "labyrinthmod", "deco_1",
-        //                 new BlockPos(50, 32, 50), true),
-        //         new BlockPos(50, 32, 50)
-        // ));
     }
 
     public static void loadSizesIfNeeded(WorldGenLevel level) {
@@ -120,21 +115,29 @@ public class StructureGenerator {
             if (data.intersectsChunk(chunkX, chunkZ)) {
                 data.placement.place(level, null);
 
-                // ★ РЕГИСТРИРУЕМ ЗАЩИЩЁННУЮ ЗОНУ, если структура не ломаемая
                 if (!data.breakable && data.size != null && data.size.getX() > 0) {
-                    // Проверяем, не добавлена ли уже эта зона
                     boolean alreadyRegistered = protectedRegions.stream()
                             .anyMatch(r -> r.structureName.equals(data.placement.getName()));
+
                     if (!alreadyRegistered) {
+                        // ★ УЧИТЫВАЕМ ПОВОРОТ ДЛЯ РАЗМЕРОВ ЗОНЫ ★
+                        // При повороте на 90 или 270 градусов ширина (X) и длина (Z) меняются местами
+                        Vec3i actualSize = data.size;
+                        Rotation rot = data.placement.getRotation();
+                        if (rot == Rotation.CLOCKWISE_90 || rot == Rotation.COUNTERCLOCKWISE_90) {
+                            actualSize = new Vec3i(data.size.getZ(), data.size.getY(), data.size.getX());
+                        }
+
                         protectedRegions.add(
-                                new ProtectedRegion(data.placement.getName(), data.origin, data.size)
+                                new ProtectedRegion(data.placement.getName(), data.origin, actualSize)
                         );
+
                         System.out.println("[StructureGenerator] Protected region registered: "
-                                + data.placement.getName()
+                                + data.placement.getName() + " (Rot: " + rot + ")"
                                 + " (" + data.origin + " -> "
-                                + (data.origin.getX() + data.size.getX()) + ","
-                                + (data.origin.getY() + data.size.getY()) + ","
-                                + (data.origin.getZ() + data.size.getZ()) + ")");
+                                + (data.origin.getX() + actualSize.getX()) + ","
+                                + (data.origin.getY() + actualSize.getY()) + ","
+                                + (data.origin.getZ() + actualSize.getZ()) + ")");
                     }
                 }
             }
@@ -154,5 +157,42 @@ public class StructureGenerator {
     // ★ Для отладки
     public static List<ProtectedRegion> getProtectedRegions() {
         return protectedRegions;
+    }
+    public static void updateDverPosition(int currentGladeRadius) {
+        structures.removeIf(data -> "dver_1".equals(data.placement.getName()));
+
+        int dverX = -24;
+        int dverY = 31;
+        int dverZ = -(currentGladeRadius + 8);
+
+        // ★ ДВЕРЬ 1 (Отрицательный Z) — ПОВОРОТ НА 90 ГРАДУСОВ (ПРИМЕР)
+        structures.add(new StructureData(
+                new StructurePlacement("dver_2", "labyrinthmod", "dver_2",
+                        new BlockPos(dverX, dverY, dverZ), false, Rotation.NONE), // ★ ПОВОРОТ
+                new BlockPos(dverX, dverY, dverZ)
+        ));
+
+        // ★ ДВЕРЬ 2 (Положительный Z) — ПОВОРОТ НА 180 ГРАДУСОВ (ЧТОБЫ СМОТРЕЛА В ЦЕНТР)
+        structures.add(new StructureData(
+                new StructurePlacement("dver_1", "labyrinthmod", "dver_1",
+                        new BlockPos(dverX, dverY, -dverZ-9), false, Rotation.NONE), // ★ ПОВОРОТ
+                new BlockPos(dverX, dverY, -dverZ-9)
+        ));
+
+        structures.add(new StructureData(
+                new StructurePlacement("dver_4", "labyrinthmod", "dver_4",
+                        new BlockPos(dverZ, dverY, dverX), false, Rotation.NONE), // ★ ПОВОРОТ
+                new BlockPos(dverZ, dverY, dverX)
+        ));
+
+        // ★ ДВЕРЬ 2 (Положительный Z) — ПОВОРОТ НА 180 ГРАДУСОВ (ЧТОБЫ СМОТРЕЛА В ЦЕНТР)
+        structures.add(new StructureData(
+                new StructurePlacement("dver_3", "labyrinthmod", "dver_3",
+                        new BlockPos(-dverZ-9, dverY, dverX), false, Rotation.NONE), // ★ ПОВОРОТ
+                new BlockPos(-dverZ-9, dverY, dverX)
+        ));
+
+
+        System.out.println("[StructureGenerator] dver_1 dynamically positioned at Z=" + dverZ + " (Radius=" + currentGladeRadius + ")");
     }
 }

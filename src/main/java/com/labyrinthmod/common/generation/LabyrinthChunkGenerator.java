@@ -20,6 +20,7 @@ import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.LegacyRandomSource;
 import net.minecraft.world.level.levelgen.RandomState;
 import net.minecraft.world.level.levelgen.blending.Blender;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
@@ -36,7 +37,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
     public static final Codec<LabyrinthChunkGenerator> CODEC = RecordCodecBuilder.create(inst ->
             inst.group(
                     BiomeSource.CODEC.fieldOf("biome_source").forGetter(LabyrinthChunkGenerator::getBiomeSource),
-                    Codec.LONG.fieldOf("seed").forGetter(g -> g.seed)
+                    Codec.LONG.optionalFieldOf("seed", 0L).forGetter(g -> g.seed)  // ★ 0 = "брать сид из мира"
             ).apply(inst, inst.stable((biomeSource, seed) -> new LabyrinthChunkGenerator(biomeSource, seed)))
     );
 
@@ -95,7 +96,8 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
     private static final BlockState GLADE_TOP = Blocks.GRASS_BLOCK.defaultBlockState();
     private static final BlockState GLADE_UNDER = Blocks.DIRT.defaultBlockState();
 
-    private final long seed;
+    private volatile long seed;
+    private volatile boolean seedInitialized = false;
 
     // ★ КЭШ ЛАБИРИНТА ★
     private final Set<Long> mazeCorridors = new HashSet<>();
@@ -105,9 +107,15 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
     private final Set<Long> gladeExits = new HashSet<>();
     private final Set<Long> passages = new HashSet<>(); // ★ ВСЕ ПРОХОДЫ ★
     private final Set<Long> passageZones = new HashSet<>();// ★ РАСШИРЕННЫЕ ЗОНЫ ★
-    private final ImprovedNoise terrainNoise;
-    private final ImprovedNoise featureNoise;
+    private volatile ImprovedNoise terrainNoise;
+    private volatile ImprovedNoise featureNoise;
     private final LabyrinthConfig config;
+    // ★ ПЕЩЕРНАЯ СИСТЕМА ★
+    private int caveEntranceX = 0;
+    private int caveEntranceZ = 0;
+    private int caveEntranceTopY = 0; // Высота вершины холма
+    private boolean caveInitialized = false;
+
 
     public LabyrinthChunkGenerator(BiomeSource biomeSource, long seed) {
         super(biomeSource);
@@ -135,8 +143,15 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         this.PASSAGE_DISTANCE = SEPARATOR_WALL_END;
         this.PASSAGE_OFFSET = MAIN_MAZE_WIDTH;
 
-        this.terrainNoise = new ImprovedNoise(new net.minecraft.world.level.levelgen.LegacyRandomSource(seed));
-        this.featureNoise = new ImprovedNoise(new net.minecraft.world.level.levelgen.LegacyRandomSource(seed ^ 0x123456789ABCDEFL));
+        if (seed != 0) {
+            this.terrainNoise = new ImprovedNoise(new net.minecraft.world.level.levelgen.LegacyRandomSource(seed));
+            this.featureNoise = new ImprovedNoise(new net.minecraft.world.level.levelgen.LegacyRandomSource(seed ^ 0x123456789ABCDEFL));
+            this.seedInitialized = true;
+        } else {
+            this.terrainNoise = null;
+            this.featureNoise = null;
+            this.seedInitialized = false;
+        }
     }
 
     private void generateMaze() {
@@ -454,7 +469,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
     }
 
     private BlockState generateSectorBlock(int x, int y, int z, long hash) {
-        if (y == FLOOR_Y) return randomFloorBlock();
+        if (y == FLOOR_Y) return randomFloorBlock(x, z);
         int dist = Math.max(Math.abs(x), Math.abs(z));
         boolean isInternalWall = (Math.abs(x) <= 2 || Math.abs(z) <= 2 || Math.abs(x - z) <= 2 || Math.abs(x + z) <= 2);
         int wallHeight = (dist >= SECTORS_END || isInternalWall) ? SEPARATOR_WALL_HEIGHT : MAZE_HEIGHT;
@@ -659,7 +674,8 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
     @Override
     public void applyCarvers(@NotNull WorldGenRegion region, long seed, @NotNull RandomState random,
                              @NotNull BiomeManager biomeManager, @NotNull StructureManager structureManager,
-                             @NotNull ChunkAccess chunk, @NotNull GenerationStep.Carving carving) {}
+                             @NotNull ChunkAccess chunk, @NotNull GenerationStep.Carving step) {
+    }
 
     @Override
     public void spawnOriginalMobs(@NotNull WorldGenRegion region) {}
@@ -671,22 +687,27 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
     public CompletableFuture<ChunkAccess> fillFromNoise(@NotNull Executor executor, @NotNull Blender blender,
                                                         @NotNull RandomState random, @NotNull StructureManager structureManager,
                                                         @NotNull ChunkAccess chunk) {
+        initializeSeed(random);
+        invalidateRiverIfSeedChanged();
         ensureGenerated();
+
         int chunkX = chunk.getPos().x;
         int chunkZ = chunk.getPos().z;
 
         for (int secY = chunk.getMinSection(); secY < chunk.getMaxSection(); secY++) {
             LevelChunkSection section = chunk.getSection(chunk.getSectionIndexFromSectionY(secY));
             int baseY = secY << 4;
+
             for (int localX = 0; localX < 16; localX++) {
                 int worldX = (chunkX << 4) + localX;
+
                 for (int localZ = 0; localZ < 16; localZ++) {
                     int worldZ = (chunkZ << 4) + localZ;
-                    // ★ ОПТИМИЗАЦИЯ: Вычисляем константы для колонки 1 раз ДО цикла Y
                     fillColumnFast(section, baseY, localX, localZ, worldX, worldZ);
                 }
             }
         }
+
         return CompletableFuture.completedFuture(chunk);
     }
 
@@ -764,22 +785,37 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
     private BlockState generateUnderground(int x, int y, int z) {
         if (y <= -64) return Blocks.BEDROCK.defaultBlockState();
 
-        long seed = this.seed ^ (x * 31L + y * 17L + z * 13L);
-        Random rand = new Random(seed);
+        // 1. Переход в Deepslate и Tuff (Ванильная логика)
+        if (y < 0) {
+            double deepslateNoise = terrainNoise.noise(x * 0.05, y * 0.05, z * 0.05);
+            if (y < -8) {
+                return Blocks.DEEPSLATE.defaultBlockState(); // Ниже Y=-8 только глубинный сланец
+            } else {
+                if (deepslateNoise > 0.0) return Blocks.DEEPSLATE.defaultBlockState(); // Плавный переход
+            }
 
-        if (y < 0 && rand.nextDouble() < 0.025) return Blocks.COAL_ORE.defaultBlockState();
-        if (y < -10 && rand.nextDouble() < 0.020) return Blocks.COAL_ORE.defaultBlockState();
-        if (y < -10 && rand.nextDouble() < 0.018) return Blocks.IRON_ORE.defaultBlockState();
-        if (y < -20 && rand.nextDouble() < 0.012) return Blocks.IRON_ORE.defaultBlockState();
-        if (y < -30 && rand.nextDouble() < 0.008) return Blocks.GOLD_ORE.defaultBlockState();
-        if (y < -40 && rand.nextDouble() < 0.005) return Blocks.GOLD_ORE.defaultBlockState();
-        if (y < -50 && rand.nextDouble() < 0.003) return Blocks.DIAMOND_ORE.defaultBlockState();
-        if (y < -55 && rand.nextDouble() < 0.002) return Blocks.DIAMOND_ORE.defaultBlockState();
-        if (y < -20 && rand.nextDouble() < 0.001) return Blocks.EMERALD_ORE.defaultBlockState();
-        if (y < -20 && rand.nextDouble() < 0.010) return Blocks.REDSTONE_ORE.defaultBlockState();
-        if (y < -30 && rand.nextDouble() < 0.008) return Blocks.REDSTONE_ORE.defaultBlockState();
-        if (y < -20 && rand.nextDouble() < 0.005) return Blocks.LAPIS_ORE.defaultBlockState();
+            // Жилы туфа (Tuff)
+            double tuffNoise = featureNoise.noise(x * 0.1, y * 0.1, z * 0.1);
+            if (tuffNoise > 0.8) return Blocks.TUFF.defaultBlockState();
+        }
 
+        // 2. Карманы земли и гравия (Dirt and Gravel pockets)
+        double pocketNoise = featureNoise.noise(x * 0.08, y * 0.08, z * 0.08);
+        if (pocketNoise > 0.85) {
+            return y < 0 ? Blocks.GRAVEL.defaultBlockState() : Blocks.DIRT.defaultBlockState();
+        }
+
+        // 3. Жилы Гранита, Диорита и Андезита
+        double stoneOreNoise = terrainNoise.noise(x * 0.12 + 100, y * 0.12, z * 0.12 + 100);
+        if (stoneOreNoise > 0.88) {
+            long hash = (x * 31L) ^ (y * 17L) ^ (z * 13L) ^ seed;
+            int type = (int)(hash & 0x3);
+            if (type == 0) return Blocks.GRANITE.defaultBlockState();
+            if (type == 1) return Blocks.DIORITE.defaultBlockState();
+            if (type == 2) return Blocks.ANDESITE.defaultBlockState();
+        }
+
+        // 4. Обычный камень (Руды теперь генерируются ванилью через super.applyBiomeDecoration)
         return Blocks.STONE.defaultBlockState();
     }
     /**
@@ -1277,6 +1313,25 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
                     }
                 }
             }
+            if (dist >= 30 && dist <= 55) {
+                // Используем два слоя шума для создания плавных, органичных возвышенностей
+                double hillNoise1 = featureNoise.noise(x * 0.04, 0, z * 0.04);
+                double hillNoise2 = terrainNoise.noise(x * 0.08, 0, z * 0.08);
+
+                // Комбинируем шумы
+                double combinedNoise = (hillNoise1 + hillNoise2) * 0.5;
+
+                // Если значение шума достаточно высокое, формируем холм
+                if (combinedNoise > 0.4) {
+                    // Масштабируем высоту: от 0 до 6 блоков
+                    double heightFactor = (combinedNoise - 0.4) / 0.6; // нормализуем значение от 0 до 1
+                    int addedHeight = (int)(heightFactor * 6.0);
+
+                    // ★ ЖЕСТКИЙ ЛИМИТ: холм не может быть выше 6 блоков и не может уходить в минус ★
+                    addedHeight = Math.max(0, Math.min(addedHeight, 6));
+                    terrainHeight += addedHeight;
+                }
+            }
             if (y > terrainHeight) {
                 if (y == terrainHeight + 1 || y == terrainHeight + 2) {
                     // ★ КАЧЕСТВЕННЫЙ ХЕШ для равномерного распределения ★
@@ -1394,7 +1449,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         return state;
     }
     private BlockState generateMainMazeBlock(int x, int y, int z, long hash) {
-        if (y == FLOOR_Y) return randomFloorBlock();
+        if (y == FLOOR_Y) return randomFloorBlock(x, z);
         if (y > FLOOR_Y && y <= FLOOR_Y + MAZE_HEIGHT) {
             if (passages.contains(hash) || passageZones.contains(hash)) {
                 BlockState bush = tryGenerateBush(x, y, z);
@@ -1449,8 +1504,16 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         return WALL_BLOCKS[Math.abs(index)];
     }
 
-    private BlockState randomFloorBlock() {
-        return Math.random() < 0.5 ? FLOOR_ANDESITE : FLOOR_POLISHED_ANDESITE;
+    private BlockState randomFloorBlock(int x, int z) {
+        long mixed = ((long) x * 73856093L) ^ ((long) z * 83492791L) ^ this.seed;
+
+        mixed ^= (mixed >>> 32);
+        mixed *= 0x85EBCA77C2B2AE63L;
+        mixed ^= (mixed >>> 27);
+        mixed *= 0xC2B2AE3D27D4EB4FL;
+        mixed ^= (mixed >>> 31);
+
+        return ((mixed & 0xFF) < 128) ? FLOOR_ANDESITE : FLOOR_POLISHED_ANDESITE;
     }
 
     @Override
@@ -1681,6 +1744,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
 
     private void ensureGenerated() {
         if (isGenerated) return;
+        StructureGenerator.updateDverPosition(this.GLADE_RADIUS);
 
         synchronized (generationLock) {
             if (isGenerated) return;
@@ -1730,9 +1794,19 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
     }
     @Override
     public void applyBiomeDecoration(WorldGenLevel level, ChunkAccess chunk, StructureManager structureManager) {
+        super.applyBiomeDecoration(level, chunk, structureManager);
+
         // ★ РАЗМЕЩЕНИЕ NBT СТРУКТУР ★
         StructureGenerator.placeStructuresInChunk(level, chunk);
+
+        ensureDecorationSeed(level);
+
+        if (!seedInitialized || terrainNoise == null || featureNoise == null) {
+            return;
+        }
+
         ChunkPos chunkPos = chunk.getPos();
+
         int minX = chunkPos.getMinBlockX();
         int minZ = chunkPos.getMinBlockZ();
         int maxX = chunkPos.getMaxBlockX();
@@ -1750,62 +1824,93 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
                 int dist = Math.max(Math.abs(x), Math.abs(z));
                 if (dist > GLADE_RADIUS - 5) continue;
 
-                // ★ ДЕРЕВЬЯ: сетка 4×4, минимальное расстояние 3 блока ★
+                // ★ ПУНКТ 10: не ставим декор в зоне реки ★
+                if (isInRiverZone(x, z)) continue;
+
+                // ★ ДЕРЕВЬЯ: сетка 3×3 ★
                 int treeGridX = Math.floorDiv(x, 3);
                 int treeGridZ = Math.floorDiv(z, 3);
-                long treeGridSeed = ((long) treeGridX * 73856093L) ^ ((long) treeGridZ * 19349663L) ^ this.seed;
+
+                long treeGridSeed = ((long) treeGridX * 73856093L)
+                        ^ ((long) treeGridZ * 19349663L)
+                        ^ this.seed;
+
                 Random treeGridRand = new Random(treeGridSeed);
-                // Случайная позиция внутри центральных 2×2 блоков ячейки
+
                 int chosenTreeX = treeGridX * 3 + 1 + treeGridRand.nextInt(2);
                 int chosenTreeZ = treeGridZ * 3 + 1 + treeGridRand.nextInt(2);
 
-                if (x == chosenTreeX && z == chosenTreeZ && treeGridRand.nextDouble() < 0.40) {
-                    double noise = terrainNoise.noise(x * 0.04, 0, z * 0.04);
-                    int surfaceY = FLOOR_Y + (int)(noise * 5) + 1;
-                    BlockPos pos = new BlockPos(x, surfaceY, z);
+                if (x == chosenTreeX && z == chosenTreeZ) {
+                    // ★ ПУНКТ 11: шумовая плотность леса ★
+                    double densityNoise =
+                            terrainNoise.noise(x * 0.02, 0, z * 0.02) * 0.65
+                                    + featureNoise.noise(x * 0.055, 0, z * 0.055) * 0.35;
 
-                    BlockPos below = pos.below();
-                    BlockState belowState = level.getBlockState(below);
-                    if (!belowState.is(Blocks.GRASS_BLOCK) && !belowState.is(Blocks.DIRT)) {
-                        continue;
-                    }
+                    // Если шум сильно отрицательный — поляна.
+                    if (densityNoise > -0.22) {
+                        double treeChance = 0.24 + (densityNoise + 1.0) * 0.16;
+                        treeChance = Math.max(0.05, Math.min(0.60, treeChance));
 
-                    // Перемешанные типы: 40% дуб, 35% высокая берёза, 25% обычная берёза
-                    double typeRand = treeGridRand.nextDouble();
-                    String featureName;
-                    if (typeRand < 0.60) {
-                        featureName = "minecraft:fancy_oak";
-                    } else if (typeRand < 0.85) {
-                        featureName = "minecraft:super_birch_bees";
-                    } else {
-                        featureName = "minecraft:birch";
-                    }
+                        if (treeGridRand.nextDouble() < treeChance) {
+                            double noise = terrainNoise.noise(x * 0.04, 0, z * 0.04);
+                            int surfaceY = FLOOR_Y + (int) (noise * 5) + 1;
 
-                    RandomSource random = RandomSource.create(treeGridSeed);
-                    ConfiguredFeature<?, ?> feature = level.registryAccess()
-                            .registryOrThrow(Registries.CONFIGURED_FEATURE)
-                            .get(ResourceLocation.of(featureName, ':'));
+                            BlockPos pos = new BlockPos(x, surfaceY, z);
+                            BlockPos below = pos.below();
 
-                    if (feature != null) {
-                        feature.place(level, this, random, pos);
+                            BlockState belowState = level.getBlockState(below);
+
+                            if (!belowState.is(Blocks.GRASS_BLOCK) && !belowState.is(Blocks.DIRT)) {
+                                continue;
+                            }
+
+                            double typeRand = treeGridRand.nextDouble();
+
+                            String featureName;
+
+                            if (typeRand < 0.60) {
+                                featureName = "minecraft:fancy_oak";
+                            } else if (typeRand < 0.85) {
+                                featureName = "minecraft:super_birch_bees";
+                            } else {
+                                featureName = "minecraft:birch";
+                            }
+
+                            RandomSource random = RandomSource.create(treeGridSeed);
+
+                            ConfiguredFeature<?, ?> feature = level.registryAccess()
+                                    .registryOrThrow(Registries.CONFIGURED_FEATURE)
+                                    .get(ResourceLocation.of(featureName, ':'));
+
+                            if (feature != null) {
+                                feature.place(level, this, random, pos);
+                            }
+                        }
                     }
                 }
 
-                // ★ ПОВАЛЕННЫЕ ДЕРЕВЬЯ: сетка 8×8, максимум одно на ячейку ★
+                // ★ ПОВАЛЕННЫЕ ДЕРЕВЬЯ: сетка 6×6 ★
                 int fallenGridX = Math.floorDiv(x, 6);
                 int fallenGridZ = Math.floorDiv(z, 6);
-                long fallenGridSeed = ((long) fallenGridX * 31337L) ^ ((long) fallenGridZ * 7919L) ^ this.seed;
+
+                long fallenGridSeed = ((long) fallenGridX * 31337L)
+                        ^ ((long) fallenGridZ * 7919L)
+                        ^ this.seed;
+
                 Random fallenGridRand = new Random(fallenGridSeed);
+
                 int chosenFallenX = fallenGridX * 6 + fallenGridRand.nextInt(6);
                 int chosenFallenZ = fallenGridZ * 6 + fallenGridRand.nextInt(6);
 
                 if (x == chosenFallenX && z == chosenFallenZ && fallenGridRand.nextDouble() < 0.12) {
                     double noise = terrainNoise.noise(x * 0.04, 0, z * 0.04);
-                    int surfaceY = FLOOR_Y + (int)(noise * 5) + 1;
-                    BlockPos pos = new BlockPos(x, surfaceY, z);
+                    int surfaceY = FLOOR_Y + (int) (noise * 5) + 1;
 
+                    BlockPos pos = new BlockPos(x, surfaceY, z);
                     BlockPos below = pos.below();
+
                     BlockState belowState = level.getBlockState(below);
+
                     if (belowState.is(Blocks.GRASS_BLOCK) || belowState.is(Blocks.DIRT)) {
                         RandomSource fallenRandom = RandomSource.create(fallenGridSeed ^ 0xDEADBEEFL);
                         boolean isOak = fallenGridRand.nextBoolean();
@@ -1813,11 +1918,16 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
                     }
                 }
 
-                // ★ КЛАСТЕРЫ ЦВЕТОВ: сетка 5×5, 10% шанс, 5-10 цветов ★
+                // ★ КЛАСТЕРЫ ЦВЕТОВ: сетка 5×5 ★
                 int flowerGridX = Math.floorDiv(x, 5);
                 int flowerGridZ = Math.floorDiv(z, 5);
-                long flowerGridSeed = ((long) flowerGridX * 48271L) ^ ((long) flowerGridZ * 65537L) ^ this.seed;
+
+                long flowerGridSeed = ((long) flowerGridX * 48271L)
+                        ^ ((long) flowerGridZ * 65537L)
+                        ^ this.seed;
+
                 Random flowerGridRand = new Random(flowerGridSeed);
+
                 int chosenFlowerX = flowerGridX * 5 + flowerGridRand.nextInt(5);
                 int chosenFlowerZ = flowerGridZ * 5 + flowerGridRand.nextInt(5);
 
@@ -1915,148 +2025,259 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             default: return Blocks.POPPY.defaultBlockState();
         }
     }
-    // ★ КРИВАЯ РЕКИ: метод потенциальных полей (гарантированное соединение) ★
-    private double[][] riverCurvePoints = null;
-
+    private volatile double[][] riverCurvePoints = null;
+    private volatile long riverSeedUsed = Long.MIN_VALUE;
     private void ensureRiverCurve() {
-        if (riverCurvePoints != null) return;
+        long currentSeed = getEffectiveRiverSeed();
 
-        long riverSeed = this.seed ^ 0x5EEDL;
-        Random riverRand = new Random(riverSeed);
-        int R = GLADE_RADIUS;
-
-        // Определение начального угла
-        int startCorner = riverRand.nextInt(4);
-        double startX, startZ, endX, endZ;
-        switch (startCorner) {
-            case 0: startX = -R; startZ = -R; break;
-            case 1: startX = R; startZ = -R; break;
-            case 2: startX = R; startZ = R; break;
-            default: startX = -R; startZ = R; break;
+        double[][] existing = riverCurvePoints;
+        if (existing != null && riverSeedUsed == currentSeed) {
+            return;
         }
 
-        // Противоположный угол со смещением 15 блоков
-        int endCorner = (startCorner + 2) % 4;
-        switch (endCorner) {
-            case 0: endX = -R; endZ = -R; break;
-            case 1: endX = R; endZ = -R; break;
-            case 2: endX = R; endZ = R; break;
-            default: endX = -R; endZ = R; break;
+        synchronized (generationLock) {
+            existing = riverCurvePoints;
+            if (existing != null && riverSeedUsed == currentSeed) {
+                return;
+            }
+
+            if (featureNoise == null) {
+                featureNoise = new ImprovedNoise(
+                        new net.minecraft.world.level.levelgen.LegacyRandomSource(currentSeed ^ 0x123456789ABCDEFL)
+                );
+            }
+
+            ImprovedNoise localFeatureNoise = featureNoise;
+
+            long riverSeed = currentSeed ^ 0x5EEDL;
+            Random riverRand = new Random(riverSeed);
+
+            int R = GLADE_RADIUS;
+
+            // === 1. ВЫБОР УГЛА А (старт) ===
+            int startCorner = riverRand.nextInt(4);
+            double startX, startZ;
+
+            switch (startCorner) {
+                case 0:
+                    startX = -R + 2;
+                    startZ = -R + 2;
+                    break;
+                case 1:
+                    startX = R - 2;
+                    startZ = -R + 2;
+                    break;
+                case 2:
+                    startX = R - 2;
+                    startZ = R - 2;
+                    break;
+                default:
+                    startX = -R + 2;
+                    startZ = R - 2;
+                    break;
+            }
+
+            // === 2. ВЫБОР ТОЧКИ Б (противоположная стена) ===
+            double endX, endZ;
+            int minPassageDist = 15;
+
+            int wallChoice = riverRand.nextInt(2);
+            boolean isHorizontalWall;
+            int wallSign;
+
+            switch (startCorner) {
+                case 0: // Северо-запад → восточная или южная
+                    if (wallChoice == 0) {
+                        endX = R - 2;
+                        endZ = riverRand.nextBoolean()
+                                ? minPassageDist + riverRand.nextDouble() * (R - minPassageDist - 5)
+                                : -(minPassageDist + riverRand.nextDouble() * (R - minPassageDist - 5));
+                    } else {
+                        endZ = R - 2;
+                        endX = riverRand.nextBoolean()
+                                ? minPassageDist + riverRand.nextDouble() * (R - minPassageDist - 5)
+                                : -(minPassageDist + riverRand.nextDouble() * (R - minPassageDist - 5));
+                    }
+                    break;
+
+                case 1: // Северо-восток → западная или южная
+                    if (wallChoice == 0) {
+                        endX = -R + 2;
+                        endZ = riverRand.nextBoolean()
+                                ? minPassageDist + riverRand.nextDouble() * (R - minPassageDist - 5)
+                                : -(minPassageDist + riverRand.nextDouble() * (R - minPassageDist - 5));
+                    } else {
+                        endZ = R - 2;
+                        endX = riverRand.nextBoolean()
+                                ? minPassageDist + riverRand.nextDouble() * (R - minPassageDist - 5)
+                                : -(minPassageDist + riverRand.nextDouble() * (R - minPassageDist - 5));
+                    }
+                    break;
+
+                case 2: // Юго-восток → западная или северная
+                    if (wallChoice == 0) {
+                        endX = -R + 2;
+                        endZ = riverRand.nextBoolean()
+                                ? minPassageDist + riverRand.nextDouble() * (R - minPassageDist - 5)
+                                : -(minPassageDist + riverRand.nextDouble() * (R - minPassageDist - 5));
+                    } else {
+                        endZ = -R + 2;
+                        endX = riverRand.nextBoolean()
+                                ? minPassageDist + riverRand.nextDouble() * (R - minPassageDist - 5)
+                                : -(minPassageDist + riverRand.nextDouble() * (R - minPassageDist - 5));
+                    }
+                    break;
+
+                default: // Юго-запад → восточная или северная
+                    if (wallChoice == 0) {
+                        endX = R - 2;
+                        endZ = riverRand.nextBoolean()
+                                ? minPassageDist + riverRand.nextDouble() * (R - minPassageDist - 5)
+                                : -(minPassageDist + riverRand.nextDouble() * (R - minPassageDist - 5));
+                    } else {
+                        endZ = -R + 2;
+                        endX = riverRand.nextBoolean()
+                                ? minPassageDist + riverRand.nextDouble() * (R - minPassageDist - 5)
+                                : -(minPassageDist + riverRand.nextDouble() * (R - minPassageDist - 5));
+                    }
+                    break;
+            }
+
+            // === 3. ПОСТРОЕНИЕ ПУТИ ===
+            int pointCount = 80;
+            double[][] points = new double[pointCount][2];
+
+            double currentX = startX;
+            double currentZ = startZ;
+
+            double centerAvoidRadius = 40.0;
+
+            for (int i = 0; i < pointCount; i++) {
+                points[i][0] = currentX;
+                points[i][1] = currentZ;
+
+                if (i == pointCount - 1) break;
+
+                double attractX = endX - currentX;
+                double attractZ = endZ - currentZ;
+                double attractDist = Math.sqrt(attractX * attractX + attractZ * attractZ);
+
+                if (attractDist > 0.001) {
+                    attractX /= attractDist;
+                    attractZ /= attractDist;
+                }
+
+                double repelCenterX = 0, repelCenterZ = 0;
+                double centerDist = Math.sqrt(currentX * currentX + currentZ * currentZ);
+
+                if (centerDist < centerAvoidRadius && centerDist > 0.001) {
+                    double t = 1.0 - centerDist / centerAvoidRadius;
+                    double strength = t * t * 6.0;
+                    repelCenterX = (currentX / centerDist) * strength;
+                    repelCenterZ = (currentZ / centerDist) * strength;
+                }
+
+                double repelWallX = 0, repelWallZ = 0;
+
+                if (attractDist > 10.0) {
+                    double wallMargin = 8.0;
+
+                    double distRight = (R - 2) - currentX;
+                    double distLeft = currentX - (-R + 2);
+                    double distUp = (R - 2) - currentZ;
+                    double distDown = currentZ - (-R + 2);
+
+                    double minWallDist = Math.min(Math.min(distRight, distLeft), Math.min(distUp, distDown));
+
+                    if (minWallDist < wallMargin) {
+                        double strength = (1.0 - minWallDist / wallMargin) * 2.5;
+
+                        if (minWallDist == distRight) repelWallX = -strength;
+                        else if (minWallDist == distLeft) repelWallX = strength;
+                        else if (minWallDist == distUp) repelWallZ = -strength;
+                        else repelWallZ = strength;
+                    }
+                }
+
+                double totalX = attractX * 1.5 + repelCenterX + repelWallX;
+                double totalZ = attractZ * 1.5 + repelCenterZ + repelWallZ;
+
+                double noiseScale = 0.04;
+                double bendX = localFeatureNoise.noise(currentX * noiseScale, currentZ * noiseScale, 500.0);
+                double bendZ = localFeatureNoise.noise(currentX * noiseScale, currentZ * noiseScale, 600.0);
+
+                double progress = (double) i / (pointCount - 1);
+                double bendMultiplier = Math.sin(progress * Math.PI) * 3.0;
+
+                totalX += bendX * bendMultiplier;
+                totalZ += bendZ * bendMultiplier;
+
+                double totalDist = Math.sqrt(totalX * totalX + totalZ * totalZ);
+
+                if (totalDist > 0.001) {
+                    totalX /= totalDist;
+                    totalZ /= totalDist;
+                }
+
+                double stepSize = attractDist / (pointCount - 1 - i);
+                stepSize = Math.min(stepSize, attractDist);
+                stepSize = Math.min(stepSize, 4.0);
+
+                currentX += totalX * stepSize;
+                currentZ += totalZ * stepSize;
+
+                currentX = Math.max(-R + 3, Math.min(R - 3, currentX));
+                currentZ = Math.max(-R + 3, Math.min(R - 3, currentZ));
+            }
+
+            points[pointCount - 1][0] = endX;
+            points[pointCount - 1][1] = endZ;
+
+            riverCurvePoints = points;
+            riverSeedUsed = currentSeed;
         }
-
-        double shiftDir = riverRand.nextBoolean() ? 1.0 : -1.0;
-        if (endCorner == 0 || endCorner == 2) {
-            endX += shiftDir * 15.0;
-        } else {
-            endZ += shiftDir * 15.0;
-        }
-
-        // ★ ПОСТРОЕНИЕ ПУТИ МЕТОДОМ ПОТЕНЦИАЛЬНЫХ ПОЛЕЙ ★
-        int pointCount = 60;
-        riverCurvePoints = new double[pointCount][2];
-
-        double currentX = startX;
-        double currentZ = startZ;
-
-        // Параметры препятствий
-        double liftX = 0.0;
-        double liftZ = 0.0;
-        double liftAvoidRadius = 40.0;  // радиус обхода лифта
-        double centerAvoidRadius = 40.0; // радиус обхода центра
-        double wallMargin = 8.0;         // отступ от стен глейда
-
-        for (int i = 0; i < pointCount; i++) {
-            riverCurvePoints[i][0] = currentX;
-            riverCurvePoints[i][1] = currentZ;
-
-            if (i == pointCount - 1) break;
-
-            // === 1. ПРИТЯЖЕНИЕ К ЦЕЛИ (гарантирует соединение) ===
-            double attractX = endX - currentX;
-            double attractZ = endZ - currentZ;
-            double attractDist = Math.sqrt(attractX * attractX + attractZ * attractZ);
-            if (attractDist > 0.001) {
-                attractX /= attractDist;
-                attractZ /= attractDist;
-            }
-
-            // === 2. ОТТАЛКИВАНИЕ ОТ ЛИФТА ===
-            double repelLiftX = 0, repelLiftZ = 0;
-            double dlx = currentX - liftX;
-            double dlz = currentZ - liftZ;
-            double liftDist = Math.sqrt(dlx * dlx + dlz * dlz);
-            if (liftDist < liftAvoidRadius && liftDist > 0.001) {
-                double t = 1.0 - liftDist / liftAvoidRadius;
-                double strength = t * t * 4.0; // квадратичное усиление
-                repelLiftX = (dlx / liftDist) * strength;
-                repelLiftZ = (dlz / liftDist) * strength;
-            }
-
-            // === 3. ОТТАЛКИВАНИЕ ОТ ЦЕНТРА ГЛЕЙДА ===
-            double repelCenterX = 0, repelCenterZ = 0;
-            double centerDist = Math.sqrt(currentX * currentX + currentZ * currentZ);
-            if (centerDist < centerAvoidRadius && centerDist > 0.001) {
-                double t = 1.0 - centerDist / centerAvoidRadius;
-                double strength = t * t * 3.0;
-                repelCenterX = (currentX / centerDist) * strength;
-                repelCenterZ = (currentZ / centerDist) * strength;
-            }
-
-            // === 4. ОТТАЛКИВАНИЕ ОТ СТЕН ГЛЕЙДА ===
-            double repelWallX = 0, repelWallZ = 0;
-            double distRight = R - currentX;
-            double distLeft = currentX + R;
-            double distUp = R - currentZ;
-            double distDown = currentZ + R;
-            double minWallDist = Math.min(Math.min(distRight, distLeft), Math.min(distUp, distDown));
-
-            if (minWallDist < wallMargin) {
-                double strength = (1.0 - minWallDist / wallMargin) * 2.5;
-                if (minWallDist == distRight) repelWallX = -strength;
-                else if (minWallDist == distLeft) repelWallX = strength;
-                else if (minWallDist == distUp) repelWallZ = -strength;
-                else repelWallZ = strength;
-            }
-
-            // === 5. РЕЗУЛЬТИРУЮЩАЯ СИЛА ===
-            double totalX = attractX * 1.0 + repelLiftX + repelCenterX + repelWallX;
-            double totalZ = attractZ * 1.0 + repelLiftZ + repelCenterZ + repelWallZ;
-
-            double totalDist = Math.sqrt(totalX * totalX + totalZ * totalZ);
-            if (totalDist > 0.001) {
-                totalX /= totalDist;
-                totalZ /= totalDist;
-            }
-
-            // === 6. ШАГ К ЦЕЛИ ===
-            double stepSize = attractDist / (pointCount - 1 - i);
-            stepSize = Math.min(stepSize, attractDist); // не перепрыгиваем цель
-
-            currentX += totalX * stepSize;
-            currentZ += totalZ * stepSize;
-
-            // Жёсткое ограничение: не выходим за глейд
-            currentX = Math.max(-R + 3, Math.min(R - 3, currentX));
-            currentZ = Math.max(-R + 3, Math.min(R - 3, currentZ));
-        }
-
-        // Принудительно фиксируем конечную точку
-        riverCurvePoints[pointCount - 1][0] = endX;
-        riverCurvePoints[pointCount - 1][1] = endZ;
     }
 
     private double distanceToRiverCurve(double x, double z) {
         ensureRiverCurve();
-        double minDist = Double.MAX_VALUE;
-        for (int i = 0; i < riverCurvePoints.length; i++) {
-            double dx = x - riverCurvePoints[i][0];
-            double dz = z - riverCurvePoints[i][1];
-            double dist = Math.sqrt(dx * dx + dz * dz);
-            if (dist < minDist) {
-                minDist = dist;
+
+        double[][] points = riverCurvePoints;
+        if (points == null) {
+            return Double.MAX_VALUE;
+        }
+
+        double minDistSq = Double.MAX_VALUE;
+
+        for (int i = 0; i < points.length - 1; i++) {
+            double x1 = points[i][0];
+            double z1 = points[i][1];
+
+            double x2 = points[i + 1][0];
+            double z2 = points[i + 1][1];
+
+            double dx = x2 - x1;
+            double dz = z2 - z1;
+
+            double lenSq = dx * dx + dz * dz;
+
+            double t = 0;
+
+            if (lenSq > 0.0001) {
+                t = ((x - x1) * dx + (z - z1) * dz) / lenSq;
+                t = Math.max(0.0, Math.min(1.0, t));
+            }
+
+            double projX = x1 + t * dx;
+            double projZ = z1 + t * dz;
+
+            double distSq = (x - projX) * (x - projX) + (z - projZ) * (z - projZ);
+
+            if (distSq < minDistSq) {
+                minDistSq = distSq;
             }
         }
-        return minDist;
+
+        return Math.sqrt(minDistSq);
     }
     // ★ РАССТОЯНИЕ ДО БЛИЖАЙШЕГО ПРОХОДА В ГЛЕЙД ★
     private double getPassageBlendFactor(int x, int z) {
@@ -2104,7 +2325,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         int structX = 0;
         int structZ = 0;
 
-        int blendRadius = 35; // радиус сглаживания
+        int blendRadius = 50; // радиус сглаживания
 
         double dx = x - structX;
         double dz = z - structZ;
@@ -2113,4 +2334,104 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         if (dist >= blendRadius) return 0.0;
         return 1.0 - (dist / blendRadius);
     }
+
+    private void initializeSeed(RandomState random) {
+        if (seedInitialized) return;
+
+        synchronized (generationLock) {
+            if (seedInitialized) return;
+
+            long s = 0;
+
+            if (WorldSeedHolder.isSeedLoaded()) {
+                s = WorldSeedHolder.getWorldSeed();
+            }
+
+            if (s == 0) {
+                net.minecraft.world.level.biome.Climate.TargetPoint point = random.sampler().sample(0, 0, 0);
+                s = point.temperature() ^ point.continentalness();
+            }
+
+            if (s == 0) {
+                // Fallback, чтобы точно не было полностью нулевого сида.
+                s = 0x9E3779B97F4A7C15L;
+            }
+
+            this.seed = s;
+
+            this.terrainNoise = new ImprovedNoise(
+                    new net.minecraft.world.level.levelgen.LegacyRandomSource(seed)
+            );
+
+            this.featureNoise = new ImprovedNoise(
+                    new net.minecraft.world.level.levelgen.LegacyRandomSource(seed ^ 0x123456789ABCDEFL)
+            );
+
+            seedInitialized = true;
+        }
+    }
+    private long getEffectiveRiverSeed() {
+        if (WorldSeedHolder.isSeedLoaded()) {
+            long s = WorldSeedHolder.getWorldSeed();
+            if (s != 0) return s;
+        }
+
+        if (this.seed != 0) {
+            return this.seed;
+        }
+
+        return 0x9E3779B97F4A7C15L;
+    }
+
+    private void invalidateRiverIfSeedChanged() {
+        long currentSeed = getEffectiveRiverSeed();
+
+        if (riverCurvePoints != null && riverSeedUsed != currentSeed) {
+            synchronized (generationLock) {
+                if (riverCurvePoints != null && riverSeedUsed != currentSeed) {
+                    riverCurvePoints = null;
+                }
+            }
+        }
+    }
+    private void ensureDecorationSeed(WorldGenLevel level) {
+        if (seedInitialized && terrainNoise != null && featureNoise != null) {
+            return;
+        }
+
+        synchronized (generationLock) {
+            if (seedInitialized && terrainNoise != null && featureNoise != null) {
+                return;
+            }
+
+            long s = level.getSeed();
+
+            if (s == 0 && WorldSeedHolder.isSeedLoaded()) {
+                s = WorldSeedHolder.getWorldSeed();
+            }
+
+            if (s == 0) {
+                s = this.seed;
+            }
+
+            if (s == 0) {
+                s = 0x9E3779B97F4A7C15L;
+            }
+
+            this.seed = s;
+
+            this.terrainNoise = new ImprovedNoise(
+                    new net.minecraft.world.level.levelgen.LegacyRandomSource(seed)
+            );
+
+            this.featureNoise = new ImprovedNoise(
+                    new net.minecraft.world.level.levelgen.LegacyRandomSource(seed ^ 0x123456789ABCDEFL)
+            );
+
+            this.seedInitialized = true;
+        }
+    }
+
+
+
 }

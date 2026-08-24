@@ -1,6 +1,7 @@
 modLoader="javafml"
 loaderVersion="${loader_version_range}"
 license="${mod_license}"
+accessTransformerFile = "META-INF/accesstransformer.cfg"
 
 # Mixin configs. compat — опциональный, required=false, для интеграций (sophisticatedbackpacks и т.д.)
 mixins=[
