@@ -64,8 +64,6 @@ minecraft {
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
 repositories {
-    mavenCentral()
-
     // ★ ДОБАВЛЕНО: Репозитории для Create, Ponder, Flywheel и Registrate ★
     maven {
         name = "Create"
