@@ -7,6 +7,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.WorldGenRegion;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.*;
 import net.minecraft.world.level.biome.BiomeManager;
 import net.minecraft.world.level.biome.BiomeSource;
@@ -469,6 +470,146 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         }
     }
 
+
+
+    private boolean isLianaRope(int x, int z) {
+        /*
+         * Лианы не должны появляться равномерной сеткой.
+         *
+         * Используем несколько уровней шума:
+         *  - крупный шум создаёт большие заросшие участки;
+         *  - мелкий шум разбивает их на отдельные пряди.
+         *
+         * Результат:
+         *   ████      ███
+         *   ███       ██
+         *    █        █
+         *
+         * вместо:
+         *   █ █ █ █ █ █
+         *   █ █ █ █ █ █
+         */
+
+        double large = featureNoise.noise(
+                x * 0.035,
+                0,
+                z * 0.035
+        );
+
+        double medium = featureNoise.noise(
+                x * 0.09 + 173.0,
+                0,
+                z * 0.09 + 173.0
+        );
+
+        double small = featureNoise.noise(
+                x * 0.22 + 731.0,
+                0,
+                z * 0.22 + 731.0
+        );
+
+        /*
+         * Большой шум отвечает за то, где вообще
+         * могут быть заросли.
+         */
+        if (large < -0.05) {
+            return false;
+        }
+
+        /*
+         * Средний шум формирует отдельные группы.
+         */
+        if (medium < -0.25) {
+            return false;
+        }
+
+        /*
+         * Мелкий шум не даёт стене покрываться
+         * лианами полностью.
+         */
+        return small > -0.35;
+    }
+
+    /**
+     * ★ ЛИАНЫ v5 (НЕ ЛЕТАЮТ) ★
+     * Три защиты от неба:
+     *  1. y <= localTopY — никогда выше крыши
+     *  2. Только вплотную к стене (ортогонально, 1 блок)
+     *  3. isSolidWall на ЭТОЙ же высоте — стена реально существует рядом
+     */
+    private BlockState tryGenerateVine(int x, int y, int z, int localTopY) {
+        // ★ ЗАЩИТА 1: выше крыши — ничего ★
+        if (y > localTopY) return null;
+        int hang = localTopY - y;
+        if (hang < 0 || hang > 20) return null;
+
+        // ★ ЗАЩИТА 2: стена только вплотную, ортогонально ★
+        int dir = -1;
+        if (isLogicalWall(x + 1, z)) dir = 0;
+        else if (isLogicalWall(x - 1, z)) dir = 1;
+        else if (isLogicalWall(x, z + 1)) dir = 2;
+        else if (isLogicalWall(x, z - 1)) dir = 3;
+        if (dir < 0) return null;
+
+        // ★ ЗАЩИТА 3: стена существует НА ЭТОЙ ВЫСОТЕ ★
+        int wx = x + (dir == 0 ? 1 : dir == 1 ? -1 : 0);
+        int wz = z + (dir == 2 ? 1 : dir == 3 ? -1 : 0);
+        if (!isSolidWall(wx, y, wz)) return null;
+
+        if (!isLianaRope(x, z)) return null;
+
+        // Длина верёвки 6..18
+        double lenNoise = featureNoise.noise(x * 0.07 + 777, 0, z * 0.07 + 777);
+        int maxLen = 6 + (int) ((lenNoise + 1.0) * 6.0);
+        if (hang > maxLen) return null;
+
+        // Шапка из листвы на кромке (2 блока), ниже — лиана
+        if (hang <= 1) return getJungleLeafBlock();
+        return getVineBlockFacingWall(dir);
+    }
+
+    /**
+     * ★ ВЕРХУШКИ (ШАПКИ) ИЗ ЛИСТВЫ ★
+     * Округлый куст на кромке стены: закрывает верх, свисает по бокам,
+     * торчит на 1-2 блока вверх. Выглядит как заросшая кромка, а не плоская стена.
+     */
+    private BlockState tryGenerateVineCap(int x, int y, int z, int topY) {
+        int dy = y - topY;
+        // Только кромка: 1 блок ниже и до 2 блоков выше
+        if (dy < -1 || dy > 2) return null;
+
+        int[] wall = findNearestWall(x, z);
+        if (wall == null) return null;
+        int dist = wall[0];
+        int dir = wall[2];
+        if (dist > 2) return null;
+        int wallTop = wall[1];
+
+        // Колонка вдоль стены, якорь куста каждые 6 блоков
+        int t = (dir == 0 || dir == 1) ? z : x;
+        int anchor = Math.floorDiv(t, 6) * 6 + 3;
+
+        // Гейт: шапки пятнами, не сплошной полосой
+        double gate = featureNoise.noise(anchor * 0.37 + dir * 91, 0, anchor * 0.19);
+        if (gate < 0.0) return null;
+
+        // Радиус куста 1.6..2.6 (разные размеры)
+        double r = 1.6 + (featureNoise.noise(anchor * 0.53 + 7, 0, anchor * 0.31 + 7) + 1.0) * 0.5;
+
+        int dt = t - anchor;                      // вдоль стены
+        double dv = y - (wallTop + 0.5);          // по высоте (центр чуть выше кромки)
+        double rad = Math.sqrt(dt * dt + dv * dv);
+
+        // Чем дальше от стены — тем короче свисание (куст "сидит" на стене)
+        double allow = r - (dist - 1) * 0.7;
+        double perturb = featureNoise.noise(x * 0.5, y * 0.5, z * 0.5) * 0.5;
+
+        if (rad <= allow + perturb) {
+            return getJungleLeafBlock();
+        }
+        return null;
+    }
+
     private BlockState generateSectorBlock(int x, int y, int z, long hash) {
         if (y == FLOOR_Y) return randomFloorBlock(x, z);
         int dist = Math.max(Math.abs(x), Math.abs(z));
@@ -478,11 +619,15 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             if (passages.contains(hash) || passageZones.contains(hash)) {
                 BlockState bush = tryGenerateBush(x, y, z);
                 if (bush != null) return bush;
+                BlockState vine = tryGenerateVine(x, y, z, FLOOR_Y + wallHeight);
+                if (vine != null) return vine;
                 return Blocks.AIR.defaultBlockState();
             }
             if (sectorCorridors.contains(hash)) {
                 BlockState bush = tryGenerateBush(x, y, z);
                 if (bush != null) return bush;
+                BlockState vine = tryGenerateVine(x, y, z, FLOOR_Y + wallHeight);
+                if (vine != null) return vine;
                 return Blocks.AIR.defaultBlockState();
             }
             int depthFromSurface;
@@ -741,7 +886,16 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
     }
 
     private BlockState generateLabyrinthFast(int x, int y, int z, int dist, long hash, int topY) {
-        if (y > topY) return Blocks.AIR.defaultBlockState();
+        if (y > topY) {
+            // ★ ЛИСТВА ТОРЧИТ НАД КРОМКОЙ ★
+            BlockState vines = tryGenerateWallVines(x, y, z);
+            if (vines != null) return vines;
+            return Blocks.AIR.defaultBlockState();
+        }
+
+        // ★ ЛИАНЫ И КУСТЫ — до всех зон ★
+        BlockState vines = tryGenerateWallVines(x, y, z);
+        if (vines != null) return vines;
 
         BlockState state = Blocks.AIR.defaultBlockState();
 
@@ -915,86 +1069,221 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         return cache;
     }
 
-    /**
-     * ★ МЕТОД: Старение и декор (С защитой фундамента) ★
-     * 1. Нижние 5 блоков от пола абсолютно монолитны (никаких дыр и трещин)
-     * 2. Ширина динамическая (2-5 блоков)
-     * 3. Длина ограничена (обрезается маской, превращаясь в короткие сегменты)
-     * 4. Глубина строго ограничена (1-3 блока, не пробивает насквозь)
-     */
-    private BlockState getDecayedWallBlock(int x, int y, int z, int depthFromSurface) {
+    // =====================================================================
+    // ★ СИСТЕМА ТРЕЩИН v5 (ОРИГИНАЛ v3 + УМНЫЕ ПРУТЬЯ) ★
+    // =====================================================================
+    private static final int MAX_CARVE_DEPTH = 2;
 
-        // ★ АБСОЛЮТНАЯ ЗАЩИТА ФУНДАМЕНТА ★
-        // Нижние 5 блоков от пола (y от FLOOR_Y до FLOOR_Y + 4) остаются идеально целыми.
-        // Здесь не будет ни трещин, ни дыр, ни выветривания.
-        if (y < FLOOR_Y + 5) {
-            return getWallBlock(x, y, z);
+    private int[] wallGeometry(int x, int z) {
+        int dist = Math.max(Math.abs(x), Math.abs(z));
+        if (dist <= GLADE_WALL_END) {
+            int dH = Math.min(dist - GLADE_RADIUS, GLADE_WALL_END - dist);
+            return new int[]{Math.max(0, dH), GLADE_WALL_END - GLADE_RADIUS + 1, GLADE_WALL_HEIGHT};
         }
-
-        // Абсолютная защита: если расстояние от поверхности больше 3 блоков, возвращаем целую стену
-        if (depthFromSurface > 3) {
-            return getWallBlock(x, y, z);
+        if (dist < MAIN_MAZE_END) {
+            int modX = Math.floorMod(x, 5);
+            int modZ = Math.floorMod(z, 5);
+            int dH = Math.min(Math.min(modX, 4 - modX), Math.min(modZ, 4 - modZ));
+            return new int[]{dH, WALL_THICKNESS, MAZE_HEIGHT};
         }
+        if (dist <= SEPARATOR_WALL_END) {
+            int dH = Math.min(dist - MAIN_MAZE_END, SEPARATOR_WALL_END - dist);
+            return new int[]{Math.max(0, dH), SEPARATOR_WALL_END - MAIN_MAZE_END + 1, SEPARATOR_WALL_HEIGHT};
+        }
+        if (dist <= SECTORS_END) {
+            boolean internal = (Math.abs(x) <= 2 || Math.abs(z) <= 2
+                    || Math.abs(x - z) <= 2 || Math.abs(x + z) <= 2);
+            int dH;
+            if (Math.abs(x) <= 2) dH = 2 - Math.abs(x);
+            else if (Math.abs(z) <= 2) dH = 2 - Math.abs(z);
+            else if (Math.abs(x - z) <= 2) dH = 2 - Math.abs(x - z);
+            else if (Math.abs(x + z) <= 2) dH = 2 - Math.abs(x + z);
+            else dH = SECTORS_END - dist;
+            int height = (dist >= SECTORS_END || internal) ? SEPARATOR_WALL_HEIGHT : MAZE_HEIGHT;
+            int thickness = internal ? 5 : 64;
+            return new int[]{Math.max(0, dH), thickness, height};
+        }
+        int dH = Math.min(dist - SECTORS_END, OUTER_WALL_END - dist);
+        return new int[]{Math.max(0, dH), OUTER_WALL_END - SECTORS_END + 1, OUTER_WALL_HEIGHT};
+    }
 
-        // ==========================================
-        // 1. Базовая форма трещин (трубчатая) и динамическая ширина (2-5 блоков)
-        // ==========================================
-        // Частота 0.04 (период 25), подходит для генерации широких трещин
-        double coreNoise = Math.abs(featureNoise.noise(x * 0.04, y * 0.04, z * 0.04));
+    private boolean isCarveSafe(int dH, int thickness) {
+        return dH < MAX_CARVE_DEPTH && dH <= thickness - 1 - MAX_CARVE_DEPTH;
+    }
 
-        // Используем низкочастотный шум для плавного изменения ширины трещины
-        double widthMod = terrainNoise.noise(x * 0.015, y * 0.015, z * 0.015);
-        // Маппинг порога от 0.10 (~2 блока) до 0.25 (~5 блоков)
-        double threshold = 0.10 + (widthMod + 1.0) * 0.075;
+    private double crackVein(int x, int y, int z) {
+        double jx = featureNoise.noise(x * 0.11, y * 0.11, z * 0.11) * 0.6;
+        double jy = featureNoise.noise(x * 0.11 + 137, y * 0.11 + 137, z * 0.11 + 137) * 0.6;
+        double jz = featureNoise.noise(x * 0.11 + 291, y * 0.11 + 291, z * 0.11 + 291) * 0.6;
+        return Math.abs(featureNoise.noise(x * 0.045 + jx, y * 0.020 + jy, z * 0.045 + jz));
+    }
 
-        boolean isCrackCore = (coreNoise < threshold);
+    private double crackZone(int x, int y, int z) {
+        return terrainNoise.noise(x * 0.012, y * 0.012, z * 0.012);
+    }
 
-        // ==========================================
-        // 2. Обрезка трещин (ограничение длины, превращение в короткие сегменты)
-        // ==========================================
-        // Среднечастотный шум как "маска": трещина видна только когда значение > 0.
-        // Это разрезает непрерывные трубы на короткие сегменты по 10-15 блоков.
-        double breakNoise = featureNoise.noise(x * 0.08 + 500.0, y * 0.08, z * 0.08);
-        boolean isVisible = (breakNoise > 0.0);
+    private double crackSegmentMask(int x, int y, int z) {
+        return terrainNoise.noise(x * 0.03 + 500, y * 0.045 + 500, z * 0.03 + 500);
+    }
 
-        // ==========================================
-        // 3. Генерация трещин и арматуры
-        // ==========================================
-        if (isCrackCore && isVisible) {
-            // Динамический расчет глубины текущей трещины (от 1 до 3 блоков)
-            double depthMod = terrainNoise.noise(x * 0.1, y * 0.1, z * 0.1);
-            int maxDepth = 1 + (int)((depthMod + 1.0) * 1.0); // Результат 1, 2, или 3
+    private double hash01(int x, int y, int z) {
+        long h = (x * 73856093L) ^ (y * 19349663L) ^ (z * 83492791L) ^ seed;
+        h ^= h >>> 32; h *= 0x85EBCA77C2B2AE63L;
+        h ^= h >>> 27; h *= 0xC2B2AE3D27D4EB4FL;
+        h ^= h >>> 31;
+        return (h & 0xFFFF) / 65535.0;
+    }
 
-            // Блок вырезается (становится воздухом), только если его глубина меньше макс. глубины трещины
-            if (depthFromSurface < maxDepth) {
+    // =====================================================================
+    // ★ УМНЫЕ ПРУТЬЯ: проверяют соседей и соединяются/удаляются ★
+    // =====================================================================
 
-                // ★ Логика арматуры (срабатывает только на поверхности depth 0) ★
-                if (depthFromSurface == 0) {
-                    double rebarChance = featureNoise.noise(x * 0.25, y * 0.25, z * 0.25);
-                    // ~12.5% поверхностных блоков трещины будут содержать арматуру
-                    if (rebarChance > 0.75) {
-                        return Blocks.IRON_BARS.defaultBlockState();
-                    }
-                }
+    /** Проверка: является ли блок твёрдым (стена/кирпич/другие прутья, но НЕ воздух) */
+    private boolean isSupportBlock(int x, int y, int z) {
+        int[] geo = wallGeometry(x, z);
+        int dH = geo[0];
+        int wallHeight = geo[2];
+        int dV = (FLOOR_Y + wallHeight) - y;
 
-                return Blocks.AIR.defaultBlockState();
+        // За пределами стены = опора
+        if (y < FLOOR_Y || dV < 0) return true;
+
+        // Проверяем: это блок стены или воздух?
+        double zone = crackZone(x, y, z);
+        double base = 0.06 + (zone + 1.0) * 0.025;
+        double vein = crackVein(x, y, z);
+        boolean visible = crackSegmentMask(x, y, z) > -0.1;
+
+        // Верхушка = всегда твёрдая
+        if (dV < dH) return true;
+
+        // Если это воздух трещины - не опора
+        if (visible && dH < MAX_CARVE_DEPTH) {
+            double t = base * (1.0 - 0.38 * dH);
+            if (vein < t && isCarveSafe(dH, geo[1])) {
+                return false; // воздух
             }
         }
 
-        // ==========================================
-        // 4. Поверхностное выветривание (только для внешнего слоя depth 0)
-        // ==========================================
-        if (depthFromSurface == 0) {
-            long hash = (x * 73856093L) ^ (y * 19349663L) ^ (z * 83492791L) ^ seed;
-            int randVal = (int)(hash & 0xFF);
+        return true; // стена или заполненная трещина
+    }
 
-            if (randVal < 38) return Blocks.CRACKED_STONE_BRICKS.defaultBlockState(); // ~15%
-            if (randVal < 63) return Blocks.MOSSY_STONE_BRICKS.defaultBlockState();  // ~10%
-            if (randVal < 76) return Blocks.COBBLESTONE.defaultBlockState();         // ~5%
+    /** Умные прутья: соединяются с опорой, если висят - воздух */
+    private BlockState smartIronBars(int x, int y, int z) {
+        boolean up    = isSupportBlock(x, y + 1, z);
+        boolean down  = isSupportBlock(x, y - 1, z);
+        boolean north = isSupportBlock(x, y, z - 1);
+        boolean south = isSupportBlock(x, y, z + 1);
+        boolean west  = isSupportBlock(x - 1, y, z);
+        boolean east  = isSupportBlock(x + 1, y, z);
+
+        // Если со всех 6 сторон пусто - заменяем на воздух
+        if (!(up || down || north || south || west || east)) {
+            return Blocks.AIR.defaultBlockState();
         }
 
-        // По умолчанию возвращаем стандартную стену
+        // Соединяем с каждой стороной где есть опора
+        BlockState bars = Blocks.IRON_BARS.defaultBlockState();
+        if (north) bars = bars.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.NORTH, true);
+        if (south) bars = bars.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.SOUTH, true);
+        if (west)  bars = bars.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.WEST, true);
+        if (east)  bars = bars.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.EAST, true);
+        return bars;
+    }
+
+    // =====================================================================
+    // ★ ДНО ТРЕЩИНЫ (ОРИГИНАЛ v3 + УМНЫЕ ПРУТЬЯ) ★
+    // =====================================================================
+    private BlockState crackBottomBlock(int x, int y, int z, int dH) {
+        double r = hash01(x, y, z);
+        if (dH == 0) {
+            // Поверхность: отверстие + изредка арматура/кирпичи
+            if (r > 0.80) return smartIronBars(x, y, z);        // умные прутья
+            if (r > 0.62) return Blocks.CRACKED_STONE_BRICKS.defaultBlockState();
+            return Blocks.AIR.defaultBlockState();
+        }
+        // dH == 1: глубже - больше прутьев (рельеф)
+        if (r > 0.55) return smartIronBars(x, y, z);
+        return Blocks.AIR.defaultBlockState();
+    }
+
+    private BlockState filledCrackBlock(int x, int y, int z) {
+        double r = hash01(x, y, z);
+        if (r < 0.6) return Blocks.CRACKED_STONE_BRICKS.defaultBlockState();
+        return Blocks.COBBLESTONE.defaultBlockState();
+    }
+
+    private BlockState weatheredSurface(int x, int y, int z, double vein, double base) {
+        double r = hash01(x, y, z);
+        if (vein < base * 2.0 && r < 0.55) {
+            return Blocks.CRACKED_STONE_BRICKS.defaultBlockState();
+        }
+        if (r < 0.12) return Blocks.CRACKED_STONE_BRICKS.defaultBlockState();
+        if (r < 0.22) return Blocks.MOSSY_STONE_BRICKS.defaultBlockState();
+        if (r < 0.28) return Blocks.COBBLESTONE.defaultBlockState();
         return getWallBlock(x, y, z);
+    }
+
+    // =====================================================================
+    // ★ ГЛАВНЫЙ МЕТОД (ОРИГИНАЛ v3 + УМНЫЕ ПРУТЬЯ) ★
+    // =====================================================================
+    private BlockState getDecayedWallBlock(int x, int y, int z, int depthFromSurface) {
+        // ★ ЛИСТВЕННАЯ ШАПКА НА КРОМКЕ (верх стены зарастает) ★
+        BlockState cap = tryGenerateVineCap(x, y, z, getTopY(x, z));
+        if (cap != null) return cap;
+
+        // ... остальной код без изменений
+        // ★ АБСОЛЮТНАЯ ЗАЩИТА ФУНДАМЕНТА ★
+        if (y < FLOOR_Y + 5) {
+            return getWallBlock(x, y, z);
+        }
+        if (depthFromSurface > 2) {
+            return getWallBlock(x, y, z);
+        }
+
+        int[] geo = wallGeometry(x, z);
+        int dH = geo[0];
+        int thickness = geo[1];
+        int wallHeight = geo[2];
+        int dV = (FLOOR_Y + wallHeight) - y;
+        if (dV < 0) return getWallBlock(x, y, z);
+
+        double zone = crackZone(x, y, z);
+        double base = 0.06 + (zone + 1.0) * 0.025;
+        double vein = crackVein(x, y, z);
+        boolean visible = crackSegmentMask(x, y, z) > -0.1;
+
+        // Верхушка стены — только выветривание
+        boolean isTop = dV < dH;
+        if (isTop) {
+            return weatheredSurface(x, y, z, vein, base);
+        }
+
+        if (visible) {
+            double t = base * (1.0 - 0.38 * dH);
+            if (vein < t) {
+                if (dH < MAX_CARVE_DEPTH) {
+                    return isCarveSafe(dH, thickness)
+                            ? crackBottomBlock(x, y, z, dH)
+                            : filledCrackBlock(x, y, z);
+                }
+                if (dH == MAX_CARVE_DEPTH) {
+                    // Трещина "продолжается" вглубь: умные прутья + cracked
+                    double r = hash01(x, y, z);
+                    if (r < 0.3) return smartIronBars(x, y, z);
+                    return Blocks.CRACKED_STONE_BRICKS.defaultBlockState();
+                }
+            }
+        }
+
+        // Сколотые края вокруг трещины
+        if (dH == 0 && vein < base * 2.0) {
+            double r = hash01(x, y, z);
+            if (r < 0.45) return Blocks.CRACKED_STONE_BRICKS.defaultBlockState();
+            if (r < 0.60) return Blocks.COBBLESTONE.defaultBlockState();
+        }
+
+        return weatheredSurface(x, y, z, vein, base);
     }
     /**
      * ★ СОЗДАНИЕ ОСЕВОГО ПРОХОДА ★
@@ -1079,57 +1368,107 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
 
 
     /**
-     * ★ ГЕНЕРАЦИЯ ОРГАНИЧНЫХ КУСТОВ (УВЕЛИЧЕННЫЕ И БОЛЕЕ ЧАСТЫЕ) ★
+     * ★ КУСТЫ В ЛАБИРИНТЕ ★
+     * Органичные кусты у стен: эллипсоид с шумовой "пушистостью",
+     * разные размеры (маленькие/средние/большие), азалия на верхушке.
      */
     private BlockState tryGenerateBush(int x, int y, int z) {
         int height = y - FLOOR_Y;
-        // ★ УВЕЛИЧЕНО: Кусты теперь растут на 1, 2, 3 и 4 блоках от пола
         if (height < 1 || height > 4) return null;
 
+        // 1. Ближайшая стена (1-2 блока)
         int depth = 3;
         int sideCoord = 0;
-        boolean isXWall = false;
-
-        // 1. Ищем ближайшую стену и определяем локальные координаты
         for (int d = 1; d <= 2; d++) {
-            if (isLogicalWall(x + d, z)) { depth = d; sideCoord = z; isXWall = true; break; }
-            if (isLogicalWall(x - d, z)) { depth = d; sideCoord = z; isXWall = true; break; }
-            if (isLogicalWall(x, z + d)) { depth = d; sideCoord = x; isXWall = false; break; }
-            if (isLogicalWall(x, z - d)) { depth = d; sideCoord = x; isXWall = false; break; }
+            if (isLogicalWall(x + d, z)) { depth = d; sideCoord = z; break; }
+            if (isLogicalWall(x - d, z)) { depth = d; sideCoord = z; break; }
+            if (isLogicalWall(x, z + d)) { depth = d; sideCoord = x; break; }
+            if (isLogicalWall(x, z - d)) { depth = d; sideCoord = x; break; }
         }
-        if (depth > 2) return null; // Слишком далеко от стены
+        if (depth > 2) return null;
 
-        // ★ ЧАЩЕ: Интервал группировки уменьшен с 6.0 до 5.0 блоков
-        int centerSide = (int)(Math.round(sideCoord / 5.0) * 5.0);
+        // 2. Центры кустов каждые 5 блоков вдоль стены (~70% мест)
+        int centerSide = (int) (Math.round(sideCoord / 5.0) * 5.0);
         double centerNoise = terrainNoise.noise(centerSide * 0.3, centerSide * 0.1, 0);
-        // ★ ЧАЩЕ: Порог изменен, теперь только ~35% центров пустые (кусты растут плотнее)
         if (centerNoise < -0.3) return null;
 
         int offsetSide = sideCoord - centerSide;
-        // ★ УВЕЛИЧЕНО: Лимит разрастания в стороны от центра
         if (Math.abs(offsetSide) > 4) return null;
 
-        // 3. ★ МАГИЯ ОРГАНИЧЕСКОЙ ФОРМЫ (Увеличенный эллипсоид) ★
-        // Нормализуем координаты в радиусы эллипсоида (4 по бокам, 4 ввысь, 3 вглубь)
-        double sideNorm = (offsetSide * offsetSide) / 16.0;
-        double heightNorm = (height * height) / 16.0;
-        double depthNorm = (depth * depth) / 9.0;
+        // 3. ★ РАЗНЫЙ РАЗМЕР кустов (0.8..1.3) — не все одинаковые ★
+        double sizeNoise = featureNoise.noise(centerSide * 0.7, 0, 77);
+        double size = 0.8 + (sizeNoise + 1.0) * 0.25;
 
+        // 4. "Пушистый" эллипсоид
+        double sideNorm = (offsetSide * offsetSide) / (16.0 * size);
+        double heightNorm = (height * height) / (16.0 * size);
+        double depthNorm = (depth * depth) / (9.0 * size);
         double dist = Math.sqrt(sideNorm + heightNorm + depthNorm);
-
-        // 3D шум "взъерошивает" границы эллипсоида, убирая геометрическую правильность
         double perturb = featureNoise.noise(x * 0.5, y * 0.5, z * 0.5) * 0.25;
 
-        // Если точка внутри деформированного эллипсоида — генерируем листву
         if (dist + perturb < 0.85) {
             long hash = (x * 123L) ^ (y * 456L) ^ (z * 789L) ^ seed;
-            // На самой верхушке (height == 4) 15% шанс заменить на цветущую азалию
+            // Верхушка иногда цветущая азалия
             if (height == 4 && (hash & 0xFF) < 38) {
                 return Blocks.FLOWERING_AZALEA.defaultBlockState();
             }
             return getLeafBlock();
         }
         return null;
+    }
+    // ★ ФИКСИРОВАННАЯ ВЫСОТА ЛИАН: сколько блоков свисают от верха стены ★
+    private static final int VINE_HANG = 12;    // ← меняй на любое число (8, 15, 20...)
+    private static final int VINE_SPREAD = 2;   // ±2 блока разброса (0 = идеально ровно)
+
+    /** ★ ТОЧНЫЙ верх стены для колонки (getTopY врёт для коридоров лабиринта) ★ */
+    private int wallTopAt(int wx, int wz) {
+        int d = Math.max(Math.abs(wx), Math.abs(wz));
+        if (d <= GLADE_WALL_END) return FLOOR_Y + GLADE_WALL_HEIGHT;
+        if (d < MAIN_MAZE_END) return FLOOR_Y + MAZE_HEIGHT;
+        if (d <= SEPARATOR_WALL_END) return FLOOR_Y + SEPARATOR_WALL_HEIGHT;
+        if (d <= SECTORS_END) {
+            boolean internal = (Math.abs(wx) <= 2 || Math.abs(wz) <= 2
+                    || Math.abs(wx - wz) <= 2 || Math.abs(wx + wz) <= 2);
+            return FLOOR_Y + ((d >= SECTORS_END || internal) ? SEPARATOR_WALL_HEIGHT : MAZE_HEIGHT);
+        }
+        return FLOOR_Y + OUTER_WALL_HEIGHT;
+    }
+
+    /**
+     * ★ ЗЕЛЕНЬ НА СТЕНАХ: ТОЛЬКО ТРОПИЧЕСКАЯ ЛИСТВА ★
+     * Никаких блоков VINE — шапки и свисающие пряди целиком из листвы.
+     */
+    private BlockState tryGenerateWallVines(int x, int y, int z) {
+        // Не трогаем саму колонку стены
+        if (isLogicalWall(x, z)) return null;
+
+        int[] wall = findNearestWall(x, z);
+        if (wall == null || wall[0] > 1) return null;   // только вплотную к стене
+        int wallTop = wall[1];
+        int dir = wall[2];
+
+        int hang = wallTop - y;
+        if (hang < 1 || hang > 20) return null;          // только ниже кромки
+
+        // Пряди: якоря каждые 4 блока вдоль стены, растёт ~70%
+        int t = (dir == 0 || dir == 1) ? z : x;
+        int anchor = Math.floorDiv(t, 4) * 4 + 1;
+        if (terrainNoise.noise(anchor * 0.31, 0, anchor * 0.17) < -0.15) return null;
+        if (Math.abs(t - anchor) > 1) return null;       // прядь 3 блока шириной
+
+        // Длина пряди 8..16 блоков
+        double lenNoise = featureNoise.noise(anchor * 0.53, 0, anchor * 0.29);
+        int len = 8 + (int) ((lenNoise + 1.0) * 4.0);
+        if (hang > len) return null;
+
+        // Кончик пряди сужается
+        if (hang > len - 2 && Math.abs(t - anchor) > 0) {
+            long h = (x * 123L) ^ (y * 456L) ^ (z * 789L) ^ seed;
+            if ((h & 0xFF) > 120) return null;
+        }
+
+        // ★ ВСЕГДА ЛИСТВА — блоки VINE больше не генерируются ★
+        return getJungleLeafBlock();
     }
 
     /**
@@ -1479,11 +1818,25 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             if (passages.contains(hash) || passageZones.contains(hash)) {
                 BlockState bush = tryGenerateBush(x, y, z);
                 if (bush != null) return bush;
+                BlockState vine = tryGenerateVine(x, y, z, FLOOR_Y + MAZE_HEIGHT);
+                if (vine != null) return vine;
                 return Blocks.AIR.defaultBlockState();
             }
+
+
+
+            if (y > FLOOR_Y + MAZE_HEIGHT) {
+                BlockState vine = tryGenerateWallVines(x, y, z);   // ★ лианы вдоль высоких стен
+                if (vine != null) return vine;
+                return Blocks.AIR.defaultBlockState();
+            }
+
+
             if (mazeCorridors.contains(hash)) {
                 BlockState bush = tryGenerateBush(x, y, z);
                 if (bush != null) return bush;
+                BlockState vine = tryGenerateWallVines(x, y, z);   // ★
+                if (vine != null) return vine;
                 return Blocks.AIR.defaultBlockState();
             }
             int modX = Math.floorMod(x, 5);
@@ -1492,6 +1845,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             int depthY = (FLOOR_Y + MAZE_HEIGHT) - y;
             int depthFromSurface = Math.min(depthXZ, depthY);
             return getDecayedWallBlock(x, y, z, depthFromSurface);
+
         }
         return Blocks.AIR.defaultBlockState();
     }
@@ -1662,24 +2016,39 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
     // КЭШ ДЛЯ СТОЛБЦОВ (X, Z)
     private static final Map<Long, Boolean> lianaCache = new ConcurrentHashMap<>();
 
-    // ★ ОПТИМИЗАЦИЯ ЛИАН (УБИРАЕМ ОПАСНЫЙ КЭШ, УБИВАЮЩИЙ TPS) ★
-    private boolean isLianaRope(int x, int z) {
-        // ★ УБРАН lianaCache (ConcurrentHashMap).
-        // Шум детерминирован, вычисляется за наносекунды. Кэш создавал пробки в многопоточке.
-        double noise1 = featureNoise.noise(x * 0.1, 0, z * 0.1);
-        double noise2 = terrainNoise.noise(x * 0.05, 0, z * 0.05);
-        return noise1 > 0.6 && noise2 > 0.3;
-    }
     /**
      * ★ 根据墙壁方向生成侧面贴合的原版藤蔓 ★
      */
     private BlockState getVineBlockFacingWall(int wallDir) {
+        BlockState vine = Blocks.VINE.defaultBlockState();
+
         switch (wallDir) {
-            case 0: return getVineBlock(false, false, false, true, false);  // 墙在 X+，藤蔓朝 EAST
-            case 1: return getVineBlock(false, false, false, false, true);  // 墙在 X-，藤蔓朝 WEST
-            case 2: return getVineBlock(false, false, true, false, false);  // 墙在 Z+，藤蔓朝 SOUTH
-            case 3: return getVineBlock(false, true, false, false, false);  // 墙在 Z-，藤蔓朝 NORTH
-            default: return getVineBlock(true, false, false, false, false);
+            // Стена справа от лианы (+X)
+            case 0:
+                return vine.setValue(
+                        BlockStateProperties.EAST, true
+                );
+
+            // Стена слева от лианы (-X)
+            case 1:
+                return vine.setValue(
+                        BlockStateProperties.WEST, true
+                );
+
+            // Стена впереди (+Z)
+            case 2:
+                return vine.setValue(
+                        BlockStateProperties.SOUTH, true
+                );
+
+            // Стена сзади (-Z)
+            case 3:
+                return vine.setValue(
+                        BlockStateProperties.NORTH, true
+                );
+
+            default:
+                return vine;
         }
     }
 
@@ -1699,13 +2068,19 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
 
 
     private BlockState getJungleLeafBlock() {
-        try {
-            return Blocks.JUNGLE_LEAVES.defaultBlockState().setValue(
-                    net.minecraft.world.level.block.state.properties.BlockStateProperties.PERSISTENT, true
-            );
-        } catch (Exception e) {
-            return Blocks.JUNGLE_LEAVES.defaultBlockState();
-        }
+        /*
+         * Листва используется только как декоративная часть
+         * зарослей/верхушек.
+         *
+         * PERSISTENT = true:
+         * листья не будут исчезать из-за отсутствия дерева.
+         */
+
+        return Blocks.JUNGLE_LEAVES.defaultBlockState()
+                .setValue(
+                        BlockStateProperties.PERSISTENT,
+                        true
+                );
     }
 
     private BlockState getVineBlock(boolean up, boolean north, boolean south, boolean east, boolean west) {
