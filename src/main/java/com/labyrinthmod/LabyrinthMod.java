@@ -9,10 +9,7 @@ import com.labyrinthmod.common.command.*;
 import com.labyrinthmod.common.config.ModConfig;
 import com.labyrinthmod.common.entity.GriverEntity;
 import com.labyrinthmod.common.entity.GriverEntityType;
-import com.labyrinthmod.common.event.ChatDisableHandler;
-import com.labyrinthmod.common.event.DebugStickHandler;
-import com.labyrinthmod.common.event.FractionEvents;
-import com.labyrinthmod.common.event.GriverPossessionHandler;
+import com.labyrinthmod.common.event.*;
 import com.labyrinthmod.common.generation.BiomeDebugChat;
 import com.labyrinthmod.common.generation.LabyrinthBiomeSource;
 import com.labyrinthmod.common.generation.LabyrinthChunkGenerator;
@@ -22,6 +19,7 @@ import com.labyrinthmod.common.init.ModCreativeTabs;
 import com.labyrinthmod.common.init.ModMenuTypes;
 import com.labyrinthmod.common.init.ModSounds;
 import com.labyrinthmod.common.network.NetworkHandler;
+import com.labyrinthmod.common.quest.DailyQuestManager;
 import com.labyrinthmod.common.util.ModLogger;
 
 import com.infection.capability.InfectionAttacher;
@@ -117,9 +115,13 @@ public class LabyrinthMod {
         return ResourceLocation.fromNamespaceAndPath(INFECTION_MOD_ID, path);
     }
 
+
     public LabyrinthMod() {
+        DailyQuestManager.init();
+
 
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
+        MinecraftForge.EVENT_BUS.register(new DailyQuestSpawner());
 
 
         modEventBus.addListener(this::registerChunkGenerator);

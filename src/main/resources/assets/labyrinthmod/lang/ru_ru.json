@@ -45,5 +45,6 @@
   "block.labyrinthmod.bulletin_board": "Доска Заданий",
 
   "worldType.labyrinthmod.labyrinth": "Лабиринт",
-  "block.nameable_signal_block": "Блок-Условие"
+  "block.nameable_signal_block": "Блок-Условие",
+  "item.labyrinthmod.task_item": "Задание"
 }

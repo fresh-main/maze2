@@ -228,6 +228,17 @@ public class NetworkHandler {
                 .decoder(S2CLiftLockPacket::decode)
                 .consumerMainThread(S2CLiftLockPacket::handle)
                 .add();
+        CHANNEL.messageBuilder(SaveQuestToJsonPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SaveQuestToJsonPacket::encode)
+                .decoder(SaveQuestToJsonPacket::decode)
+                .consumerMainThread(SaveQuestToJsonPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(CompleteScrollPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(CompleteScrollPacket::encode)
+                .decoder(CompleteScrollPacket::decode)
+                .consumerMainThread(CompleteScrollPacket::handle)
+                .add();
+
     }
     public static void sendToPlayer(ServerPlayer player, S2CLiftLockPacket packet) {
         CHANNEL.sendTo(packet, player.connection.connection, NetworkDirection.PLAY_TO_CLIENT);

@@ -48,15 +48,7 @@ public class SyncBoardDataPacket {
     public static void handle(SyncBoardDataPacket msg, Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
         context.enqueueWork(() -> {
-            if (context.getDirection().getReceptionSide().isClient()) {
-                var level = net.minecraft.client.Minecraft.getInstance().level;
-                if (level != null) {
-                    var be = level.getBlockEntity(msg.boardPos);
-                    if (be instanceof BulletinBoardBlockEntity board) {
-                        board.syncDataFromServer(msg.spawnIntervalSeconds, msg.spawnTimer, msg.preloadedTasks);
-                    }
-                }
-            }
+            // Синхронизация старых данных очереди удалена
         });
         context.setPacketHandled(true);
     }

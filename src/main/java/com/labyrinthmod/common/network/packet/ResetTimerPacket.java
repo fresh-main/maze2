@@ -26,14 +26,7 @@ public class ResetTimerPacket {
     public static void handle(ResetTimerPacket msg, Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
         context.enqueueWork(() -> {
-            ServerPlayer player = context.getSender();
-            if (player != null) {
-                player.level().getChunkAt(msg.boardPos).getBlockEntity(msg.boardPos, com.labyrinthmod.common.init.ModBlockEntities.BULLETIN_BOARD_BE.get())
-                        .ifPresent(board -> {
-                            board.resetTimer();
-                            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§aТаймер сброшен!"));
-                        });
-            }
+            // Таймеры удалены
         });
         context.setPacketHandled(true);
     }

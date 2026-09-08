@@ -13,6 +13,7 @@ import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.DoublePlantBlock;
 import net.minecraft.world.level.block.RotatedPillarBlock;
+import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.chunk.ChunkAccess;
@@ -1155,14 +1156,38 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
                 int targetHeight = FLOOR_Y;
                 terrainHeight = (int)(terrainHeight * (1.0 - smoothBlend) + targetHeight * smoothBlend);
             }
-            double structureBlend = getStructureBlendFactor(x, z);
-            if (structureBlend > 0.0) {
-                double smoothBlend = structureBlend * structureBlend * (3.0 - 2.0 * structureBlend);
-                terrainHeight = (int)(terrainHeight * (1.0 - smoothBlend) + FLOOR_Y * smoothBlend);
+
+            if (passageBlend > 0.0) {
+                double smoothBlend = passageBlend * passageBlend * (3.0 - 2.0 * passageBlend);
+                int targetHeight = FLOOR_Y;
+                terrainHeight = (int)(terrainHeight * (1.0 - smoothBlend) + targetHeight * smoothBlend);
+            }
+
+            StructureBlendResult structureBlend = getStructureBlendResult(x, z);
+
+            if (structureBlend.factor > 0.0) {
+                double smoothBlend = structureBlend.factor * structureBlend.factor * (3.0 - 2.0 * structureBlend.factor);
+                terrainHeight = (int)(terrainHeight * (1.0 - smoothBlend) + structureBlend.targetY * smoothBlend);
+            }
+
+            if (structureBlend.core) {
+                if (y > terrainHeight) {
+                    return Blocks.AIR.defaultBlockState();
+                }
+
+                if (y == terrainHeight) {
+                    return GLADE_TOP;
+                }
+
+                if (y > terrainHeight - 4) {
+                    return GLADE_UNDER;
+                }
+
+                return generateUnderground(x, y, z);
             }
 
             // ★ РЕКА через расстояние до кривой Безье ★
-            if (riverDist >= 0) {
+            if (riverDist >= 0 && structureBlend.factor < 0.35) {
                 double widthNoise = featureNoise.noise(x * 0.05, 0, z * 0.05) * 1.5;
                 double waterHalfWidth = 8.5 + widthNoise;
                 waterHalfWidth = Math.max(7.0, waterHalfWidth);
@@ -1313,7 +1338,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
                     }
                 }
             }
-            if (dist >= 30 && dist <= 55) {
+            if (structureBlend.factor <= 0.0 && dist >= 30 && dist <= 55) {
                 // Используем два слоя шума для создания плавных, органичных возвышенностей
                 double hillNoise1 = featureNoise.noise(x * 0.04, 0, z * 0.04);
                 double hillNoise2 = terrainNoise.noise(x * 0.08, 0, z * 0.08);
@@ -1744,7 +1769,11 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
 
     private void ensureGenerated() {
         if (isGenerated) return;
+        StructureGenerator.preloadGladeSizes();
+
         StructureGenerator.updateDverPosition(this.GLADE_RADIUS);
+        initializeBridge();
+        initializeGladeStructures();
 
         synchronized (generationLock) {
             if (isGenerated) return;
@@ -1757,21 +1786,31 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             isGenerated = true;
         }
     }
-    private boolean isInRiverZone(int x, int z) {
-        int dist = Math.max(Math.abs(x), Math.abs(z));
-        if (dist > GLADE_RADIUS) return false;
+    private double getRiverTotalHalfWidth(int x, int z) {
+        if (featureNoise == null) {
+            return 10.0;
+        }
 
-        double riverDist = distanceToRiverCurve(x, z);
-
-        // ★ УВЕЛИЧЕННАЯ ШИРИНА ★
         double widthNoise = featureNoise.noise(x * 0.05, 0, z * 0.05) * 1.5;
         double waterHalfWidth = 8.5 + widthNoise;
         waterHalfWidth = Math.max(7.0, waterHalfWidth);
 
-        // ★ УВЕЛИЧЕННАЯ ЗОНА БЕРЕГА ★
         double bankHalfWidth = 3.0;
+        return waterHalfWidth + bankHalfWidth;
+    }
 
-        return riverDist < waterHalfWidth + bankHalfWidth;
+    private boolean isInRiverZone(int x, int z) {
+        return isInRiverZone(x, z, 0.0);
+    }
+
+    private boolean isInRiverZone(int x, int z, double margin) {
+        int dist = Math.max(Math.abs(x), Math.abs(z));
+        if (dist > GLADE_RADIUS) return false;
+
+        double riverDist = distanceToRiverCurve(x, z);
+        double totalHalfWidth = getRiverTotalHalfWidth(x, z);
+
+        return riverDist < totalHalfWidth + margin;
     }
     private BlockState getRiverBedBlock(int x, int y, int z) {
         // Шумовое распределение блоков дна: песок, глина, земля, гравий
@@ -2319,20 +2358,53 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             }
         }
     }
-    // ★ СГЛАЖИВАНИЕ ЛАНДШАФТА ВОКРУГ СТРУКТУР ★
+    private StructureBlendResult getStructureBlendResult(int x, int z) {
+        double maxBlend = 0.0;
+        int targetY = FLOOR_Y;
+        boolean core = false;
+
+        for (StructureGenerator.GladeStructureInfo info : StructureGenerator.getGladeStructureInfos()) {
+            double dist = info.distanceToFootprint(x, z);
+
+            // Внутри самого пятна застройки + маленький запас — жёсткая зона без воды.
+            if (dist <= 1.0) {
+                core = true;
+            }
+
+            if (dist < info.blendRadius) {
+                double d = Math.max(0.0, dist);
+                double blend = 1.0 - (d / info.blendRadius);
+                blend = blend * blend * (3.0 - 2.0 * blend);
+
+                if (blend > maxBlend) {
+                    maxBlend = blend;
+                    targetY = info.origin.getY();
+                }
+            }
+        }
+
+        // Радиус сглаживания лифта.
+        // Применяется только если рядом нет структуры глейда.
+        if (maxBlend <= 0.0) {
+            double dist0 = Math.sqrt((double) x * x + (double) z * z);
+            int liftBlendRadius = 20; // ★ РАДИУС СГЛАЖИВАНИЯ ЛИФТА
+
+            if (dist0 < liftBlendRadius) {
+                double blend0 = 1.0 - (dist0 / liftBlendRadius);
+                blend0 = blend0 * blend0 * (3.0 - 2.0 * blend0);
+
+                if (blend0 > maxBlend) {
+                    maxBlend = blend0;
+                    targetY = FLOOR_Y;
+                }
+            }
+        }
+
+        return new StructureBlendResult(maxBlend, targetY, core);
+    }
+
     private double getStructureBlendFactor(int x, int z) {
-        // Центры структур (X, Z) — lift_1 и lift_2 имеют одинаковые координаты
-        int structX = 0;
-        int structZ = 0;
-
-        int blendRadius = 50; // радиус сглаживания
-
-        double dx = x - structX;
-        double dz = z - structZ;
-        double dist = Math.sqrt(dx * dx + dz * dz);
-
-        if (dist >= blendRadius) return 0.0;
-        return 1.0 - (dist / blendRadius);
+        return getStructureBlendResult(x, z).factor;
     }
 
     private void initializeSeed(RandomState random) {
@@ -2430,6 +2502,618 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
 
             this.seedInitialized = true;
         }
+    }
+    /**
+     * ★ ИНИЦИАЛИЗАЦИЯ МОСТА ★
+     * Находит самый прямой участок реки и размещает мост перпендикулярно течению.
+     */
+    private void initializeBridge() {
+        ensureRiverCurve();
+        double[][] points = riverCurvePoints;
+        if (points == null || points.length < 20) return;
+
+        // === 1. ПОИСК САМОГО ПРЯМОГО УЧАСТКА РЕКИ ===
+        int windowSize = 15; // Сколько точек анализируем (чем больше, тем строже критерий)
+        int margin = 5;      // Отступ от краёв кривой (чтобы мост не упирался в стены глейда)
+
+        double bestStraightness = Double.MAX_VALUE;
+        int bestCenterIdx = points.length / 2; // Фоллбэк — середина
+
+        for (int i = margin; i <= points.length - windowSize - margin; i++) {
+            // Вектор направления участка (от первой до последней точки окна)
+            double dirX = points[i + windowSize - 1][0] - points[i][0];
+            double dirZ = points[i + windowSize - 1][1] - points[i][1];
+            double dirLen = Math.sqrt(dirX * dirX + dirZ * dirZ);
+            if (dirLen < 0.001) continue;
+
+            // Нормализуем направление
+            double ndx = dirX / dirLen;
+            double ndz = dirZ / dirLen;
+
+            // Считаем сумму отклонений всех промежуточных точек от прямой
+            double totalDeviation = 0;
+            for (int j = i + 1; j < i + windowSize - 1; j++) {
+                // Вектор от начала окна до текущей точки
+                double vx = points[j][0] - points[i][0];
+                double vz = points[j][1] - points[i][1];
+                // Проекция на направление (расстояние вдоль прямой)
+                double proj = vx * ndx + vz * ndz;
+                // Точка на прямой, ближайшая к points[j]
+                double closestX = points[i][0] + ndx * proj;
+                double closestZ = points[i][1] + ndz * proj;
+                // Перпендикулярное расстояние
+                double devX = points[j][0] - closestX;
+                double devZ = points[j][1] - closestZ;
+                totalDeviation += Math.sqrt(devX * devX + devZ * devZ);
+            }
+
+            if (totalDeviation < bestStraightness) {
+                bestStraightness = totalDeviation;
+                bestCenterIdx = i + windowSize / 2;
+            }
+        }
+
+        // === 2. ВЫЧИСЛЕНИЕ ПОЗИЦИИ И ПОВОРОТА МОСТА ===
+        int midIdx = bestCenterIdx;
+        int step = 5;
+        int idx1 = Math.max(0, midIdx - step);
+        int idx2 = Math.min(points.length - 1, midIdx + step);
+
+        // Направление реки в самом прямом участке
+        double dx = points[idx2][0] - points[idx1][0];
+        double dz = points[idx2][1] - points[idx1][1];
+
+        // Базовый поворот: перпендикулярно реке
+        Rotation baseRot = (Math.abs(dx) > Math.abs(dz))
+                ? Rotation.CLOCKWISE_90
+                : Rotation.NONE;
+
+        // Компенсация ориентации NBT-модели (+90°)
+        Rotation bridgeRot = (baseRot == Rotation.NONE)
+                ? Rotation.CLOCKWISE_90
+                : Rotation.CLOCKWISE_180;
+
+        // Координаты центра самого прямого участка
+        double bx = points[midIdx][0];
+        double bz = points[midIdx][1];
+
+        int blockX = (int) Math.round(bx);
+        int blockZ = (int) Math.round(bz);
+        int blockY = FLOOR_Y - 1; // Опускаем на 1 блок ниже
+
+        System.out.println("[LabyrinthGenerator] Bridge placed at straightest river segment "
+                + "(deviation=" + String.format("%.2f", bestStraightness) + ")"
+                + " pos=" + blockX + "," + blockY + "," + blockZ
+                + " rot=" + bridgeRot);
+
+        StructureGenerator.updateBridgePosition(blockX, blockY, blockZ, bridgeRot);
+    }
+    private void initializeGladeStructures() {
+        StructureGenerator.clearGladeStructures();
+        StructureGenerator.preloadGladeSizes();
+
+        if (terrainNoise == null || featureNoise == null) {
+            return;
+        }
+
+        Random rand = new Random(this.seed ^ 0xDEADBEEFCAFEL);
+
+        int fermaRadius = StructureGenerator.getGladeStructurePlacementRadius("ferma", 12);
+        int banfairRadius = StructureGenerator.getGladeStructurePlacementRadius("banfair", 12);
+        int lagerRadius = StructureGenerator.getGladeStructurePlacementRadius("lager", 10);
+        int towerRadius = StructureGenerator.getGladeStructurePlacementRadius("tower", 7);
+
+        // Разводим структуры по секторам:
+        // 0 = северо-восток
+        // 1 = юго-восток
+        // 2 = юго-запад
+        // 3 = северо-запад
+        placeGladeStructure("ferma", rand, 0, fermaRadius, fermaRadius + 12, 4);
+        placeGladeStructure("banfair", rand, 1, banfairRadius, banfairRadius + 12, 4);
+        placeGladeStructure("lager", rand, 2, lagerRadius, lagerRadius + 10, 4);
+
+        placeTowerStructure(rand, towerRadius);
+    }
+
+    /**
+     * ★ ТОЧНЫЙ РАСЧЕТ ВЫСОТЫ ПОВЕРХНОСТИ ★
+     * На 100% копирует логику из generateNaturalTerrain, чтобы найти реальный блок травы.
+     */
+    private int getExactTerrainHeight(int x, int z) {
+        double noise = terrainNoise.noise(x * 0.04, 0, z * 0.04);
+        int terrainHeight = FLOOR_Y + (int)(noise * 5);
+
+        int dist = Math.max(Math.abs(x), Math.abs(z));
+        if (dist >= 30 && dist <= 55) {
+            double hillNoise1 = featureNoise.noise(x * 0.04, 0, z * 0.04);
+            double hillNoise2 = terrainNoise.noise(x * 0.08, 0, z * 0.08);
+            double combinedNoise = (hillNoise1 + hillNoise2) * 0.5;
+            if (combinedNoise > 0.4) {
+                double heightFactor = (combinedNoise - 0.4) / 0.6;
+                int addedHeight = (int)(heightFactor * 6.0);
+                addedHeight = Math.max(0, Math.min(addedHeight, 6));
+                terrainHeight += addedHeight;
+            }
+        }
+        return terrainHeight;
+    }
+
+    /**
+     * ★ ПОИСК САМОГО ВЫСОКОГО ХОЛМА ★
+     * Сканирует зону холмов (dist 30-55) с помощью точной формулы.
+     */
+    private int[] findHighestHill() {
+        int bestX = 0, bestZ = 0, maxY = FLOOR_Y;
+
+        // Грубый поиск (шаг 2 для оптимизации)
+        for (int x = -GLADE_RADIUS; x <= GLADE_RADIUS; x += 2) {
+            for (int z = -GLADE_RADIUS; z <= GLADE_RADIUS; z += 2) {
+                int dist = Math.max(Math.abs(x), Math.abs(z));
+                if (dist < 30 || dist > 55) continue; // Ищем только в зоне холмов
+
+                int y = getExactTerrainHeight(x, z);
+                if (y > maxY) {
+                    maxY = y;
+                    bestX = x;
+                    bestZ = z;
+                }
+            }
+        }
+
+        // Точный поиск вокруг найденной точки (шаг 1)
+        int finalX = bestX, finalZ = bestZ;
+        for (int x = bestX - 2; x <= bestX + 2; x++) {
+            for (int z = bestZ - 2; z <= bestZ + 2; z++) {
+                int dist = Math.max(Math.abs(x), Math.abs(z));
+                if (dist < 30 || dist > 55) continue;
+                int y = getExactTerrainHeight(x, z);
+                if (y > maxY) {
+                    maxY = y;
+                    finalX = x;
+                    finalZ = z;
+                }
+            }
+        }
+
+        return new int[]{finalX, maxY, finalZ};
+    }
+
+    /**
+     * ★ ПРОВЕРКА: ПОПАДАЕТ ЛИ ТОЧКА В ЗОНУ СТРУКТУРЫ ★
+     * Нужно, чтобы деревья и цветы не спавнились внутри фундаментов.
+     */
+    private boolean isInsideStructureZone(int x, int z) {
+        return StructureGenerator.isInsideGladeStructureZone(x, z, 2);
+    }
+    private static class StructureBlendResult {
+        final double factor;
+        final int targetY;
+        final boolean core;
+
+        StructureBlendResult(double factor, int targetY, boolean core) {
+            this.factor = factor;
+            this.targetY = targetY;
+            this.core = core;
+        }
+    }
+    private int getGladeStructureMinDist() {
+        return Math.max(22, GLADE_RADIUS / 4);
+    }
+
+    private void placeGladeStructure(String name, Random rand, int quadrant, int fallbackRadius, int fallbackBlendRadius, int margin) {
+        Rotation rotation = Rotation.values()[rand.nextInt(Rotation.values().length)];
+
+        BlockPos pos = tryFindGladeStructurePosition(
+                name,
+                rand,
+                quadrant,
+                rotation,
+                fallbackRadius,
+                margin,
+                10
+        );
+
+        if (pos == null) {
+            pos = new BlockPos(0, FLOOR_Y, 0);
+        }
+
+        StructureGenerator.addGladeStructure(name, pos, rotation, fallbackRadius, fallbackBlendRadius);
+    }
+
+    private void placeTowerStructure(Random rand, int fallbackRadius) {
+        int margin = 4;
+        int minGap = 10;
+
+        Rotation rotation = Rotation.values()[rand.nextInt(Rotation.values().length)];
+
+        BlockPos pos = findBestTowerPosition("tower", rotation, fallbackRadius, margin, minGap);
+
+        if (pos == null) {
+            pos = tryFindGladeStructurePosition("tower", rand, 3, rotation, fallbackRadius, margin, minGap);
+        }
+
+        if (pos == null) {
+            pos = new BlockPos(0, FLOOR_Y, 0);
+        }
+
+        StructureGenerator.addGladeStructure("tower", pos, rotation, fallbackRadius, fallbackRadius + 12);
+    }
+
+    private BlockPos tryFindGladeStructurePosition(
+            String name,
+            Random rand,
+            int quadrant,
+            Rotation rotation,
+            int fallbackRadius,
+            int margin,
+            int minGap
+    ) {
+        int minDist = getGladeStructureMinDist();
+        int maxDist = GLADE_RADIUS - 5;
+
+        int distanceRange = Math.max(1, maxDist - minDist);
+        double baseAngle = quadrant * Math.PI / 2.0 + Math.PI / 4.0;
+
+        for (int attempt = 0; attempt < 220; attempt++) {
+            double angle = baseAngle + (rand.nextDouble() * 2.0 - 1.0) * (Math.PI / 4.0) * 0.8;
+            int distance = minDist + rand.nextInt(distanceRange);
+
+            int x = (int) Math.round(Math.cos(angle) * distance);
+            int z = (int) Math.round(Math.sin(angle) * distance);
+
+            if (isSafeForGladeStructure(name, x, z, rotation, fallbackRadius, margin, minGap)) {
+                return new BlockPos(x, getPlacementTerrainHeight(x, z), z);
+            }
+        }
+
+        for (int attempt = 0; attempt < 260; attempt++) {
+            double angle = rand.nextDouble() * Math.PI * 2.0;
+            int distance = minDist + rand.nextInt(distanceRange);
+
+            int x = (int) Math.round(Math.cos(angle) * distance);
+            int z = (int) Math.round(Math.sin(angle) * distance);
+
+            if (isSafeForGladeStructure(name, x, z, rotation, fallbackRadius, margin, minGap)) {
+                return new BlockPos(x, getPlacementTerrainHeight(x, z), z);
+            }
+        }
+
+        return findFallbackGladePosition(name, rotation, fallbackRadius, margin, minGap);
+    }
+
+    private BlockPos findFallbackGladePosition(String name, Rotation rotation, int fallbackRadius, int margin, int minGap) {
+        int minDist = getGladeStructureMinDist();
+        int maxDist = GLADE_RADIUS - 5;
+
+        for (int distance = maxDist; distance >= minDist; distance -= 4) {
+            for (int angleDeg = 0; angleDeg < 360; angleDeg += 15) {
+                double angle = Math.toRadians(angleDeg);
+
+                int x = (int) Math.round(Math.cos(angle) * distance);
+                int z = (int) Math.round(Math.sin(angle) * distance);
+
+                if (isSafeForGladeStructure(name, x, z, rotation, fallbackRadius, margin, minGap)) {
+                    return new BlockPos(x, getPlacementTerrainHeight(x, z), z);
+                }
+            }
+        }
+
+        return new BlockPos(0, FLOOR_Y, 0);
+    }
+
+    private boolean isSafeForGladeStructure(
+            String name,
+            int x,
+            int z,
+            Rotation rotation,
+            int fallbackRadius,
+            int margin,
+            int minGap
+    ) {
+        if (!quickStructureSafety(x, z, fallbackRadius, minGap)) {
+            return false;
+        }
+
+        int[] aabb = StructureGenerator.getFootprintAabb(
+                name,
+                new BlockPos(x, 0, z),
+                rotation,
+                fallbackRadius,
+                margin
+        );
+
+        int minDist = getGladeStructureMinDist();
+
+        // Проверяем не только центр, а реальное пятно застройки.
+        for (int sx = aabb[0]; sx <= aabb[1]; sx += 2) {
+            for (int sz = aabb[2]; sz <= aabb[3]; sz += 2) {
+                int sd = Math.max(Math.abs(sx), Math.abs(sz));
+
+                if (sd < minDist || sd > GLADE_RADIUS - 5) {
+                    return false;
+                }
+
+                if (isInRiverZone(sx, sz, margin)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private boolean quickStructureSafety(int x, int z, int radius, int minGap) {
+        int dist = Math.max(Math.abs(x), Math.abs(z));
+
+        int minDist = getGladeStructureMinDist();
+        int maxDist = GLADE_RADIUS - 5;
+
+        if (dist < minDist || dist > maxDist) {
+            return false;
+        }
+
+        if (getPassageBlendFactor(x, z) > 0.25) {
+            return false;
+        }
+
+        if (StructureGenerator.isTooCloseToGladeStructures(x, z, radius, minGap)) {
+            return false;
+        }
+
+        return !isInRiverZone(x, z, 2.0);
+    }
+
+    private int getPlacementTerrainHeight(int x, int z) {
+        int terrainHeight = getExactTerrainHeight(x, z);
+
+        double passageBlend = getPassageBlendFactor(x, z);
+        if (passageBlend > 0.0) {
+            double smoothBlend = passageBlend * passageBlend * (3.0 - 2.0 * passageBlend);
+            terrainHeight = (int)(terrainHeight * (1.0 - smoothBlend) + FLOOR_Y * smoothBlend);
+        }
+
+        return Math.max(FLOOR_Y, terrainHeight);
+    }
+
+    private BlockPos findBestTowerPosition(String name, Rotation rotation, int fallbackRadius, int margin, int minGap) {
+        int minDist = getGladeStructureMinDist();
+        int maxDist = GLADE_RADIUS - 5;
+
+        BlockPos best = null;
+        int bestY = Integer.MIN_VALUE;
+
+        // Сначала ищем на холмах.
+        for (int x = -GLADE_RADIUS; x <= GLADE_RADIUS; x += 4) {
+            for (int z = -GLADE_RADIUS; z <= GLADE_RADIUS; z += 4) {
+                int dist = Math.max(Math.abs(x), Math.abs(z));
+
+                if (dist < 30 || dist > 55) {
+                    continue;
+                }
+
+                if (!quickStructureSafety(x, z, fallbackRadius, minGap)) {
+                    continue;
+                }
+
+                int y = getPlacementTerrainHeight(x, z);
+
+                if (y <= bestY) {
+                    continue;
+                }
+
+                if (!isSafeForGladeStructure(name, x, z, rotation, fallbackRadius, margin, minGap)) {
+                    continue;
+                }
+
+                bestY = y;
+                best = new BlockPos(x, y, z);
+            }
+        }
+
+        if (best != null) {
+            return best;
+        }
+
+        // Если холмов нет — ищем просто безопасную высокую точку.
+        for (int x = -GLADE_RADIUS; x <= GLADE_RADIUS; x += 5) {
+            for (int z = -GLADE_RADIUS; z <= GLADE_RADIUS; z += 5) {
+                int dist = Math.max(Math.abs(x), Math.abs(z));
+
+                if (dist < minDist || dist > maxDist) {
+                    continue;
+                }
+
+                if (!quickStructureSafety(x, z, fallbackRadius, minGap)) {
+                    continue;
+                }
+
+                int y = getPlacementTerrainHeight(x, z);
+
+                if (y <= bestY) {
+                    continue;
+                }
+
+                if (!isSafeForGladeStructure(name, x, z, rotation, fallbackRadius, margin, minGap)) {
+                    continue;
+                }
+
+                bestY = y;
+                best = new BlockPos(x, y, z);
+            }
+        }
+
+        return best;
+    }
+
+    private int getGladeStructureMaxDist(int radius) {
+        return Math.max(getGladeStructureMinDist() + 1, GLADE_RADIUS - radius - 8);
+    }
+
+    private BlockPos tryFindGladeStructurePosition(Random rand, int quadrant, int radius, int margin, int minGap) {
+        int minDist = getGladeStructureMinDist();
+        int maxDist = getGladeStructureMaxDist(radius);
+
+        int distanceRange = Math.max(1, maxDist - minDist);
+
+        double baseAngle = quadrant * Math.PI / 2.0 + Math.PI / 4.0;
+
+        // Сначала пробуем внутри назначенного сектора.
+        for (int attempt = 0; attempt < 220; attempt++) {
+            double angle = baseAngle + (rand.nextDouble() * 2.0 - 1.0) * (Math.PI / 4.0) * 0.8;
+            int distance = minDist + rand.nextInt(distanceRange);
+
+            int x = (int) Math.round(Math.cos(angle) * distance);
+            int z = (int) Math.round(Math.sin(angle) * distance);
+
+            if (isSafeForGladeStructure(x, z, radius, margin, minGap)) {
+                return new BlockPos(x, getPlacementTerrainHeight(x, z), z);
+            }
+        }
+
+        // Если в секторе не нашли, ищем по всему глейду.
+        for (int attempt = 0; attempt < 260; attempt++) {
+            double angle = rand.nextDouble() * Math.PI * 2.0;
+            int distance = minDist + rand.nextInt(distanceRange);
+
+            int x = (int) Math.round(Math.cos(angle) * distance);
+            int z = (int) Math.round(Math.sin(angle) * distance);
+
+            if (isSafeForGladeStructure(x, z, radius, margin, minGap)) {
+                return new BlockPos(x, getPlacementTerrainHeight(x, z), z);
+            }
+        }
+
+        return findFallbackGladePosition(radius, margin, minGap);
+    }
+
+    private BlockPos findFallbackGladePosition(int radius, int margin, int minGap) {
+        int minDist = getGladeStructureMinDist();
+        int maxDist = getGladeStructureMaxDist(radius);
+
+        for (int distance = maxDist; distance >= minDist; distance -= 4) {
+            for (int angleDeg = 0; angleDeg < 360; angleDeg += 15) {
+                double angle = Math.toRadians(angleDeg);
+
+                int x = (int) Math.round(Math.cos(angle) * distance);
+                int z = (int) Math.round(Math.sin(angle) * distance);
+
+                if (isSafeForGladeStructure(x, z, radius, margin, minGap)) {
+                    return new BlockPos(x, getPlacementTerrainHeight(x, z), z);
+                }
+            }
+        }
+
+        return new BlockPos(0, FLOOR_Y, 0);
+    }
+
+    private boolean isSafeForGladeStructure(int x, int z, int radius, int margin, int minGap) {
+        if (!quickStructureSafety(x, z, radius, minGap)) {
+            return false;
+        }
+
+        int checkRadius = radius + margin;
+
+        // Проверяем пятно застройки и безопасный отступ вокруг неё.
+        // Шаг 2, чтобы не было слишком дорого при инициализации мира.
+        for (int dx = -checkRadius; dx <= checkRadius; dx += 2) {
+            for (int dz = -checkRadius; dz <= checkRadius; dz += 2) {
+                if (dx * dx + dz * dz > checkRadius * checkRadius) {
+                    continue;
+                }
+
+                int sx = x + dx;
+                int sz = z + dz;
+
+                int dist = Math.max(Math.abs(sx), Math.abs(sz));
+
+                int minDist = getGladeStructureMinDist();
+                int maxDist = GLADE_RADIUS - 5;
+
+                if (dist < minDist || dist > maxDist) {
+                    return false;
+                }
+
+                if (isInRiverZone(sx, sz, margin)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+
+    private BlockPos findBestTowerPosition(int radius, int margin, int minGap) {
+        int minDist = getGladeStructureMinDist();
+        int maxDist = getGladeStructureMaxDist(radius);
+
+        int hillMin = Math.max(minDist, Math.min(28, maxDist));
+        int hillMax = Math.max(hillMin, Math.min(maxDist, 55));
+
+        BlockPos best = null;
+        int bestY = Integer.MIN_VALUE;
+
+        // Сначала ищем именно на холмах.
+        for (int x = -GLADE_RADIUS; x <= GLADE_RADIUS; x += 4) {
+            for (int z = -GLADE_RADIUS; z <= GLADE_RADIUS; z += 4) {
+                int dist = Math.max(Math.abs(x), Math.abs(z));
+
+                if (dist < hillMin || dist > hillMax) {
+                    continue;
+                }
+
+                if (!quickStructureSafety(x, z, radius, minGap)) {
+                    continue;
+                }
+
+                int y = getPlacementTerrainHeight(x, z);
+
+                if (y <= bestY) {
+                    continue;
+                }
+
+                if (!isSafeForGladeStructure(x, z, radius, margin, minGap)) {
+                    continue;
+                }
+
+                bestY = y;
+                best = new BlockPos(x, y, z);
+            }
+        }
+
+        if (best != null) {
+            return best;
+        }
+
+        // Если холмов нет — ищем просто безопасную высокую точку.
+        for (int x = -GLADE_RADIUS; x <= GLADE_RADIUS; x += 5) {
+            for (int z = -GLADE_RADIUS; z <= GLADE_RADIUS; z += 5) {
+                int dist = Math.max(Math.abs(x), Math.abs(z));
+
+                if (dist < minDist || dist > maxDist) {
+                    continue;
+                }
+
+                if (!quickStructureSafety(x, z, radius, minGap)) {
+                    continue;
+                }
+
+                int y = getPlacementTerrainHeight(x, z);
+
+                if (y <= bestY) {
+                    continue;
+                }
+
+                if (!isSafeForGladeStructure(x, z, radius, margin, minGap)) {
+                    continue;
+                }
+
+                bestY = y;
+                best = new BlockPos(x, y, z);
+            }
+        }
+
+        return best;
     }
 
 

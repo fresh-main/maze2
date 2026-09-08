@@ -32,22 +32,57 @@ public class BulletinBoardBlock extends BaseEntityBlock {
     }
 
     @Override
-    public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit) {
-        if (!level.isClientSide) {
-            BlockEntity blockEntity = level.getBlockEntity(pos);
-            if (blockEntity instanceof BulletinBoardBlockEntity board) {
-                ItemStack heldItem = player.getItemInHand(hand);
+    public InteractionResult use(
+            BlockState state,
+            Level level,
+            BlockPos pos,
+            Player player,
+            InteractionHand hand,
+            BlockHitResult hit
+    ) {
+        ItemStack heldItem = player.getItemInHand(hand);
 
-                // Если держит предмет — пытаемся выполнить задание
-                if (!heldItem.isEmpty()) {
-                    NetworkHandler.CHANNEL.sendToServer(new PlaceItemPacket(pos));
-                    return InteractionResult.SUCCESS;
+        // ==========================================================
+        // SHIFT + ПКМ СО СВИТКОМ -> ПОЛОЖИТЬ СВИТОК НА ДОСКУ
+        // ==========================================================
+        if (player.isSecondaryUseActive() && heldItem.getItem() instanceof com.labyrinthmod.common.item.TaskScrollItem) {
+            if (!level.isClientSide) {
+                if (level.getBlockEntity(pos) instanceof BulletinBoardBlockEntity board) {
+                    if (board.placeScrollOnBoard(heldItem, player)) {
+                        heldItem.shrink(1);
+
+                        if (player.containerMenu != null) {
+                            player.containerMenu.broadcastChanges();
+                        }
+                    }
                 }
+            }
 
-                // Иначе открываем GUI
-                NetworkHooks.openScreen((ServerPlayer) player, board, buf -> buf.writeBlockPos(pos));
+            return InteractionResult.sidedSuccess(level.isClientSide);
+        }
+
+        // ==========================================================
+        // ЕСЛИ В РУКЕ ЕСТЬ ПРЕДМЕТ — НЕ ОТКРЫВАЕМ ДОСКУ,
+        // ДАЁМ ПРЕДМЕТУ ОБРАБОТАТЬ КЛИК САМОМУ
+        // ==========================================================
+        if (!heldItem.isEmpty()) {
+            return InteractionResult.PASS;
+        }
+
+        // ==========================================================
+        // ПКМ ПУСТОЙ РУКОЙ -> ОТКРЫТЬ ДОСКУ
+        // ==========================================================
+        if (level.isClientSide) {
+            return InteractionResult.SUCCESS;
+        }
+
+        if (player instanceof ServerPlayer serverPlayer) {
+            if (level.getBlockEntity(pos) instanceof BulletinBoardBlockEntity board) {
+                NetworkHooks.openScreen(serverPlayer, board, buf -> buf.writeBlockPos(pos));
+                board.sendTasksToPlayer(serverPlayer);
             }
         }
+
         return InteractionResult.SUCCESS;
     }
 
@@ -79,7 +114,6 @@ public class BulletinBoardBlock extends BaseEntityBlock {
         if (level.isClientSide) return null;
         return (lvl, pos, st, be) -> {
             if (be instanceof BulletinBoardBlockEntity board) {
-                board.tick();
             }
         };
     }

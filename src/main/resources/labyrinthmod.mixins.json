@@ -11,7 +11,8 @@
     "InventoryMenuMixin",
     "InventoryMixin",
     "FirstAidDamageablePartMixin",
-    "StructureBlockEntityMixin"
+    "StructureBlockEntityMixin",
+    "UtilLogMixin"
   ],
   "client": [
     "MixinShaderPackScreenPaper",

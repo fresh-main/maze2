@@ -29,14 +29,7 @@ public class SpawnSpecificTaskPacket {
     public static void handle(SpawnSpecificTaskPacket msg, Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
         context.enqueueWork(() -> {
-            ServerPlayer player = context.getSender();
-            if (player != null) {
-                player.level().getChunkAt(msg.boardPos).getBlockEntity(msg.boardPos, com.labyrinthmod.common.init.ModBlockEntities.BULLETIN_BOARD_BE.get())
-                        .ifPresent(board -> {
-                            board.spawnSpecificTask(msg.taskIndex);
-                            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§aЗадание заспавнено мгновенно!"));
-                        });
-            }
+            // Ручной спавн удалён
         });
         context.setPacketHandled(true);
     }

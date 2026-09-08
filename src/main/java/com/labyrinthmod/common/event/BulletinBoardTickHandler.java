@@ -12,11 +12,5 @@ public class BulletinBoardTickHandler {
             return;
         }
 
-        System.out.println("[BB TickHandler] Ticking " + BulletinBoardBlockEntity.ALL_BOARDS.size() + " boards");
-
-        for (BulletinBoardBlockEntity board : BulletinBoardBlockEntity.ALL_BOARDS) {
-            System.out.println("[BB TickHandler] Ticking board at " + board.getBlockPos() + ", interval=" + board.getSpawnIntervalSeconds());
-            board.tick();
-        }
     }
 }

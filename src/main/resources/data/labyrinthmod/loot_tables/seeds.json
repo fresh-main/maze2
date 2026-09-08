@@ -1,0 +1,106 @@
+{
+  "pools": [
+    {
+      "rolls": {
+        "min": 1,
+        "max": 20
+      },
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:pumpkin_seeds",
+          "functions": [
+            {
+              "function": "minecraft:set_count",
+              "count": {
+                "min": 2,
+                "max": 5
+              }
+            }
+          ]
+        },
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:wheat_seeds",
+          "functions": [
+            {
+              "function": "minecraft:set_count",
+              "count": {
+                "min": 1,
+                "max": 10
+              }
+            }
+          ]
+        },
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:cocoa_beans",
+          "functions": [
+            {
+              "function": "minecraft:set_count",
+              "count": {
+                "min": 1,
+                "max": 3
+              }
+            }
+          ]
+        },
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:melon_seeds",
+          "functions": [
+            {
+              "function": "minecraft:set_count",
+              "count": {
+                "min": 3,
+                "max": 6
+              }
+            }
+          ]
+        },
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:beetroot_seeds",
+          "functions": [
+            {
+              "function": "minecraft:set_count",
+              "count": {
+                "min": 3,
+                "max": 4
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "rolls": {
+        "min": 1,
+        "max": 15
+      },
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "farmersdelight:rice"
+        },
+        {
+          "type": "minecraft:item",
+          "name": "farmersdelight:tomato_seeds"
+        },
+        {
+          "type": "minecraft:item",
+          "name": "farmersdelight:cabbage_seeds"
+        },
+        {
+          "type": "minecraft:item",
+          "name": "farmersdelight:onion"
+        },
+        {
+          "type": "minecraft:item",
+          "name": "supplementaries:flax_seeds"
+        }
+      ],
+      "functions": []
+    }
+  ]
+}

@@ -1,8 +1,11 @@
 package com.labyrinthmod.client.screen;
 
 import com.labyrinthmod.common.blockentity.BulletinBoardBlockEntity;
+import com.labyrinthmod.common.capability.FractionProvider;
+import com.labyrinthmod.common.capability.FractionType;
 import com.labyrinthmod.common.menu.BulletinBoardMenu;
 import com.labyrinthmod.common.network.NetworkHandler;
+import com.labyrinthmod.common.network.packet.CompleteTaskPacket;
 import com.labyrinthmod.common.network.packet.TakeTaskPacket;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -39,6 +42,7 @@ public class BulletinBoardScreen extends AbstractContainerScreen<BulletinBoardMe
         this.imageHeight = GUI_HEIGHT;
     }
 
+
     @Override
     protected void init() {
         super.init();
@@ -46,17 +50,25 @@ public class BulletinBoardScreen extends AbstractContainerScreen<BulletinBoardMe
         this.titleLabelY = 10;
         this.inventoryLabelY = this.imageHeight + 100;
 
-        Button adminButton = Button.builder(
-                Component.literal("⚙"),
-                btn -> {
-                    BulletinBoardBlockEntity be = this.menu.getBlockEntity();
-                    if (be != null) {
-                        this.minecraft.setScreen(new BulletinBoardAdminScreen(be));
+        // === ПРОВЕРКА ФРАКЦИИ ИГРОКА ===
+        boolean isOperator = this.minecraft.player.getCapability(FractionProvider.FRACTION)
+                .map(data -> data.getFraction() == FractionType.OPERATOR)
+                .orElse(false);
+
+        // Кнопка настроек (добавление заданий) показывается ТОЛЬКО операторам
+        if (isOperator) {
+            Button adminButton = Button.builder(
+                    Component.literal("⚙"),
+                    btn -> {
+                        BulletinBoardBlockEntity be = this.menu.getBlockEntity();
+                        if (be != null) {
+                            this.minecraft.setScreen(new BulletinBoardAdminScreen(be));
+                        }
                     }
-                }
-        ).bounds((this.width - this.imageWidth) / 2 + this.imageWidth - 30,
-                (this.height - this.imageHeight) / 2 + 5, 25, 20).build();
-        this.addRenderableWidget(adminButton);
+            ).bounds((this.width - this.imageWidth) / 2 + this.imageWidth - 30,
+                    (this.height - this.imageHeight) / 2 + 5, 25, 20).build();
+            this.addRenderableWidget(adminButton);
+        }
     }
 
     @Override
@@ -127,15 +139,54 @@ public class BulletinBoardScreen extends AbstractContainerScreen<BulletinBoardMe
 
                 if (!taskStack.isEmpty()) {
                     final int slotIndex = hoveredCardIndex;
-                    Runnable callback = () -> {
-                        NetworkHandler.CHANNEL.sendToServer(new TakeTaskPacket(blockEntity.getBlockPos(), slotIndex));
+                    final BulletinBoardBlockEntity board = blockEntity;
+                    final ItemStack clickedStack = taskStack.copy();
+
+                    // ===============================
+                    // Кнопка "Взять задание"
+                    // ===============================
+                    Runnable takeCallback = () -> {
+                        NetworkHandler.CHANNEL.sendToServer(
+                                new TakeTaskPacket(board.getBlockPos(), slotIndex)
+                        );
+
+                        if (this.minecraft != null && this.minecraft.player != null) {
+                            if (this.minecraft.player.getInventory().getFreeSlot() != -1) {
+                                board.clearTaskVisual(slotIndex);
+                            }
+                        }
+
+                        if (this.minecraft != null) {
+                            this.minecraft.setScreen(this);
+                        }
                     };
-                    TaskViewScreen taskScreen = new TaskViewScreen(taskStack, callback, slotIndex);
+
+                    // ===============================
+                    // Кнопка "Выполнить задание"
+                    // ===============================
+                    Runnable completeCallback = () -> {
+                        NetworkHandler.CHANNEL.sendToServer(
+                                new CompleteTaskPacket(board.getBlockPos(), slotIndex)
+                        );
+
+                        if (this.minecraft != null) {
+                            this.minecraft.setScreen(this);
+                        }
+                    };
+
+                    TaskViewScreen taskScreen = new TaskViewScreen(
+                            clickedStack,
+                            takeCallback,
+                            completeCallback,
+                            slotIndex
+                    );
+
                     this.minecraft.setScreen(taskScreen);
                     return true;
                 }
             }
         }
+
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
