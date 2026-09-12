@@ -30,14 +30,7 @@ public class AddTaskPacket {
     public static void handle(AddTaskPacket msg, Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
         context.enqueueWork(() -> {
-            ServerPlayer player = context.getSender();
-            if (player != null) {
-                player.level().getChunkAt(msg.boardPos).getBlockEntity(msg.boardPos, com.labyrinthmod.common.init.ModBlockEntities.BULLETIN_BOARD_BE.get())
-                        .ifPresent(board -> {
-                            board.addPreloadedTask(msg.taskData);
-                            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§aЗадание добавлено в очередь!"));
-                        });
-            }
+            // Логика перенесена в SaveQuestToJsonPacket
         });
         context.setPacketHandled(true);
     }

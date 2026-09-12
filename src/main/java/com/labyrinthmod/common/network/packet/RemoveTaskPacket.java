@@ -29,14 +29,7 @@ public class RemoveTaskPacket {
     public static void handle(RemoveTaskPacket msg, Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
         context.enqueueWork(() -> {
-            ServerPlayer player = context.getSender();
-            if (player != null) {
-                player.level().getChunkAt(msg.boardPos).getBlockEntity(msg.boardPos, com.labyrinthmod.common.init.ModBlockEntities.BULLETIN_BOARD_BE.get())
-                        .ifPresent(board -> {
-                            board.removePreloadedTask(msg.index);
-                            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§cЗадание удалено из очереди!"));
-                        });
-            }
+            // Очередь заданий удалена
         });
         context.setPacketHandled(true);
     }

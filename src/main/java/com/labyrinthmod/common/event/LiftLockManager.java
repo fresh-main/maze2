@@ -10,12 +10,13 @@ import java.util.Set;
 import java.util.UUID;
 
 public class LiftLockManager {
+
     private static volatile boolean isLocked = false;
     private static UUID initiator = null;
     private static final Set<UUID> waitingPlayers = new HashSet<>();
 
     public static void lock(UUID initiatorUuid) {
-        if (isLocked) return; // Уже заблокировано
+        if (isLocked) return;
         isLocked = true;
         initiator = initiatorUuid;
         System.out.println("[LiftLock] Мир заблокирован. Инициатор: " + initiatorUuid);
@@ -31,11 +32,7 @@ public class LiftLockManager {
                 ServerPlayer p = server.getPlayerList().getPlayer(uuid);
                 if (p != null) {
                     unfreezePlayer(p);
-                    // Отправляем пакет на закрытие меню
                     NetworkHandler.sendToPlayer(p, new S2CLiftLockPacket(false));
-
-                    // ★ КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Запускаем ритуал лифта для этого игрока ★
-                    // Теперь он в мире, меню закрыто, и он может начать свою активацию
                     LiftCommandHandler.addToPending(uuid);
                 }
             }
@@ -51,7 +48,6 @@ public class LiftLockManager {
         player.getAbilities().flying = true;
         player.onUpdateAbilities();
         player.teleportTo(0, -40, 0);
-
         NetworkHandler.sendToPlayer(player, new S2CLiftLockPacket(true));
     }
 
@@ -69,7 +65,6 @@ public class LiftLockManager {
         waitingPlayers.remove(uuid);
     }
 
-    // ★ НОВЫЙ МЕТОД: Проверка, ждет ли игрок в меню ★
     public static boolean isWaiting(UUID uuid) {
         return waitingPlayers.contains(uuid);
     }

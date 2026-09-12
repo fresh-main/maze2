@@ -29,14 +29,7 @@ public class SetSpawnIntervalPacket {
     public static void handle(SetSpawnIntervalPacket msg, Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
         context.enqueueWork(() -> {
-            ServerPlayer player = context.getSender();
-            if (player != null) {
-                player.level().getChunkAt(msg.boardPos).getBlockEntity(msg.boardPos, com.labyrinthmod.common.init.ModBlockEntities.BULLETIN_BOARD_BE.get())
-                        .ifPresent(board -> {
-                            board.setSpawnIntervalSeconds(msg.seconds);
-                            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§aИнтервал установлен: " + msg.seconds + " сек"));
-                        });
-            }
+            // Интервалы спавна удалены
         });
         context.setPacketHandled(true);
     }

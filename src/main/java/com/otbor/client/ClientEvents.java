@@ -54,17 +54,7 @@ public class ClientEvents {
         } catch (Throwable ignored) {}
     }
 
-    /** Запасной per-frame сброс камеры, если игрок нажмёт F5 — третье лицо
-     *  не успеет отрисоваться даже на 1 кадр. */
-    @SubscribeEvent
-    public static void onRenderTick(net.minecraftforge.event.TickEvent.RenderTickEvent event) {
-        if (event.phase != net.minecraftforge.event.TickEvent.Phase.START) return;
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.options == null) return;
-        if (mc.options.getCameraType() != net.minecraft.client.CameraType.FIRST_PERSON) {
-            mc.options.setCameraType(net.minecraft.client.CameraType.FIRST_PERSON);
-        }
-    }
+
 
     /** Поставлено OtborMod при смене языка — перезагрузим ресурсы в первом
      *  ClientTickEvent (вне setup-фазы, чтобы reloadResourcePacks не упал). */
@@ -94,11 +84,7 @@ public class ClientEvents {
             mc.setScreen(null);
         }
 
-        // F5 (третье лицо) — БЕЗУСЛОВНО блокируем. Третье лицо не нужно никому, даже
-        // админам в креативе (для тестов есть spectator).
-        if (mc.options.getCameraType() != net.minecraft.client.CameraType.FIRST_PERSON) {
-            mc.options.setCameraType(net.minecraft.client.CameraType.FIRST_PERSON);
-        }
+
         // F3 (координаты) и F3+B (хитбоксы) — БЕЗУСЛОВНО блокируем для всех режимов.
         if (mc.options.renderDebug) mc.options.renderDebug = false;
         if (mc.getEntityRenderDispatcher().shouldRenderHitBoxes()) {

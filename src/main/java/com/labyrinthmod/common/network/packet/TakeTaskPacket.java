@@ -9,6 +9,7 @@ import net.minecraftforge.network.NetworkEvent;
 import java.util.function.Supplier;
 
 public class TakeTaskPacket {
+
     private final BlockPos boardPos;
     private final int slotIndex;
 
@@ -28,15 +29,23 @@ public class TakeTaskPacket {
 
     public static void handle(TakeTaskPacket msg, Supplier<NetworkEvent.Context> contextSupplier) {
         NetworkEvent.Context context = contextSupplier.get();
+
         context.enqueueWork(() -> {
             ServerPlayer player = context.getSender();
-            if (player != null) {
-                player.level().getChunkAt(msg.boardPos).getBlockEntity(msg.boardPos, com.labyrinthmod.common.init.ModBlockEntities.BULLETIN_BOARD_BE.get())
-                        .ifPresent(board -> {
-                            board.takeTaskAsScroll(msg.slotIndex, player);
-                        });
+            if (player == null) return;
+
+            if (player.level().getBlockEntity(msg.boardPos) instanceof BulletinBoardBlockEntity board) {
+                boolean success = board.takeTaskAsScroll(msg.slotIndex, player);
+
+                // Если сервер не смог взять задание: слот пуст, нет места в инвентаре,
+                // нет тега и т.д. — сразу синкаем клиенту актуальное состояние доски.
+                // Иначе клиент может продолжать показывать "несуществующую" карточку.
+                if (!success) {
+                    board.sendTasksToPlayer(player);
+                }
             }
         });
+
         context.setPacketHandled(true);
     }
 }
