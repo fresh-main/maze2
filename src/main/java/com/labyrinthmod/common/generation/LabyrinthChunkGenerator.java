@@ -508,17 +508,28 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         );
 
         /*
+         * ★ Региональный "характер" зарастания ★
+         * Крупные участки мира (~71 блок) случайно, но детерминированно
+         * (на основе seed мира) получают разную плотность лиан: где-то
+         * густые заросли, где-то почти голый камень. Работает поверх
+         * обычной шумовой кластеризации ниже, а не вместо неё —
+         * поэтому даже внутри одного "густого" региона заросли всё
+         * равно распределены группами, а не сплошным ковром.
+         */
+        double densityBias = vineDensityBias(x, z);
+
+        /*
          * Большой шум отвечает за то, где вообще
          * могут быть заросли.
          */
-        if (large < -0.05) {
+        if (large < -0.05 + densityBias) {
             return false;
         }
 
         /*
          * Средний шум формирует отдельные группы.
          */
-        if (medium < -0.25) {
+        if (medium < -0.25 + densityBias * 0.6) {
             return false;
         }
 
@@ -526,7 +537,32 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
          * Мелкий шум не даёт стене покрываться
          * лианами полностью.
          */
-        return small > -0.35;
+        return small > -0.35 + densityBias * 0.4;
+    }
+
+    /**
+     * ★ РЕГИОНАЛЬНОЕ СМЕЩЕНИЕ ПЛОТНОСТИ ЛИАН ★
+     * Делит мир на крупные (~71 блок) регионы и назначает каждому
+     * один из 5 "характеров" зарастания: от очень густого до почти
+     * голого камня. Детерминировано от seed мира — при одном и том же
+     * seed картина всегда одинаковая, но разные места мира выглядят
+     * по-разному (требование "не покрывать всю поверхность одинаково").
+     */
+    private double vineDensityBias(int x, int z) {
+        int regionX = Math.floorDiv(x, 71);
+        int regionZ = Math.floorDiv(z, 71);
+        long h = (regionX * 2246822519L) ^ (regionZ * 3266489917L) ^ (seed * 668265263L);
+        h ^= (h >>> 33);
+        h *= 0xFF51AFD7ED558CCDL;
+        h ^= (h >>> 33);
+        int bucket = (int) Math.floorMod(h, 5);
+        switch (bucket) {
+            case 0: return -0.35; // очень густо заросший участок
+            case 1: return -0.15; // заросший
+            case 2: return 0.05;  // умеренно
+            case 3: return 0.25;  // скудная растительность
+            default: return 0.45; // почти голый камень
+        }
     }
 
     /**
@@ -542,29 +578,35 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         int hang = localTopY - y;
         if (hang < 0 || hang > 20) return null;
 
-        // ★ ЗАЩИТА 2: стена только вплотную, ортогонально ★
-        int dir = -1;
-        if (isLogicalWall(x + 1, z)) dir = 0;
-        else if (isLogicalWall(x - 1, z)) dir = 1;
-        else if (isLogicalWall(x, z + 1)) dir = 2;
-        else if (isLogicalWall(x, z - 1)) dir = 3;
+        // ★ ЗАЩИТА 2: стена вплотную (depth=1) либо через блок воздуха
+        // (depth=2) — второй случай нужен только для того, чтобы самые
+        // пышные грозди могли слегка выступать наружу от стены и давать
+        // лианам реальный объём, а не плоскую наклейку на грани блока.
+        int dir = -1, depth = 0;
+        if (isLogicalWall(x + 1, z)) { dir = 0; depth = 1; }
+        else if (isLogicalWall(x - 1, z)) { dir = 1; depth = 1; }
+        else if (isLogicalWall(x, z + 1)) { dir = 2; depth = 1; }
+        else if (isLogicalWall(x, z - 1)) { dir = 3; depth = 1; }
+        else if (isLogicalWall(x + 2, z)) { dir = 0; depth = 2; }
+        else if (isLogicalWall(x - 2, z)) { dir = 1; depth = 2; }
+        else if (isLogicalWall(x, z + 2)) { dir = 2; depth = 2; }
+        else if (isLogicalWall(x, z - 2)) { dir = 3; depth = 2; }
         if (dir < 0) return null;
 
-        // ★ ЗАЩИТА 3: стена существует НА ЭТОЙ ВЫСОТЕ ★
-        int wx = x + (dir == 0 ? 1 : dir == 1 ? -1 : 0);
-        int wz = z + (dir == 2 ? 1 : dir == 3 ? -1 : 0);
+        // ★ ЗАЩИТА 3: стена существует НА ЭТОЙ ВЫСОТЕ (на своей грани) ★
+        int wx = x + (dir == 0 ? depth : dir == 1 ? -depth : 0);
+        int wz = z + (dir == 2 ? depth : dir == 3 ? -depth : 0);
         if (!isSolidWall(wx, y, wz)) return null;
 
         if (!isLianaRope(x, z)) return null;
 
-        // Длина верёвки 6..18
-        double lenNoise = featureNoise.noise(x * 0.07 + 777, 0, z * 0.07 + 777);
-        int maxLen = 6 + (int) ((lenNoise + 1.0) * 6.0);
-        if (hang > maxLen) return null;
-
-        // Шапка из листвы на кромке (2 блока), ниже — лиана
-        if (hang <= 1) return getJungleLeafBlock();
-        return getVineBlockFacingWall(dir);
+        // Шапка из листвы прямо на кромке (только вплотную к стене) —
+        // дальше форму/длину целиком определяет объёмная система ниже,
+        // без внешнего прямоугольного обрезания по единой длине.
+        if (hang <= 1 && depth == 1) return getJungleLeafBlock();
+        int t = (dir == 0 || dir == 1) ? z : x;
+        if (!organicVineShape(x, y, z, dir, t, hang, depth)) return null;
+        return getJungleLeafBlock();
     }
 
     /**
@@ -584,24 +626,26 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         if (dist > 2) return null;
         int wallTop = wall[1];
 
-        // Колонка вдоль стены, якорь куста каждые 6 блоков
+        // Колонка вдоль стены, якорь куста каждые 9 блоков (было 6 — пятна сливались в ковёр)
         int t = (dir == 0 || dir == 1) ? z : x;
-        int anchor = Math.floorDiv(t, 6) * 6 + 3;
+        int anchor = Math.floorDiv(t, 9) * 9 + 4;
 
-        // Гейт: шапки пятнами, не сплошной полосой
+        // Гейт: шапки редкими пятнами, не через сегмент.
+        // noise ~[-1..1], порог 0.35 отсеивает ~2/3 сегментов вместо ~1/2.
         double gate = featureNoise.noise(anchor * 0.37 + dir * 91, 0, anchor * 0.19);
-        if (gate < 0.0) return null;
+        if (gate < 0.35) return null;
 
-        // Радиус куста 1.6..2.6 (разные размеры)
-        double r = 1.6 + (featureNoise.noise(anchor * 0.53 + 7, 0, anchor * 0.31 + 7) + 1.0) * 0.5;
+        // Радиус куста 1.0..1.8 (было 1.6..2.6 — раньше соседние пятна перекрывались)
+        double r = 1.0 + (featureNoise.noise(anchor * 0.53 + 7, 0, anchor * 0.31 + 7) + 1.0) * 0.4;
 
         int dt = t - anchor;                      // вдоль стены
         double dv = y - (wallTop + 0.5);          // по высоте (центр чуть выше кромки)
         double rad = Math.sqrt(dt * dt + dv * dv);
 
-        // Чем дальше от стены — тем короче свисание (куст "сидит" на стене)
-        double allow = r - (dist - 1) * 0.7;
-        double perturb = featureNoise.noise(x * 0.5, y * 0.5, z * 0.5) * 0.5;
+        // Чем дальше от стены — тем короче свисание (куст "сидит" на стене),
+        // и падает резче, чем раньше, чтобы не размазываться на соседние блоки воздуха
+        double allow = r - (dist - 1) * 1.1;
+        double perturb = featureNoise.noise(x * 0.5, y * 0.5, z * 0.5) * 0.4;
 
         if (rad <= allow + perturb) {
             return getJungleLeafBlock();
@@ -613,7 +657,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         if (y == FLOOR_Y) return randomFloorBlock(x, z);
         int dist = Math.max(Math.abs(x), Math.abs(z));
         boolean isInternalWall = (Math.abs(x) <= 2 || Math.abs(z) <= 2 || Math.abs(x - z) <= 2 || Math.abs(x + z) <= 2);
-        int wallHeight = (dist >= SECTORS_END || isInternalWall) ? SEPARATOR_WALL_HEIGHT : MAZE_HEIGHT;
+        int wallHeight = applyRuinOffset((dist >= SECTORS_END || isInternalWall) ? SEPARATOR_WALL_HEIGHT : MAZE_HEIGHT, x, z);
         if (y > FLOOR_Y && y <= FLOOR_Y + wallHeight) {
             if (passages.contains(hash) || passageZones.contains(hash)) {
                 BlockState bush = tryGenerateBush(x, y, z);
@@ -867,11 +911,27 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             riverDist = distanceToRiverCurve(worldX, worldZ);
         }
 
+        // ★ ЛИАНЫ ВНУТРИ ГЛЕЙДА ★
+        // generateNaturalTerrain() никогда не размещает лианы — из-за этого
+        // внутренняя сторона стены Глейда (видимая изнутри поляны) оставалась
+        // голой, хотя сама стена и снаружи, и изнутри одинаково распознаётся
+        // как "логическая стена" (isLogicalWall/findNearestWall). Не хватало
+        // только вызова генератора лиан для внутренних колонок. Проверяем
+        // лишь колонки в пределах досягаемости findNearestWall (макс. радиус
+        // поиска — 4 блока от границы Глейда) и только там, где природный
+        // рельеф и так оставил бы воздух — форма и рельеф самого Глейда не
+        // меняются, лианы лишь дополняют пустое пространство у стены.
+        boolean nearGladeWall = dist <= GLADE_RADIUS && dist >= GLADE_RADIUS - 4;
+
         for (int localY = 0; localY < 16; localY++) {
             int worldY = baseY + localY;
             BlockState state;
             if (isNatural) {
                 state = generateNaturalTerrain(worldX, worldY, worldZ, dist, riverDist);
+                if (nearGladeWall && (state == null || state.isAir())) {
+                    BlockState vines = tryGenerateWallVines(worldX, worldY, worldZ);
+                    if (vines != null) state = vines;
+                }
             } else {
                 if (worldY < FLOOR_Y) {
                     state = getWallBlock(worldX, worldY, worldZ);
@@ -1077,17 +1137,17 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         int dist = Math.max(Math.abs(x), Math.abs(z));
         if (dist <= GLADE_WALL_END) {
             int dH = Math.min(dist - GLADE_RADIUS, GLADE_WALL_END - dist);
-            return new int[]{Math.max(0, dH), GLADE_WALL_END - GLADE_RADIUS + 1, GLADE_WALL_HEIGHT};
+            return new int[]{Math.max(0, dH), GLADE_WALL_END - GLADE_RADIUS + 1, applyRuinOffset(GLADE_WALL_HEIGHT, x, z)};
         }
         if (dist < MAIN_MAZE_END) {
             int modX = Math.floorMod(x, 5);
             int modZ = Math.floorMod(z, 5);
             int dH = Math.min(Math.min(modX, 4 - modX), Math.min(modZ, 4 - modZ));
-            return new int[]{dH, WALL_THICKNESS, MAZE_HEIGHT};
+            return new int[]{dH, WALL_THICKNESS, applyRuinOffset(MAZE_HEIGHT, x, z)};
         }
         if (dist <= SEPARATOR_WALL_END) {
             int dH = Math.min(dist - MAIN_MAZE_END, SEPARATOR_WALL_END - dist);
-            return new int[]{Math.max(0, dH), SEPARATOR_WALL_END - MAIN_MAZE_END + 1, SEPARATOR_WALL_HEIGHT};
+            return new int[]{Math.max(0, dH), SEPARATOR_WALL_END - MAIN_MAZE_END + 1, applyRuinOffset(SEPARATOR_WALL_HEIGHT, x, z)};
         }
         if (dist <= SECTORS_END) {
             boolean internal = (Math.abs(x) <= 2 || Math.abs(z) <= 2
@@ -1098,12 +1158,108 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             else if (Math.abs(x - z) <= 2) dH = 2 - Math.abs(x - z);
             else if (Math.abs(x + z) <= 2) dH = 2 - Math.abs(x + z);
             else dH = SECTORS_END - dist;
-            int height = (dist >= SECTORS_END || internal) ? SEPARATOR_WALL_HEIGHT : MAZE_HEIGHT;
+            int height = applyRuinOffset((dist >= SECTORS_END || internal) ? SEPARATOR_WALL_HEIGHT : MAZE_HEIGHT, x, z);
             int thickness = internal ? 5 : 64;
             return new int[]{Math.max(0, dH), thickness, height};
         }
         int dH = Math.min(dist - SECTORS_END, OUTER_WALL_END - dist);
-        return new int[]{Math.max(0, dH), OUTER_WALL_END - SECTORS_END + 1, OUTER_WALL_HEIGHT};
+        return new int[]{Math.max(0, dH), OUTER_WALL_END - SECTORS_END + 1, applyRuinOffset(OUTER_WALL_HEIGHT, x, z)};
+    }
+
+    // =====================================================================
+    // ★ СИСТЕМА НЕРОВНОГО СИЛУЭТА РУИН (v1) ★
+    // Ломает идеально ровную, одинаковую высоту/форму стен: верх стен
+    // становится неровным, ступенчатым, местами обрушенным, местами
+    // "уцелевшим" (выше среднего) — как у настоящей заросшей древней
+    // постройки, а не у прямоугольной коробки.
+    //
+    // Работает ТОЛЬКО поверх уже существующей логики (высота колонки,
+    // текстура поверхности). Форма коридоров/стен в плане (topology,
+    // проходимость лабиринта) не меняется — по требованию не трогать
+    // остальные системы/механику без необходимости.
+    // =====================================================================
+
+    /**
+     * Делит мир на крупные (~53 блока) регионы и жёстко, но случайно
+     * (на основе seed мира) назначает каждому региону один из
+     * нескольких "почерков" разрушения. Благодаря этому разные участки
+     * одной и той же постройки выглядят по-разному, а не повторяют один
+     * и тот же шаблон каждые несколько блоков.
+     */
+    private int ruinProfileVariant(int x, int z) {
+        int regionX = Math.floorDiv(x, 53);
+        int regionZ = Math.floorDiv(z, 53);
+        long h = (regionX * 668265263L) ^ (regionZ * 374761393L) ^ (seed * 2654435761L);
+        h ^= (h >>> 33);
+        h *= 0xFF51AFD7ED558CCDL;
+        h ^= (h >>> 33);
+        return (int) Math.floorMod(h, 4); // 4 варианта "почерка" разрушения
+    }
+
+    /**
+     * Множитель интенсивности выветривания/трещин для существующей
+     * системы трещин (crackZone/crackVein) — разные регионы выглядят
+     * более целыми или более ветхими, не меняя саму механику трещин.
+     */
+    private double erosionIntensity(int x, int z) {
+        switch (ruinProfileVariant(x, z)) {
+            case 0: return 0.70;  // более опрятный, целый участок
+            case 1: return 1.00;  // обычная выветренность
+            case 2: return 1.55;  // сильно ветхий, потрескавшийся участок
+            default: return 1.15;
+        }
+    }
+
+    /**
+     * Итоговое смещение высоты стены в конкретной колонке (x,z).
+     * Отрицательное значение — просевший/обрушенный участок,
+     * положительное — уцелевший выступающий зубец.
+     * Несколько октав шума разного масштаба (крупные проломы + мелкая
+     * рябь по кромке) плюс редкие резкие провалы (крупные обвалы).
+     */
+    private int ruinHeightOffset(int x, int z) {
+        int variant = ruinProfileVariant(x, z);
+
+        double freqBig, freqMed, freqFine, ampBig, ampMed, ampFine;
+        switch (variant) {
+            case 0: freqBig = 0.018; freqMed = 0.050; freqFine = 0.140; ampBig = 5.0; ampMed = 2.2; ampFine = 1.0; break;
+            case 1: freqBig = 0.012; freqMed = 0.040; freqFine = 0.110; ampBig = 7.0; ampMed = 1.6; ampFine = 0.8; break;
+            case 2: freqBig = 0.026; freqMed = 0.070; freqFine = 0.170; ampBig = 3.5; ampMed = 2.8; ampFine = 1.3; break;
+            default: freqBig = 0.020; freqMed = 0.060; freqFine = 0.150; ampBig = 4.5; ampMed = 2.0; ampFine = 1.1; break;
+        }
+
+        double big = terrainNoise.noise(x * freqBig + 401.0, 0, z * freqBig + 401.0);
+        double med = terrainNoise.noise(x * freqMed + 913.0, 0, z * freqMed + 913.0);
+        double fine = featureNoise.noise(x * freqFine + 57.0, 0, z * freqFine + 57.0);
+
+        double h = big * ampBig + med * ampMed + fine * ampFine;
+
+        // Редкие крупные обвалы: отдельная низкочастотная маска резко
+        // "вырезает" ещё несколько блоков высоты на ограниченных
+        // участках — разрушенные проломы в кромке стены.
+        double collapseMask = terrainNoise.noise(x * 0.02 + 8123.0, 0, z * 0.02 + 8123.0);
+        if (collapseMask < -0.62) {
+            double depth = (-0.62 - collapseMask) / 0.38; // 0..1
+            h -= depth * 9.0;
+        }
+
+        return (int) Math.round(h);
+    }
+
+    /**
+     * Применяет смещение силуэта руин к базовой (константной) высоте
+     * стены зоны, ограничивая результат безопасными пределами:
+     * стена никогда не проваливается настолько, чтобы лабиринт
+     * перестал быть закрытым сверху, и не взлетает нелепо высоко.
+     */
+    private int applyRuinOffset(int baseHeight, int x, int z) {
+        int offset = ruinHeightOffset(x, z);
+        int lower = Math.max(14, baseHeight - 14);
+        int upper = baseHeight + 6;
+        int result = baseHeight + offset;
+        if (result < lower) result = lower;
+        if (result > upper) result = upper;
+        return result;
     }
 
     private boolean isCarveSafe(int dH, int thickness) {
@@ -1149,7 +1305,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
 
         // Проверяем: это блок стены или воздух?
         double zone = crackZone(x, y, z);
-        double base = 0.06 + (zone + 1.0) * 0.025;
+        double base = (0.06 + (zone + 1.0) * 0.025) * erosionIntensity(x, z);
         double vein = crackVein(x, y, z);
         boolean visible = crackSegmentMask(x, y, z) > -0.1;
 
@@ -1228,7 +1384,11 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
     // =====================================================================
     private BlockState getDecayedWallBlock(int x, int y, int z, int depthFromSurface) {
         // ★ ЛИСТВЕННАЯ ШАПКА НА КРОМКЕ (верх стены зарастает) ★
-        BlockState cap = tryGenerateVineCap(x, y, z, getTopY(x, z));
+        // Раньше здесь тоже был getTopY() — он завышал высоту для стен основного
+        // лабиринта, из-за чего условие "y примерно равен высоте стены" почти
+        // никогда не выполнялось и кустики просто не рождались. wallTopAt() даёт
+        // реальную высоту конкретной стены.
+        BlockState cap = tryGenerateVineCap(x, y, z, wallTopAt(x, z));
         if (cap != null) return cap;
 
         // ... остальной код без изменений
@@ -1248,7 +1408,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         if (dV < 0) return getWallBlock(x, y, z);
 
         double zone = crackZone(x, y, z);
-        double base = 0.06 + (zone + 1.0) * 0.025;
+        double base = (0.06 + (zone + 1.0) * 0.025) * erosionIntensity(x, z);
         double vein = crackVein(x, y, z);
         boolean visible = crackSegmentMask(x, y, z) > -0.1;
 
@@ -1422,15 +1582,15 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
     /** ★ ТОЧНЫЙ верх стены для колонки (getTopY врёт для коридоров лабиринта) ★ */
     private int wallTopAt(int wx, int wz) {
         int d = Math.max(Math.abs(wx), Math.abs(wz));
-        if (d <= GLADE_WALL_END) return FLOOR_Y + GLADE_WALL_HEIGHT;
-        if (d < MAIN_MAZE_END) return FLOOR_Y + MAZE_HEIGHT;
-        if (d <= SEPARATOR_WALL_END) return FLOOR_Y + SEPARATOR_WALL_HEIGHT;
+        if (d <= GLADE_WALL_END) return FLOOR_Y + applyRuinOffset(GLADE_WALL_HEIGHT, wx, wz);
+        if (d < MAIN_MAZE_END) return FLOOR_Y + applyRuinOffset(MAZE_HEIGHT, wx, wz);
+        if (d <= SEPARATOR_WALL_END) return FLOOR_Y + applyRuinOffset(SEPARATOR_WALL_HEIGHT, wx, wz);
         if (d <= SECTORS_END) {
             boolean internal = (Math.abs(wx) <= 2 || Math.abs(wz) <= 2
                     || Math.abs(wx - wz) <= 2 || Math.abs(wx + wz) <= 2);
-            return FLOOR_Y + ((d >= SECTORS_END || internal) ? SEPARATOR_WALL_HEIGHT : MAZE_HEIGHT);
+            return FLOOR_Y + applyRuinOffset((d >= SECTORS_END || internal) ? SEPARATOR_WALL_HEIGHT : MAZE_HEIGHT, wx, wz);
         }
-        return FLOOR_Y + OUTER_WALL_HEIGHT;
+        return FLOOR_Y + applyRuinOffset(OUTER_WALL_HEIGHT, wx, wz);
     }
 
     /**
@@ -1442,32 +1602,203 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         if (isLogicalWall(x, z)) return null;
 
         int[] wall = findNearestWall(x, z);
-        if (wall == null || wall[0] > 1) return null;   // только вплотную к стене
+        // Вплотную к стене (depth=1) или через блок воздуха (depth=2) —
+        // второй случай даёт отдельным пышным гроздям немного объёма и
+        // позволяет им выступать наружу, а не лежать плоской наклейкой.
+        if (wall == null || wall[0] > 2) return null;
+        int depth = wall[0];
         int wallTop = wall[1];
         int dir = wall[2];
 
         int hang = wallTop - y;
         if (hang < 1 || hang > 20) return null;          // только ниже кромки
 
-        // Пряди: якоря каждые 4 блока вдоль стены, растёт ~70%
+        // Крупная региональная плотность зарослей — те же густые/редкие/
+        // почти голые участки, что и у остальных лиан, а не отдельная
+        // логика только для этой функции.
+        if (!isLianaRope(x, z)) return null;
+
         int t = (dir == 0 || dir == 1) ? z : x;
-        int anchor = Math.floorDiv(t, 4) * 4 + 1;
-        if (terrainNoise.noise(anchor * 0.31, 0, anchor * 0.17) < -0.15) return null;
-        if (Math.abs(t - anchor) > 1) return null;       // прядь 3 блока шириной
-
-        // Длина пряди 8..16 блоков
-        double lenNoise = featureNoise.noise(anchor * 0.53, 0, anchor * 0.29);
-        int len = 8 + (int) ((lenNoise + 1.0) * 4.0);
-        if (hang > len) return null;
-
-        // Кончик пряди сужается
-        if (hang > len - 2 && Math.abs(t - anchor) > 0) {
-            long h = (x * 123L) ^ (y * 456L) ^ (z * 789L) ^ seed;
-            if ((h & 0xFF) > 120) return null;
-        }
+        if (!organicVineShape(x, y, z, dir, t, hang, depth)) return null;
 
         // ★ ВСЕГДА ЛИСТВА — блоки VINE больше не генерируются ★
         return getJungleLeafBlock();
+    }
+
+    // =====================================================================
+    // ★ ОБЪЁМНАЯ СИСТЕМА ЛИАН (v2) ★
+    // Раньше форма пряди была одной и той же функцией на фиксированной
+    // сетке якорей (каждые 8 блоков) — это и давало эффект сплошной
+    // прямоугольной "плиты" из листвы. Теперь:
+    //   - якоря групп расставлены НЕРАВНОМЕРНО (сетка ячеек с джиттером,
+    //     а не жёсткий шаг);
+    //   - часть ячеек вообще пустая — между группами есть настоящие
+    //     разрывы, а не сплошной ковёр;
+    //   - у каждой группы случайно (по seed мира) выбирается один из
+    //     нескольких алгоритмов формы — тонкая извивающаяся плеть,
+    //     пышная объёмная гроздь с боковой веткой, несколько редких
+    //     тонких нитей с разрывами, асимметричная смещённая занавесь;
+    //   - у каждой группы свой случайный размер (короче/длиннее,
+    //     тоньше/толще) — маленькие, средние и крупные скопления;
+    //   - часть групп может слегка выступать от стены наружу (depth=2),
+    //     создавая настоящий объём, а не плоскую грань.
+    // Форма стен/коридоров этой системой не затрагивается — она решает
+    // только, ставить ли блок листвы в уже "воздушной" клетке рядом
+    // со стеной.
+    // =====================================================================
+    private static final int VINE_CELL_LEN = 7;
+
+    /** Детерминированный (от seed мира) хэш для конкретной ячейки вдоль стены. */
+    private long vineGroupHash(int cellIdx, int dir, long salt) {
+        long h = ((long) cellIdx * 0x9E3779B97F4A7C15L) ^ ((long) dir * 0xC2B2AE3D27D4EB4FL)
+                ^ (seed * 0x2545F4914F6CDD1DL) ^ salt;
+        h ^= (h >>> 33);
+        h *= 0xFF51AFD7ED558CCDL;
+        h ^= (h >>> 33);
+        h *= 0xC4CEB9FE1A85EC53L;
+        h ^= (h >>> 33);
+        return h;
+    }
+
+    /** Достаёт независимое псевдослучайное число [0,1) из хэша (slice 0..3). */
+    private double vineRnd(long h, int slice) {
+        long shifted = h >>> (slice * 16);
+        return (shifted & 0xFFFFL) / 65535.0;
+    }
+
+    /**
+     * Проверяет, попадает ли блок (x,y,z) в какую-либо из ближайших
+     * "групп" лиан вдоль стены. Смотрит на свою ячейку и двух соседей,
+     * потому что якорь соседней ячейки из-за джиттера может дотянуться
+     * и до текущей колонки.
+     */
+    private boolean organicVineShape(int x, int y, int z, int dir, int t, int hang, int depth) {
+        if (depth < 1 || depth > 2) return false;
+
+        int baseCell = Math.floorDiv(t, VINE_CELL_LEN);
+        for (int co = -1; co <= 1; co++) {
+            int cellIdx = baseCell + co;
+            long gh = vineGroupHash(cellIdx, dir, 0x51A5L);
+
+            // Не в каждой ячейке есть группа — настоящие разрывы между
+            // скоплениями лиан, а не непрерывная стена из листвы.
+            if (vineRnd(gh, 0) < 0.24) continue;
+
+            // Якорь "гуляет" внутри ячейки — расстояния между соседними
+            // группами неровные, а не строго по сетке.
+            int jitter = (int) Math.round((vineRnd(gh, 1) - 0.5) * (VINE_CELL_LEN - 2));
+            int anchor = cellIdx * VINE_CELL_LEN + VINE_CELL_LEN / 2 + jitter;
+            int dt = t - anchor;
+            if (Math.abs(dt) > 5) continue; // группа физически не дотянется настолько далеко
+
+            int style = (int) (vineRnd(gh, 2) * 4.0);
+            if (style > 3) style = 3;
+
+            double sizeRoll = vineRnd(gh, 3);
+            // ★ Крупные группы стали реже и меньше (было до 1.4x) — иначе
+            // самые пышные скопления превращались в заметный прямоугольный
+            // выступ вместо небольшой неровной кроны.
+            double sizeScale = sizeRoll < 0.5 ? 0.65 : (sizeRoll < 0.9 ? 0.95 : 1.15);
+
+            if (vineGroupMember(x, y, z, dir, dt, hang, depth, style, sizeScale, gh)) {
+                if (depth == 2) {
+                    // ★ Внешний (выступающий) слой разрежаем шумом ★
+                    // Без этого depth=2 давал сплошную вторую "стену" из
+                    // листвы поверх первой. Теперь наружу торчат только
+                    // отдельные плотные островки, а не целый слой.
+                    double punch = terrainNoise.noise(x * 1.3 + 91.0, y * 1.3, z * 1.3 + 91.0);
+                    if (punch < 0.15) return false;
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Проверка принадлежности конкретной точки одной группе лиан по
+     * выбранному для неё "стилю" — своя форма, длина и толщина у
+     * каждого стиля, плюс мелкая рябь по краю, чтобы контур никогда не
+     * был ровной линией.
+     */
+    private boolean vineGroupMember(int x, int y, int z, int dir, int dt, int hang, int depth,
+                                    int style, double sizeScale, long gh) {
+        double ripple = terrainNoise.noise(x * 0.8, y * 0.8, z * 0.8) * 0.4;
+
+        switch (style) {
+            case 0: {
+                // Тонкая длинная извивающаяся плеть — не идеальная вертикаль,
+                // слегка "змеится" по высоте.
+                int len = (int) Math.round((8 + vineRnd(gh, 4) * 10) * sizeScale);
+                if (len <= 0 || hang > len) return false;
+                if (depth > 1) return false;
+                double taper = 1.0 - (double) hang / len;
+                double swayPhase = vineRnd(gh, 5) * 6.283;
+                double sway = Math.sin(hang * 0.33 + swayPhase) * 0.9;
+                double radius = (0.5 + taper * 0.55) * sizeScale;
+                double d = Math.abs(dt - sway) - ripple;
+                return d <= radius;
+            }
+            case 1: {
+                // Пышная объёмная гроздь: толще у стены, с отдельной боковой
+                // веткой — и именно она может слегка выступать наружу.
+                int len = (int) Math.round((4 + vineRnd(gh, 4) * 6) * sizeScale);
+                if (len <= 0 || hang > len) return false;
+                double taper = 1.0 - (double) hang / len;
+                double bulge = featureNoise.noise(dt * 0.9 + dir * 13 + (gh & 0xFF),
+                        hang * 0.4, (dir + 1) * 37.0) * 0.4;
+                // ★ Радиус и штраф за выступ наружу уменьшены ★
+                // Раньше самая пышная гроздь (до 3.5 блока в поперечнике)
+                // могла легко "дотянуться" до depth=2, из-за чего заросли
+                // выглядели одной большой прямоугольной массой, а не кроной,
+                // прижатой к стене.
+                double radius = (0.65 + taper * 0.85 + bulge) * sizeScale;
+                double dLat = Math.abs(dt) - ripple;
+                double outward = (depth - 1) * 1.8;
+                double core = Math.sqrt(dLat * dLat + outward * outward);
+                if (core <= radius) return true;
+                if (depth > 1) return false;
+
+                // Боковая ветка чуть ниже центра грозди — смещена в сторону.
+                double branchHang = len * (0.35 + vineRnd(gh, 6) * 0.3);
+                double branchDt = dt - ((vineRnd(gh, 7) - 0.5) * 5.0);
+                double branchRadius = 0.55 * sizeScale;
+                double bDy = (hang - branchHang) * 0.6;
+                double bDist = Math.sqrt(branchDt * branchDt + bDy * bDy);
+                return bDist <= branchRadius;
+            }
+            case 2: {
+                // Несколько редких тонких нитей с разрывами по высоте —
+                // вместо одной сплошной пряди.
+                if (depth > 1) return false;
+                int strands = 2 + (int) (vineRnd(gh, 4) * 2.0);
+                for (int s = 0; s < strands; s++) {
+                    long sh = vineGroupHash((int) (gh & 0xFFFF), dir, 0x9000L + s);
+                    double strandDt = (vineRnd(sh, 0) - 0.5) * 5.0;
+                    int len = (int) Math.round((6 + vineRnd(sh, 1) * 12) * sizeScale);
+                    if (hang > len) continue;
+                    double gap = featureNoise.noise((x + s * 11) * 0.45, y * 0.55, (z + s * 7) * 0.45);
+                    if (gap < -0.2) continue; // разрыв в нити
+                    double radius = 0.42 * sizeScale;
+                    if (Math.abs(dt - strandDt) - ripple <= radius) return true;
+                }
+                return false;
+            }
+            default: {
+                // Асимметричная занавесь, смещённая в сторону от якоря —
+                // никакой симметрии относительно центра группы.
+                int len = (int) Math.round((7 + vineRnd(gh, 4) * 9) * sizeScale);
+                if (len <= 0 || hang > len) return false;
+                double taper = 1.0 - (double) hang / len;
+                double drift = (vineRnd(gh, 5) - 0.5) * 3.2;
+                double curve = drift * (1.0 - taper) + Math.sin(hang * 0.22) * 0.4;
+                double radius = (0.6 + taper * 0.75) * sizeScale;
+                double d = Math.abs(dt - curve) - ripple;
+                if (d > radius) return false;
+                if (depth == 1) return true;
+                return radius > 1.05 && Math.abs(dt - curve) < radius * 0.4;
+            }
+        }
     }
 
     /**
@@ -1907,14 +2238,14 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
      */
     private int getTopY(int x, int z) {
         int dist = Math.max(Math.abs(x), Math.abs(z));
-        if (dist <= GLADE_WALL_END) return FLOOR_Y + GLADE_WALL_HEIGHT;
-        if (dist <= SEPARATOR_WALL_END) return FLOOR_Y + SEPARATOR_WALL_HEIGHT;
-        if (dist <= OUTER_WALL_END) return FLOOR_Y + OUTER_WALL_HEIGHT;
+        if (dist <= GLADE_WALL_END) return FLOOR_Y + applyRuinOffset(GLADE_WALL_HEIGHT, x, z);
+        if (dist <= SEPARATOR_WALL_END) return FLOOR_Y + applyRuinOffset(SEPARATOR_WALL_HEIGHT, x, z);
+        if (dist <= OUTER_WALL_END) return FLOOR_Y + applyRuinOffset(OUTER_WALL_HEIGHT, x, z);
 
         boolean isInternalWall = (Math.abs(x) <= 2 || Math.abs(z) <= 2 || Math.abs(x - z) <= 2 || Math.abs(x + z) <= 2);
-        if (dist <= SECTORS_END && isInternalWall) return FLOOR_Y + SEPARATOR_WALL_HEIGHT;
+        if (dist <= SECTORS_END && isInternalWall) return FLOOR_Y + applyRuinOffset(SEPARATOR_WALL_HEIGHT, x, z);
 
-        return FLOOR_Y + MAZE_HEIGHT;
+        return FLOOR_Y + applyRuinOffset(MAZE_HEIGHT, x, z);
     }
 
     /**
@@ -1972,15 +2303,21 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
      */
     private int[] findNearestWall(int x, int z) {
         for (int d = 1; d <= 4; d++) { // 最大影响半径 4 格，彻底杜绝大立方体
-            if (isLogicalWall(x + d, z)) return new int[]{d, getTopY(x + d, z), 0};
-            if (isLogicalWall(x - d, z)) return new int[]{d, getTopY(x - d, z), 1};
-            if (isLogicalWall(x, z + d)) return new int[]{d, getTopY(x, z + d), 2};
-            if (isLogicalWall(x, z - d)) return new int[]{d, getTopY(x, z - d), 3};
+            // ★ ВАЖНО: используем wallTopAt(), а НЕ getTopY() ★
+            // getTopY() врёт для внутренних стен лабиринта (даёт высоту разделительной
+            // стены вместо реальной высоты стены основного лабиринта), из-за чего лианы
+            // подвешивались от фантомной кромки на 15-20 блоков выше настоящей стены
+            // и "летали" в воздухе. wallTopAt() уже был написан именно для этого случая,
+            // просто не был подключён — подключаем.
+            if (isLogicalWall(x + d, z)) return new int[]{d, wallTopAt(x + d, z), 0};
+            if (isLogicalWall(x - d, z)) return new int[]{d, wallTopAt(x - d, z), 1};
+            if (isLogicalWall(x, z + d)) return new int[]{d, wallTopAt(x, z + d), 2};
+            if (isLogicalWall(x, z - d)) return new int[]{d, wallTopAt(x, z - d), 3};
             // 对角线检查（适配扇区的斜墙）
-            if (isLogicalWall(x + d, z + d)) return new int[]{d, getTopY(x + d, z + d), 0};
-            if (isLogicalWall(x - d, z - d)) return new int[]{d, getTopY(x - d, z - d), 1};
-            if (isLogicalWall(x + d, z - d)) return new int[]{d, getTopY(x + d, z - d), 0};
-            if (isLogicalWall(x - d, z + d)) return new int[]{d, getTopY(x - d, z + d), 1};
+            if (isLogicalWall(x + d, z + d)) return new int[]{d, wallTopAt(x + d, z + d), 0};
+            if (isLogicalWall(x - d, z - d)) return new int[]{d, wallTopAt(x - d, z - d), 1};
+            if (isLogicalWall(x + d, z - d)) return new int[]{d, wallTopAt(x + d, z - d), 0};
+            if (isLogicalWall(x - d, z + d)) return new int[]{d, wallTopAt(x - d, z + d), 1};
         }
         return null; // 周围没有墙，绝对不生成
     }
