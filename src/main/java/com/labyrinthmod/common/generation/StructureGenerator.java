@@ -525,22 +525,65 @@ public class StructureGenerator {
         return new BlockPos(x, 0, z);
     }
     public static void preloadGladeSizes() {
-        if (gladeSizesLoaded) {
-            return;
-        }
+        init();
 
         try {
             MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
-
             if (server == null) {
                 return;
             }
 
-            loadGladeSizes(server.getStructureManager());
+            StructureTemplateManager manager = server.getStructureManager();
+
+            // Размеры структур на поляне
+            loadGladeSizes(manager);
+
+            // Размеры ВСЕХ уже зарегистрированных структур,
+            // включая lift_1 / lift_2 / most / dver_*
+            for (StructureData data : structures) {
+                if (data.size != null && data.size.getX() > 0 && data.size.getZ() > 0) {
+                    continue;
+                }
+
+                try {
+                    Optional<StructureTemplate> opt = manager.get(data.placement.getNbtLocation());
+
+                    if (opt.isPresent()) {
+                        data.size = opt.get().getSize();
+                    } else {
+                        data.size = new Vec3i(0, 0, 0);
+                    }
+                } catch (Throwable ignored) {
+                    data.size = new Vec3i(0, 0, 0);
+                }
+            }
+
         } catch (Throwable ignored) {
-            // Если сервер ещё недоступен — работаем на fallback-радиусах.
+            // Если сервер/менеджер ещё недоступен — остаёмся на fallback.
         }
     }
+    private static volatile Vec3i bridgeSize = null;
+
+    public static Vec3i getBridgeSize() {
+        if (bridgeSize != null) return bridgeSize;
+
+        try {
+            MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+            if (server == null) return new Vec3i(0, 0, 0);
+
+            StructureTemplateManager manager = server.getStructureManager();
+            Optional<StructureTemplate> opt = manager.get(new ResourceLocation("labyrinthmod", "most"));
+
+            if (opt.isPresent()) {
+                bridgeSize = opt.get().getSize();
+                return bridgeSize;
+            }
+        } catch (Throwable ignored) {
+        }
+
+        return new Vec3i(0, 0, 0);
+    }
+
 
     public static void loadGladeSizes(WorldGenLevel level) {
         if (gladeSizesLoaded) {
@@ -579,6 +622,60 @@ public class StructureGenerator {
         }
 
         gladeSizesLoaded = true;
+    }
+    public static boolean isStructurePlacementBlocked(
+            String name,
+            BlockPos pos,
+            Rotation rotation,
+            int fallbackRadius,
+            int margin
+    ) {
+        int[] newBounds = getFootprintAabb(
+                name,
+                pos,
+                rotation,
+                fallbackRadius,
+                margin
+        );
+
+        for (StructureData existing : structures) {
+            // Саму структуру с таким же именем не считаем конфликтом.
+            if (existing.placement.getName().equals(name)) {
+                continue;
+            }
+
+            int[] oldBounds = existing.getWorldBounds();
+
+            boolean overlapX =
+                    newBounds[0] <= oldBounds[1] &&
+                            newBounds[1] >= oldBounds[0];
+
+            boolean overlapZ =
+                    newBounds[2] <= oldBounds[3] &&
+                            newBounds[3] >= oldBounds[2];
+
+            if (overlapX && overlapZ) {
+                System.out.println(
+                        "[StructureGenerator] Placement blocked: "
+                                + name
+                                + " intersects "
+                                + existing.placement.getName()
+                                + " new=["
+                                + newBounds[0] + ", " + newBounds[1]
+                                + "] ["
+                                + newBounds[2] + ", " + newBounds[3]
+                                + "] old=["
+                                + oldBounds[0] + ", " + oldBounds[1]
+                                + "] ["
+                                + oldBounds[2] + ", " + oldBounds[3]
+                                + "]"
+                );
+
+                return true;
+            }
+        }
+
+        return false;
     }
     public static int[] getFootprintAabb(String name, BlockPos pos, Rotation rotation, int fallbackRadius, int margin) {
         Vec3i size = gladeSizeCache.get(name);

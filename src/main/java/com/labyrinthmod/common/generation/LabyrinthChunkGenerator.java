@@ -4,6 +4,7 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.Vec3i;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.WorldGenRegion;
@@ -2144,10 +2145,17 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
 
     private void ensureGenerated() {
         if (isGenerated) return;
+
+        // Сначала регистрируем базовые структуры и загружаем их размеры.
         StructureGenerator.preloadGladeSizes();
 
         StructureGenerator.updateDverPosition(this.GLADE_RADIUS);
         initializeBridge();
+
+        // После добавления dver/most снова загружаем размеры,
+        // чтобы проверка пересечений видела уже ВСЕ структуры.
+        StructureGenerator.preloadGladeSizes();
+
         initializeGladeStructures();
 
         synchronized (generationLock) {
@@ -2161,14 +2169,244 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             isGenerated = true;
         }
     }
-    private double getRiverTotalHalfWidth(int x, int z) {
+    // ★ БАЗОВАЯ ПОЛУШИРИНА ВОДЫ (без учёта сужения у моста) ★
+    private double computeBaseWaterHalfWidth(int x, int z) {
         if (featureNoise == null) {
             return 10.0;
         }
 
         double widthNoise = featureNoise.noise(x * 0.05, 0, z * 0.05) * 1.5;
         double waterHalfWidth = 8.5 + widthNoise;
-        waterHalfWidth = Math.max(7.0, waterHalfWidth);
+        return Math.max(6.0, waterHalfWidth);
+    }
+
+    private volatile double bridgeCenterX = 0.0;
+    private volatile double bridgeCenterZ = 0.0;
+    private volatile double bridgeFlowUx = 1.0;
+    private volatile double bridgeFlowUz = 0.0;
+    private volatile boolean bridgeNarrowingActive = false;
+    private volatile double bridgeForcedWaterHalfWidth = 6.0;
+    private volatile double bridgeNarrowRadius = 6.0;
+    private volatile double bridgeNarrowBlend = 6.0;
+
+    private double applyBridgeNarrowing(int x, int z, double waterHalfWidth) {
+        if (!bridgeNarrowingActive) return waterHalfWidth;
+
+        double dx = x - bridgeCenterX;
+        double dz = z - bridgeCenterZ;
+        double dist = Math.abs(dx * bridgeFlowUx + dz * bridgeFlowUz);
+
+        if (dist >= bridgeNarrowRadius + bridgeNarrowBlend) {
+            return waterHalfWidth;
+        }
+
+        double narrowed = Math.min(waterHalfWidth, bridgeForcedWaterHalfWidth);
+
+        if (dist <= bridgeNarrowRadius) {
+            return narrowed;
+        }
+
+        double t = (dist - bridgeNarrowRadius) / bridgeNarrowBlend;
+        t = t * t * (3.0 - 2.0 * t);
+        return narrowed + (waterHalfWidth - narrowed) * t;
+    }
+
+    private void initializeBridge() {
+        ensureRiverCurve();
+        double[][] points = riverCurvePoints;
+        if (points == null || points.length < 20) return;
+
+        Vec3i bridgeSize = StructureGenerator.getBridgeSize();
+        int bridgeWidthX = bridgeSize.getX() > 0 ? bridgeSize.getX() : 7;
+        int bridgeLengthZ = bridgeSize.getZ() > 0 ? bridgeSize.getZ() : 18;
+
+        double maxWaterHalfWidth = Math.max(3.0,
+                bridgeLengthZ / 2.0 - BRIDGE_BANK_HALF_WIDTH - BRIDGE_LAND_MARGIN);
+
+        int windowSize = 15;
+        int margin = 5;
+
+        boolean placed = false;
+
+        for (int idx : findNaturalNarrowRiverPoints(points, margin, windowSize)) {
+            if (tryPlaceBridgeAt(points, idx, bridgeWidthX, bridgeLengthZ, maxWaterHalfWidth, false)) {
+                placed = true;
+                break;
+            }
+        }
+
+        if (!placed) {
+            for (int idx : findStraightestSegments(points, windowSize, margin)) {
+                if (tryPlaceBridgeAt(points, idx, bridgeWidthX, bridgeLengthZ, maxWaterHalfWidth, true)) {
+                    placed = true;
+                    break;
+                }
+            }
+        }
+
+        if (!placed) {
+            System.out.println("[LabyrinthGenerator] WARNING: no valid bridge placement found with both ends on land");
+        }
+    }
+
+    private boolean tryPlaceBridgeAt(double[][] points, int midIdx, int bridgeWidthX, int bridgeLengthZ,
+                                     double maxWaterHalfWidth, boolean forceNarrowing) {
+        int step = 5;
+        int idx1 = Math.max(0, midIdx - step);
+        int idx2 = Math.min(points.length - 1, midIdx + step);
+        if (idx1 == idx2) return false;
+
+        double flowDx = points[idx2][0] - points[idx1][0];
+        double flowDz = points[idx2][1] - points[idx1][1];
+        double flowLen = Math.sqrt(flowDx * flowDx + flowDz * flowDz);
+        if (flowLen < 0.001) return false;
+
+        double flowUx = flowDx / flowLen;
+        double flowUz = flowDz / flowLen;
+
+        Rotation baseRot = (Math.abs(flowDx) > Math.abs(flowDz))
+                ? Rotation.CLOCKWISE_90
+                : Rotation.NONE;
+
+        Rotation bridgeRot = (baseRot == Rotation.NONE)
+                ? Rotation.CLOCKWISE_90
+                : Rotation.CLOCKWISE_180;
+
+        double cx = points[midIdx][0];
+        double cz = points[midIdx][1];
+
+        this.bridgeCenterX = cx;
+        this.bridgeCenterZ = cz;
+        this.bridgeFlowUx = flowUx;
+        this.bridgeFlowUz = flowUz;
+        this.bridgeNarrowingActive = forceNarrowing;
+        this.bridgeForcedWaterHalfWidth = maxWaterHalfWidth;
+        this.bridgeNarrowRadius = bridgeWidthX / 2.0;
+        this.bridgeNarrowBlend = Math.max(3.0, bridgeWidthX / 2.0);
+
+        double localWidthCenter = bridgeWidthX / 2.0;
+        double[] pointA = rotateXZ(localWidthCenter, 0, bridgeRot);
+        double[] pointB = rotateXZ(localWidthCenter, bridgeLengthZ - 1, bridgeRot);
+
+        double crossDx = pointB[0] - pointA[0];
+        double crossDz = pointB[1] - pointA[1];
+        double crossLen = Math.sqrt(crossDx * crossDx + crossDz * crossDz);
+        if (crossLen < 0.001) return false;
+
+        double ucx = crossDx / crossLen;
+        double ucz = crossDz / crossLen;
+
+        double halfSpan = (bridgeLengthZ - 1) / 2.0;
+        double worldAx = cx - ucx * halfSpan;
+        double worldAz = cz - ucz * halfSpan;
+        double worldBx = cx + ucx * halfSpan;
+        double worldBz = cz + ucz * halfSpan;
+
+        int pointAX = (int) Math.round(worldAx);
+        int pointAZ = (int) Math.round(worldAz);
+        int pointBX = (int) Math.round(worldBx);
+        int pointBZ = (int) Math.round(worldBz);
+
+        if (isInRiverZone(pointAX, pointAZ) || isInRiverZone(pointBX, pointBZ)) {
+            return false;
+        }
+
+        int originX = (int) Math.round(worldAx - pointA[0]);
+        int originZ = (int) Math.round(worldAz - pointA[1]);
+        int originY = FLOOR_Y;
+
+        System.out.println("[LabyrinthGenerator] Bridge placed at "
+                + (forceNarrowing ? "forced-narrowed" : "natural narrow")
+                + " origin=" + originX + "," + originY + "," + originZ
+                + " rot=" + bridgeRot
+                + " size=" + bridgeWidthX + "x" + bridgeLengthZ
+                + " endA=" + pointAX + "," + pointAZ
+                + " endB=" + pointBX + "," + pointBZ);
+
+        StructureGenerator.updateBridgePosition(originX, originY, originZ, bridgeRot);
+        return true;
+    }
+
+    private double[] rotateXZ(double x, double z, Rotation rotation) {
+        switch (rotation) {
+            case CLOCKWISE_90:
+                return new double[]{-z, x};
+            case CLOCKWISE_180:
+                return new double[]{-x, -z};
+            case COUNTERCLOCKWISE_90:
+                return new double[]{z, -x};
+            default:
+                return new double[]{x, z};
+        }
+    }
+
+    private double segmentDeviation(double[][] points, int startIdx, int windowSize) {
+        int endIdx = startIdx + windowSize - 1;
+        if (startIdx < 0 || endIdx >= points.length) return Double.MAX_VALUE;
+
+        double dirX = points[endIdx][0] - points[startIdx][0];
+        double dirZ = points[endIdx][1] - points[startIdx][1];
+        double dirLen = Math.sqrt(dirX * dirX + dirZ * dirZ);
+        if (dirLen < 0.001) return Double.MAX_VALUE;
+
+        double ndx = dirX / dirLen;
+        double ndz = dirZ / dirLen;
+
+        double totalDeviation = 0;
+        for (int j = startIdx + 1; j < endIdx; j++) {
+            double vx = points[j][0] - points[startIdx][0];
+            double vz = points[j][1] - points[startIdx][1];
+            double proj = vx * ndx + vz * ndz;
+            double closestX = points[startIdx][0] + ndx * proj;
+            double closestZ = points[startIdx][1] + ndz * proj;
+            double devX = points[j][0] - closestX;
+            double devZ = points[j][1] - closestZ;
+            totalDeviation += Math.sqrt(devX * devX + devZ * devZ);
+        }
+
+        return totalDeviation;
+    }
+
+    private List<Integer> findNaturalNarrowRiverPoints(double[][] points, int margin, int windowSize) {
+        List<Integer> result = new ArrayList<>();
+        int half = windowSize / 2;
+
+        for (int i = margin; i < points.length - margin; i++) {
+            int px = (int) Math.round(points[i][0]);
+            int pz = (int) Math.round(points[i][1]);
+
+            double waterWidth = computeBaseWaterHalfWidth(px, pz) * 2.0;
+            if (waterWidth < BRIDGE_MIN_WIDTH || waterWidth > BRIDGE_MAX_WIDTH) continue;
+
+            double deviation = segmentDeviation(points, i - half, windowSize);
+            if (deviation <= BRIDGE_MAX_CURVE_DEVIATION) {
+                result.add(i);
+            }
+        }
+
+        return result;
+    }
+
+    private List<Integer> findStraightestSegments(double[][] points, int windowSize, int margin) {
+        List<int[]> candidates = new ArrayList<>();
+
+        for (int i = margin; i <= points.length - windowSize - margin; i++) {
+            double deviation = segmentDeviation(points, i, windowSize);
+            if (deviation < Double.MAX_VALUE) {
+                candidates.add(new int[]{i + windowSize / 2, (int) Math.round(deviation * 1000.0)});
+            }
+        }
+
+        candidates.sort(Comparator.comparingInt(c -> c[1]));
+
+        List<Integer> result = new ArrayList<>();
+        for (int[] c : candidates) result.add(c[0]);
+        return result;
+    }
+
+    private double getRiverTotalHalfWidth(int x, int z) {
+        double waterHalfWidth = computeBaseWaterHalfWidth(x, z);
+        waterHalfWidth = applyBridgeNarrowing(x, z, waterHalfWidth);
 
         double bankHalfWidth = 3.0;
         return waterHalfWidth + bankHalfWidth;
@@ -2294,7 +2532,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
 
                             ConfiguredFeature<?, ?> feature = level.registryAccess()
                                     .registryOrThrow(Registries.CONFIGURED_FEATURE)
-                                    .get(ResourceLocation.of(featureName, ':'));
+                                    .get(ResourceLocation.parse(featureName));
 
                             if (feature != null) {
                                 feature.place(level, this, random, pos);
@@ -2441,6 +2679,14 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
     }
     private volatile double[][] riverCurvePoints = null;
     private volatile long riverSeedUsed = Long.MIN_VALUE;
+
+    private static final double BRIDGE_MIN_WIDTH = 18.0;
+    private static final double BRIDGE_MAX_WIDTH = 10.0;
+    private static final double BRIDGE_BANK_HALF_WIDTH = 3.0;
+    private static final double BRIDGE_LAND_MARGIN = 2.0;
+    private static final double BRIDGE_MAX_CURVE_DEVIATION = 1.5;
+
+
     private void ensureRiverCurve() {
         long currentSeed = getEffectiveRiverSeed();
 
@@ -2762,7 +3008,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         // Применяется только если рядом нет структуры глейда.
         if (maxBlend <= 0.0) {
             double dist0 = Math.sqrt((double) x * x + (double) z * z);
-            int liftBlendRadius = 20; // ★ РАДИУС СГЛАЖИВАНИЯ ЛИФТА
+            int liftBlendRadius = 30; // ★ РАДИУС СГЛАЖИВАНИЯ ЛИФТА
 
             if (dist0 < liftBlendRadius) {
                 double blend0 = 1.0 - (dist0 / liftBlendRadius);
@@ -2878,45 +3124,43 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             this.seedInitialized = true;
         }
     }
-    /**
-     * ★ ИНИЦИАЛИЗАЦИЯ МОСТА ★
-     * Находит самый прямой участок реки и размещает мост перпендикулярно течению.
-     */
-    private void initializeBridge() {
-        ensureRiverCurve();
-        double[][] points = riverCurvePoints;
-        if (points == null || points.length < 20) return;
 
-        // === 1. ПОИСК САМОГО ПРЯМОГО УЧАСТКА РЕКИ ===
-        int windowSize = 15; // Сколько точек анализируем (чем больше, тем строже критерий)
-        int margin = 5;      // Отступ от краёв кривой (чтобы мост не упирался в стены глейда)
+    // ★ ПОИСК ТОЧКИ, ГДЕ РЕКА УЖЕ ИМЕЕТ ШИРИНУ 10-13 БЛОКОВ ★
+    private int findNaturalNarrowRiverPoint(double[][] points, int margin) {
+        for (int i = margin; i < points.length - margin; i++) {
+            int px = (int) Math.round(points[i][0]);
+            int pz = (int) Math.round(points[i][1]);
 
+            double waterWidth = computeBaseWaterHalfWidth(px, pz) * 2.0;
+
+            if (waterWidth >= BRIDGE_MIN_WIDTH && waterWidth <= BRIDGE_MAX_WIDTH) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    // ★ ПОИСК САМОГО ПРЯМОГО УЧАСТКА РЕКИ (вынесено из старого initializeBridge) ★
+    private int findStraightestSegment(double[][] points, int windowSize, int margin) {
         double bestStraightness = Double.MAX_VALUE;
         int bestCenterIdx = points.length / 2; // Фоллбэк — середина
 
         for (int i = margin; i <= points.length - windowSize - margin; i++) {
-            // Вектор направления участка (от первой до последней точки окна)
             double dirX = points[i + windowSize - 1][0] - points[i][0];
             double dirZ = points[i + windowSize - 1][1] - points[i][1];
             double dirLen = Math.sqrt(dirX * dirX + dirZ * dirZ);
             if (dirLen < 0.001) continue;
 
-            // Нормализуем направление
             double ndx = dirX / dirLen;
             double ndz = dirZ / dirLen;
 
-            // Считаем сумму отклонений всех промежуточных точек от прямой
             double totalDeviation = 0;
             for (int j = i + 1; j < i + windowSize - 1; j++) {
-                // Вектор от начала окна до текущей точки
                 double vx = points[j][0] - points[i][0];
                 double vz = points[j][1] - points[i][1];
-                // Проекция на направление (расстояние вдоль прямой)
                 double proj = vx * ndx + vz * ndz;
-                // Точка на прямой, ближайшая к points[j]
                 double closestX = points[i][0] + ndx * proj;
                 double closestZ = points[i][1] + ndz * proj;
-                // Перпендикулярное расстояние
                 double devX = points[j][0] - closestX;
                 double devZ = points[j][1] - closestZ;
                 totalDeviation += Math.sqrt(devX * devX + devZ * devZ);
@@ -2928,40 +3172,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             }
         }
 
-        // === 2. ВЫЧИСЛЕНИЕ ПОЗИЦИИ И ПОВОРОТА МОСТА ===
-        int midIdx = bestCenterIdx;
-        int step = 5;
-        int idx1 = Math.max(0, midIdx - step);
-        int idx2 = Math.min(points.length - 1, midIdx + step);
-
-        // Направление реки в самом прямом участке
-        double dx = points[idx2][0] - points[idx1][0];
-        double dz = points[idx2][1] - points[idx1][1];
-
-        // Базовый поворот: перпендикулярно реке
-        Rotation baseRot = (Math.abs(dx) > Math.abs(dz))
-                ? Rotation.CLOCKWISE_90
-                : Rotation.NONE;
-
-        // Компенсация ориентации NBT-модели (+90°)
-        Rotation bridgeRot = (baseRot == Rotation.NONE)
-                ? Rotation.CLOCKWISE_90
-                : Rotation.CLOCKWISE_180;
-
-        // Координаты центра самого прямого участка
-        double bx = points[midIdx][0];
-        double bz = points[midIdx][1];
-
-        int blockX = (int) Math.round(bx);
-        int blockZ = (int) Math.round(bz);
-        int blockY = FLOOR_Y - 1; // Опускаем на 1 блок ниже
-
-        System.out.println("[LabyrinthGenerator] Bridge placed at straightest river segment "
-                + "(deviation=" + String.format("%.2f", bestStraightness) + ")"
-                + " pos=" + blockX + "," + blockY + "," + blockZ
-                + " rot=" + bridgeRot);
-
-        StructureGenerator.updateBridgePosition(blockX, blockY, blockZ, bridgeRot);
+        return bestCenterIdx;
     }
     private void initializeGladeStructures() {
         StructureGenerator.clearGladeStructures();
@@ -2973,21 +3184,16 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
 
         Random rand = new Random(this.seed ^ 0xDEADBEEFCAFEL);
 
-        int fermaRadius = StructureGenerator.getGladeStructurePlacementRadius("ferma", 12);
+        int fermaRadius   = StructureGenerator.getGladeStructurePlacementRadius("ferma", 12);
         int banfairRadius = StructureGenerator.getGladeStructurePlacementRadius("banfair", 12);
-        int lagerRadius = StructureGenerator.getGladeStructurePlacementRadius("lager", 10);
-        int towerRadius = StructureGenerator.getGladeStructurePlacementRadius("tower", 7);
+        int lagerRadius   = StructureGenerator.getGladeStructurePlacementRadius("lager", 10);
+        int towerRadius   = StructureGenerator.getGladeStructurePlacementRadius("tower", 7);
 
-        // Разводим структуры по секторам:
-        // 0 = северо-восток
-        // 1 = юго-восток
-        // 2 = юго-запад
-        // 3 = северо-запад
-        placeGladeStructure("ferma", rand, 0, fermaRadius, fermaRadius + 12, 4);
-        placeGladeStructure("banfair", rand, 1, banfairRadius, banfairRadius + 12, 4);
-        placeGladeStructure("lager", rand, 2, lagerRadius, lagerRadius + 10, 4);
-
-        placeTowerStructure(rand, towerRadius);
+        // ★ ГАРАНТИРОВАННОЕ размещение — все 4 структуры будут поставлены ★
+        placeGladeStructureGuaranteed("ferma",   rand, 0, fermaRadius,   fermaRadius + 12, 4);
+        placeGladeStructureGuaranteed("banfair", rand, 1, banfairRadius, banfairRadius + 12, 4);
+        placeGladeStructureGuaranteed("lager",   rand, 2, lagerRadius,   lagerRadius + 10, 4);
+        placeTowerStructureGuaranteed(rand, towerRadius);
     }
 
     /**
@@ -3075,43 +3281,104 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         return Math.max(22, GLADE_RADIUS / 4);
     }
 
-    private void placeGladeStructure(String name, Random rand, int quadrant, int fallbackRadius, int fallbackBlendRadius, int margin) {
+    /**
+     * ★ ГАРАНТИРОВАННОЕ размещение структуры глейда ★
+     * Каскад: обычный поиск → relaxed → другие квадранты → emergency → форс.
+     * Структура будет поставлена ВСЕГДА.
+     */
+    private void placeGladeStructureGuaranteed(
+            String name,
+            Random rand,
+            int quadrant,
+            int fallbackRadius,
+            int fallbackBlendRadius,
+            int margin
+    ) {
         Rotation rotation = Rotation.values()[rand.nextInt(Rotation.values().length)];
 
+        // Попытка 1: обычный поиск
         BlockPos pos = tryFindGladeStructurePosition(
-                name,
-                rand,
-                quadrant,
-                rotation,
-                fallbackRadius,
-                margin,
-                10
+                name, rand, quadrant, rotation, fallbackRadius, margin, 10
         );
 
+        // Попытка 2: relaxed (мягкие требования)
         if (pos == null) {
-            pos = new BlockPos(0, FLOOR_Y, 0);
+            pos = tryFindGladeStructurePositionRelaxed(
+                    name, rand, quadrant, rotation, fallbackRadius, margin
+            );
         }
 
-        StructureGenerator.addGladeStructure(name, pos, rotation, fallbackRadius, fallbackBlendRadius);
+        // Попытка 3: другие квадранты
+        if (pos == null) {
+            for (int q = 0; q < 4 && pos == null; q++) {
+                if (q == quadrant) continue;
+                pos = tryFindGladeStructurePositionRelaxed(
+                        name, rand, q, rotation, fallbackRadius, margin
+                );
+            }
+        }
+
+        // Попытка 4: emergency — спираль по всему глейду
+        if (pos == null) {
+            pos = findEmergencyGladePosition(name, rotation, fallbackRadius, margin);
+        }
+
+        // Попытка 5: жёсткий фоллбэк по квадранту
+        if (pos == null) {
+            pos = getForcedFallbackPosition(quadrant);
+            System.out.println("[LabyrinthChunkGenerator] FORCED fallback for '"
+                    + name + "' at " + pos);
+        }
+
+        StructureGenerator.addGladeStructure(
+                name, pos, rotation, fallbackRadius, fallbackBlendRadius
+        );
+
+        System.out.println("[LabyrinthChunkGenerator] Placed glade structure '" + name
+                + "' at " + pos + " rot=" + rotation);
     }
 
-    private void placeTowerStructure(Random rand, int fallbackRadius) {
+    private void placeTowerStructureGuaranteed(Random rand, int fallbackRadius) {
         int margin = 4;
         int minGap = 10;
 
         Rotation rotation = Rotation.values()[rand.nextInt(Rotation.values().length)];
 
-        BlockPos pos = findBestTowerPosition("tower", rotation, fallbackRadius, margin, minGap);
+        // Попытка 1: обычный поиск (ищем на холмах)
+        BlockPos pos = findBestTowerPosition(
+                "tower", rotation, fallbackRadius, margin, minGap
+        );
 
+        // Попытка 2: обычный поиск в квадранте 3
         if (pos == null) {
-            pos = tryFindGladeStructurePosition("tower", rand, 3, rotation, fallbackRadius, margin, minGap);
+            pos = tryFindGladeStructurePosition(
+                    "tower", rand, 3, rotation, fallbackRadius, margin, minGap
+            );
         }
 
+        // Попытка 3: relaxed
         if (pos == null) {
-            pos = new BlockPos(0, FLOOR_Y, 0);
+            pos = tryFindGladeStructurePositionRelaxed(
+                    "tower", rand, 3, rotation, fallbackRadius, margin
+            );
         }
 
-        StructureGenerator.addGladeStructure("tower", pos, rotation, fallbackRadius, fallbackRadius + 12);
+        // Попытка 4: emergency
+        if (pos == null) {
+            pos = findEmergencyGladePosition("tower", rotation, fallbackRadius, margin);
+        }
+
+        // Попытка 5: форс
+        if (pos == null) {
+            pos = getForcedFallbackPosition(3);
+            System.out.println("[LabyrinthChunkGenerator] FORCED fallback for tower at " + pos);
+        }
+
+        StructureGenerator.addGladeStructure(
+                "tower", pos, rotation, fallbackRadius, fallbackRadius + 12
+        );
+
+        System.out.println("[LabyrinthChunkGenerator] Placed tower at " + pos + " rot=" + rotation);
     }
 
     private BlockPos tryFindGladeStructurePosition(
@@ -3156,7 +3423,13 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         return findFallbackGladePosition(name, rotation, fallbackRadius, margin, minGap);
     }
 
-    private BlockPos findFallbackGladePosition(String name, Rotation rotation, int fallbackRadius, int margin, int minGap) {
+    private BlockPos findFallbackGladePosition(
+            String name,
+            Rotation rotation,
+            int fallbackRadius,
+            int margin,
+            int minGap
+    ) {
         int minDist = getGladeStructureMinDist();
         int maxDist = GLADE_RADIUS - 5;
 
@@ -3167,55 +3440,27 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
                 int x = (int) Math.round(Math.cos(angle) * distance);
                 int z = (int) Math.round(Math.sin(angle) * distance);
 
-                if (isSafeForGladeStructure(name, x, z, rotation, fallbackRadius, margin, minGap)) {
-                    return new BlockPos(x, getPlacementTerrainHeight(x, z), z);
+                if (isSafeForGladeStructure(
+                        name,
+                        x,
+                        z,
+                        rotation,
+                        fallbackRadius,
+                        margin,
+                        minGap
+                )) {
+                    return new BlockPos(
+                            x,
+                            getPlacementTerrainHeight(x, z),
+                            z
+                    );
                 }
             }
         }
 
-        return new BlockPos(0, FLOOR_Y, 0);
+        return null;
     }
 
-    private boolean isSafeForGladeStructure(
-            String name,
-            int x,
-            int z,
-            Rotation rotation,
-            int fallbackRadius,
-            int margin,
-            int minGap
-    ) {
-        if (!quickStructureSafety(x, z, fallbackRadius, minGap)) {
-            return false;
-        }
-
-        int[] aabb = StructureGenerator.getFootprintAabb(
-                name,
-                new BlockPos(x, 0, z),
-                rotation,
-                fallbackRadius,
-                margin
-        );
-
-        int minDist = getGladeStructureMinDist();
-
-        // Проверяем не только центр, а реальное пятно застройки.
-        for (int sx = aabb[0]; sx <= aabb[1]; sx += 2) {
-            for (int sz = aabb[2]; sz <= aabb[3]; sz += 2) {
-                int sd = Math.max(Math.abs(sx), Math.abs(sz));
-
-                if (sd < minDist || sd > GLADE_RADIUS - 5) {
-                    return false;
-                }
-
-                if (isInRiverZone(sx, sz, margin)) {
-                    return false;
-                }
-            }
-        }
-
-        return true;
-    }
 
     private boolean quickStructureSafety(int x, int z, int radius, int minGap) {
         int dist = Math.max(Math.abs(x), Math.abs(z));
@@ -3324,87 +3569,38 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         return Math.max(getGladeStructureMinDist() + 1, GLADE_RADIUS - radius - 8);
     }
 
-    private BlockPos tryFindGladeStructurePosition(Random rand, int quadrant, int radius, int margin, int minGap) {
-        int minDist = getGladeStructureMinDist();
-        int maxDist = getGladeStructureMaxDist(radius);
-
-        int distanceRange = Math.max(1, maxDist - minDist);
-
-        double baseAngle = quadrant * Math.PI / 2.0 + Math.PI / 4.0;
-
-        // Сначала пробуем внутри назначенного сектора.
-        for (int attempt = 0; attempt < 220; attempt++) {
-            double angle = baseAngle + (rand.nextDouble() * 2.0 - 1.0) * (Math.PI / 4.0) * 0.8;
-            int distance = minDist + rand.nextInt(distanceRange);
-
-            int x = (int) Math.round(Math.cos(angle) * distance);
-            int z = (int) Math.round(Math.sin(angle) * distance);
-
-            if (isSafeForGladeStructure(x, z, radius, margin, minGap)) {
-                return new BlockPos(x, getPlacementTerrainHeight(x, z), z);
-            }
-        }
-
-        // Если в секторе не нашли, ищем по всему глейду.
-        for (int attempt = 0; attempt < 260; attempt++) {
-            double angle = rand.nextDouble() * Math.PI * 2.0;
-            int distance = minDist + rand.nextInt(distanceRange);
-
-            int x = (int) Math.round(Math.cos(angle) * distance);
-            int z = (int) Math.round(Math.sin(angle) * distance);
-
-            if (isSafeForGladeStructure(x, z, radius, margin, minGap)) {
-                return new BlockPos(x, getPlacementTerrainHeight(x, z), z);
-            }
-        }
-
-        return findFallbackGladePosition(radius, margin, minGap);
-    }
-
-    private BlockPos findFallbackGladePosition(int radius, int margin, int minGap) {
-        int minDist = getGladeStructureMinDist();
-        int maxDist = getGladeStructureMaxDist(radius);
-
-        for (int distance = maxDist; distance >= minDist; distance -= 4) {
-            for (int angleDeg = 0; angleDeg < 360; angleDeg += 15) {
-                double angle = Math.toRadians(angleDeg);
-
-                int x = (int) Math.round(Math.cos(angle) * distance);
-                int z = (int) Math.round(Math.sin(angle) * distance);
-
-                if (isSafeForGladeStructure(x, z, radius, margin, minGap)) {
-                    return new BlockPos(x, getPlacementTerrainHeight(x, z), z);
-                }
-            }
-        }
-
-        return new BlockPos(0, FLOOR_Y, 0);
-    }
-
-    private boolean isSafeForGladeStructure(int x, int z, int radius, int margin, int minGap) {
-        if (!quickStructureSafety(x, z, radius, minGap)) {
+    private boolean isSafeForGladeStructure(String name, int x, int z, Rotation rotation, int fallbackRadius, int margin, int minGap) {
+        if (!quickStructureSafety(x, z, fallbackRadius, minGap)) {
             return false;
         }
 
-        int checkRadius = radius + margin;
+        // ★ ГЛАВНАЯ ЗАЩИТА ОТ ПЕРЕСЕЧЕНИЯ С ДРУГИМИ СТРУКТУРАМИ ★
+        if (StructureGenerator.isStructurePlacementBlocked(
+                name,
+                new BlockPos(x, 0, z),
+                rotation,
+                fallbackRadius,
+                margin
+        )) {
+            return false;
+        }
 
-        // Проверяем пятно застройки и безопасный отступ вокруг неё.
-        // Шаг 2, чтобы не было слишком дорого при инициализации мира.
-        for (int dx = -checkRadius; dx <= checkRadius; dx += 2) {
-            for (int dz = -checkRadius; dz <= checkRadius; dz += 2) {
-                if (dx * dx + dz * dz > checkRadius * checkRadius) {
-                    continue;
-                }
+        int[] aabb = StructureGenerator.getFootprintAabb(
+                name,
+                new BlockPos(x, 0, z),
+                rotation,
+                fallbackRadius,
+                margin
+        );
 
-                int sx = x + dx;
-                int sz = z + dz;
+        int minDist = getGladeStructureMinDist();
 
-                int dist = Math.max(Math.abs(sx), Math.abs(sz));
+        // Проверяем всё фактическое пятно структуры.
+        for (int sx = aabb[0]; sx <= aabb[1]; sx += 2) {
+            for (int sz = aabb[2]; sz <= aabb[3]; sz += 2) {
+                int sd = Math.max(Math.abs(sx), Math.abs(sz));
 
-                int minDist = getGladeStructureMinDist();
-                int maxDist = GLADE_RADIUS - 5;
-
-                if (dist < minDist || dist > maxDist) {
+                if (sd < minDist || sd > GLADE_RADIUS - 5) {
                     return false;
                 }
 
@@ -3416,81 +3612,146 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
 
         return true;
     }
+    /**
+     * ★ RELAXED-ПОИСК: расширенный квадрант, шире диапазон, мягче проверки ★
+     */
+    private BlockPos tryFindGladeStructurePositionRelaxed(
+            String name,
+            Random rand,
+            int quadrant,
+            Rotation rotation,
+            int fallbackRadius,
+            int margin
+    ) {
+        int minDist = 14;                 // было max(22, R/4)
+        int maxDist = GLADE_RADIUS - 3;   // было R - 5
+        int distanceRange = Math.max(1, maxDist - minDist);
+        double baseAngle = quadrant * Math.PI / 2.0 + Math.PI / 4.0;
 
+        // Фаза 1: расширенный целевой квадрант (±90°)
+        for (int attempt = 0; attempt < 400; attempt++) {
+            double angle = baseAngle + (rand.nextDouble() * 2.0 - 1.0) * (Math.PI / 2.0);
+            int distance = minDist + rand.nextInt(distanceRange);
 
-    private BlockPos findBestTowerPosition(int radius, int margin, int minGap) {
-        int minDist = getGladeStructureMinDist();
-        int maxDist = getGladeStructureMaxDist(radius);
+            int x = (int) Math.round(Math.cos(angle) * distance);
+            int z = (int) Math.round(Math.sin(angle) * distance);
 
-        int hillMin = Math.max(minDist, Math.min(28, maxDist));
-        int hillMax = Math.max(hillMin, Math.min(maxDist, 55));
-
-        BlockPos best = null;
-        int bestY = Integer.MIN_VALUE;
-
-        // Сначала ищем именно на холмах.
-        for (int x = -GLADE_RADIUS; x <= GLADE_RADIUS; x += 4) {
-            for (int z = -GLADE_RADIUS; z <= GLADE_RADIUS; z += 4) {
-                int dist = Math.max(Math.abs(x), Math.abs(z));
-
-                if (dist < hillMin || dist > hillMax) {
-                    continue;
-                }
-
-                if (!quickStructureSafety(x, z, radius, minGap)) {
-                    continue;
-                }
-
-                int y = getPlacementTerrainHeight(x, z);
-
-                if (y <= bestY) {
-                    continue;
-                }
-
-                if (!isSafeForGladeStructure(x, z, radius, margin, minGap)) {
-                    continue;
-                }
-
-                bestY = y;
-                best = new BlockPos(x, y, z);
+            if (isSafeRelaxed(name, x, z, rotation, fallbackRadius, margin, 4)) {
+                return new BlockPos(x, getPlacementTerrainHeight(x, z), z);
             }
         }
 
-        if (best != null) {
-            return best;
-        }
+        // Фаза 2: любой угол
+        for (int attempt = 0; attempt < 400; attempt++) {
+            double angle = rand.nextDouble() * Math.PI * 2.0;
+            int distance = minDist + rand.nextInt(distanceRange);
 
-        // Если холмов нет — ищем просто безопасную высокую точку.
-        for (int x = -GLADE_RADIUS; x <= GLADE_RADIUS; x += 5) {
-            for (int z = -GLADE_RADIUS; z <= GLADE_RADIUS; z += 5) {
-                int dist = Math.max(Math.abs(x), Math.abs(z));
+            int x = (int) Math.round(Math.cos(angle) * distance);
+            int z = (int) Math.round(Math.sin(angle) * distance);
 
-                if (dist < minDist || dist > maxDist) {
-                    continue;
-                }
-
-                if (!quickStructureSafety(x, z, radius, minGap)) {
-                    continue;
-                }
-
-                int y = getPlacementTerrainHeight(x, z);
-
-                if (y <= bestY) {
-                    continue;
-                }
-
-                if (!isSafeForGladeStructure(x, z, radius, margin, minGap)) {
-                    continue;
-                }
-
-                bestY = y;
-                best = new BlockPos(x, y, z);
+            if (isSafeRelaxed(name, x, z, rotation, fallbackRadius, margin, 4)) {
+                return new BlockPos(x, getPlacementTerrainHeight(x, z), z);
             }
         }
 
-        return best;
+        return null;
     }
 
+    /**
+     * ★ МЯГКАЯ проверка безопасности ★
+     * Не проверяем passageBlend и близость к реке (margin=1).
+     */
+    private boolean isSafeRelaxed(
+            String name,
+            int x,
+            int z,
+            Rotation rotation,
+            int fallbackRadius,
+            int margin,
+            int minGap
+    ) {
+        int dist = Math.max(Math.abs(x), Math.abs(z));
+        if (dist > GLADE_RADIUS - 3) return false;
+        if (dist < 12) return false;
 
+        // Не пересекаемся с другими структурами (это критично!)
+        if (StructureGenerator.isTooCloseToGladeStructures(
+                x, z, fallbackRadius, minGap)) {
+            return false;
+        }
+        if (StructureGenerator.isStructurePlacementBlocked(
+                name, new BlockPos(x, 0, z), rotation, fallbackRadius, margin)) {
+            return false;
+        }
 
+        // Слабый запрет на реку — только самая сердцевина
+        if (isInRiverZone(x, z, 1.0)) return false;
+
+        return true;
+    }
+
+    /**
+     * ★ EMERGENCY: спираль по всему глейду с минимальными требованиями ★
+     * Требование только одно: не пересекаться с уже поставленными структурами.
+     */
+    private BlockPos findEmergencyGladePosition(
+            String name,
+            Rotation rotation,
+            int fallbackRadius,
+            int margin
+    ) {
+        int minDist = 14;
+        int maxDist = GLADE_RADIUS - 3;
+
+        // Сначала пробуем с защитой от пересечений
+        for (int distance = maxDist; distance >= minDist; distance -= 2) {
+            for (int angleDeg = 0; angleDeg < 360; angleDeg += 5) {
+                double angle = Math.toRadians(angleDeg);
+                int x = (int) Math.round(Math.cos(angle) * distance);
+                int z = (int) Math.round(Math.sin(angle) * distance);
+
+                if (StructureGenerator.isStructurePlacementBlocked(
+                        name, new BlockPos(x, 0, z), rotation, fallbackRadius, margin)) {
+                    continue;
+                }
+                if (StructureGenerator.isTooCloseToGladeStructures(
+                        x, z, fallbackRadius, 2)) {
+                    continue;
+                }
+
+                System.out.println("[LabyrinthChunkGenerator] Emergency placement '"
+                        + name + "' at " + x + "," + z);
+                return new BlockPos(x, getPlacementTerrainHeight(x, z), z);
+            }
+        }
+
+        // Самый крайний случай: игнорируем пересечения (лучше поставить поверх, чем не поставить)
+        for (int distance = maxDist; distance >= minDist; distance -= 4) {
+            for (int angleDeg = 0; angleDeg < 360; angleDeg += 15) {
+                double angle = Math.toRadians(angleDeg);
+                int x = (int) Math.round(Math.cos(angle) * distance);
+                int z = (int) Math.round(Math.sin(angle) * distance);
+
+                System.out.println("[LabyrinthChunkGenerator] EMERGENCY (overlap-allowed) '"
+                        + name + "' at " + x + "," + z);
+                return new BlockPos(x, getPlacementTerrainHeight(x, z), z);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * ★ Форс-позиция по квадранту (если вообще ничего не сработало) ★
+     */
+    private BlockPos getForcedFallbackPosition(int quadrant) {
+        int r = Math.max(20, GLADE_RADIUS / 2);
+
+        switch (quadrant) {
+            case 0:  return new BlockPos( r, FLOOR_Y, -r);  // СВ
+            case 1:  return new BlockPos( r, FLOOR_Y,  r);  // ЮВ
+            case 2:  return new BlockPos(-r, FLOOR_Y,  r);  // ЮЗ
+            default: return new BlockPos(-r, FLOOR_Y, -r);  // СЗ (tower)
+        }
+    }
 }
