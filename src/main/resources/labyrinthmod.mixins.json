@@ -38,7 +38,8 @@
     "MixinShaderPackScreenPaper",
     "ResultSlotMixin",
     "CraftingMenuMixin",
-    "CreativeModeInventoryScreenMixin"
+    "CreativeModeInventoryScreenMixin",
+    "create.ContraptionLimitMixin"
 
   ],
   "injectors": {

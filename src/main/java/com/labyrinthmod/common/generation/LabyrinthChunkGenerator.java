@@ -28,6 +28,7 @@ import net.minecraft.world.level.levelgen.RandomState;
 import net.minecraft.world.level.levelgen.blending.Blender;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 import org.jetbrains.annotations.NotNull;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -110,6 +111,9 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
     private final Set<Long> gladeExits = new HashSet<>();
     private final Set<Long> passages = new HashSet<>(); // ★ ВСЕ ПРОХОДЫ ★
     private final Set<Long> passageZones = new HashSet<>();// ★ РАСШИРЕННЫЕ ЗОНЫ ★
+    /** Local, axis-aligned wall moves which define variant B. */
+    private final List<ShiftDefinition> plannedShifts = new ArrayList<>();
+    private static final int MAX_SHIFT_ZONES = 12;
     private volatile ImprovedNoise terrainNoise;
     private volatile ImprovedNoise featureNoise;
     private final LabyrinthConfig config;
@@ -161,6 +165,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         mazeCorridors.clear();
         mazeWalls.clear();
         gladeExits.clear();
+        plannedShifts.clear();
 
         Random rand = new Random(seed);
 
@@ -305,6 +310,8 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             }
         }
 
+        planLocalVariantBShifts(grid, isValid, CENTER);
+
         for (int i = 0; i < GRID_SIZE; i++) {
             for (int j = 0; j < GRID_SIZE; j++) {
                 if (!isValid[i][j]) continue;
@@ -331,6 +338,101 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         for (long exitHash : gladeExits) {
             mazeWalls.remove(exitHash);
         }
+    }
+
+    /**
+     * Builds B by exchanging opposite parallel edges of a 2x2 room square.
+     * A square with three corridors and one wall stays a tree fragment after
+     * this exchange, so each variant remains a complete connected maze.
+     */
+    private void planLocalVariantBShifts(boolean[][] grid, boolean[][] isValid, int center) {
+        int size = grid.length;
+        boolean[][] variantB = new boolean[size][size];
+        boolean[][] variantA = new boolean[size][size];
+        for (int i = 0; i < size; i++) {
+            variantB[i] = Arrays.copyOf(grid[i], size);
+            variantA[i] = Arrays.copyOf(grid[i], size);
+        }
+
+        Set<Integer> usedEdges = new HashSet<>();
+        Random shiftRandom = new Random(seed ^ 0x6A09E667F3BCC909L);
+
+        for (int shift = 0; shift < MAX_SHIFT_ZONES; shift++) {
+            List<int[]> squares = new ArrayList<>();
+            for (int i = 0; i + 2 < size; i += 2) {
+                for (int j = 0; j + 2 < size; j += 2) {
+                    if (isValid[i][j] && isValid[i + 2][j]
+                            && isValid[i][j + 2] && isValid[i + 2][j + 2]) {
+                        squares.add(new int[]{i, j});
+                    }
+                }
+            }
+            Collections.shuffle(squares, shiftRandom);
+
+            boolean changed = false;
+            for (int[] square : squares) {
+                int i = square[0];
+                int j = square[1];
+                int[][] squareEdges = {{i + 1, j}, {i + 1, j + 2}, {i, j + 1}, {i + 2, j + 1}};
+                int closedCount = 0;
+                int closed = -1;
+                for (int edge = 0; edge < squareEdges.length; edge++) {
+                    int[] p = squareEdges[edge];
+                    if (variantB[p[0]][p[1]]) {
+                        closedCount++;
+                        closed = edge;
+                    }
+                }
+                if (closedCount != 1) continue;
+
+                int target = switch (closed) {
+                    case 0 -> 1;
+                    case 1 -> 0;
+                    case 2 -> 3;
+                    default -> 2;
+                };
+                int[] sourcePos = squareEdges[closed];
+                int[] targetPos = squareEdges[target];
+                int sourceKey = sourcePos[0] * size + sourcePos[1];
+                int targetKey = targetPos[0] * size + targetPos[1];
+                if (usedEdges.contains(sourceKey) || usedEdges.contains(targetKey)
+                        || !variantA[sourcePos[0]][sourcePos[1]]
+                        || variantA[targetPos[0]][targetPos[1]]) continue;
+
+                variantB[sourcePos[0]][sourcePos[1]] = false;
+                variantB[targetPos[0]][targetPos[1]] = true;
+                usedEdges.add(sourceKey);
+                usedEdges.add(targetKey);
+
+                int sourceX = (sourcePos[0] - center) * 5;
+                int sourceZ = (sourcePos[1] - center) * 5;
+                plannedShifts.add(new ShiftDefinition(sourceX, sourceZ,
+                        (targetPos[0] - sourcePos[0]) * 5,
+                        (targetPos[1] - sourcePos[1]) * 5));
+                changed = true;
+                break;
+            }
+            if (!changed) break;
+        }
+    }
+
+    /** Creates the persistent source zones after variant A has been generated. */
+    public List<com.labyrinthmod.common.data.LabyrinthShiftZone> createShiftZones() {
+        ensureGenerated();
+        List<com.labyrinthmod.common.data.LabyrinthShiftZone> zones = new ArrayList<>();
+        for (int index = 0; index < plannedShifts.size(); index++) {
+            ShiftDefinition shift = plannedShifts.get(index);
+            UUID id = UUID.nameUUIDFromBytes(("labyrinth-shift:" + seed + ":" + index + ":"
+                    + shift.sourceX + ":" + shift.sourceZ).getBytes(StandardCharsets.UTF_8));
+            BlockPos min = new BlockPos(shift.sourceX, FLOOR_Y + 1, shift.sourceZ);
+            BlockPos max = new BlockPos(shift.sourceX + 4, FLOOR_Y + MAZE_HEIGHT, shift.sourceZ + 4);
+            zones.add(new com.labyrinthmod.common.data.LabyrinthShiftZone(
+                    id, min, max, shift.offsetX, 0, shift.offsetZ));
+        }
+        return zones;
+    }
+
+    private record ShiftDefinition(int sourceX, int sourceZ, int offsetX, int offsetZ) {
     }
 
     // ===== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ДЛЯ КРУСКАЛА =====
