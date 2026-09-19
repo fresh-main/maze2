@@ -1,5 +1,6 @@
 package com.labyrinthmod.common.contraption;
 
+import com.labyrinthmod.LabyrinthMod;
 import com.simibubi.create.api.contraption.ContraptionType;
 import com.simibubi.create.api.registry.CreateBuiltInRegistries;
 import com.simibubi.create.content.contraptions.AssemblyException;
@@ -13,17 +14,33 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
+import net.minecraftforge.registries.RegisterEvent;
 import org.apache.commons.lang3.tuple.Pair;
 
 public class LabyrinthContraption extends Contraption {
 
-    public static final Holder.Reference<ContraptionType> TYPE = Registry.registerForHolder(
-            CreateBuiltInRegistries.CONTRAPTION_TYPE,
-            new ResourceLocation("labyrinthmod", "labyrinth_shift"),
-            new ContraptionType(LabyrinthContraption::new)
-    );
+    // ★ ИСПРАВЛЕНИЕ: регистрация через RegisterEvent, а не статический инициализатор.
+    // Раньше было: public static final Holder.Reference<ContraptionType> TYPE = Registry.registerForHolder(...)
+    // Это вызывало "Registry is already frozen" при первом обращении к классу после загрузки мира.
+    public static Holder.Reference<ContraptionType> TYPE;
+
+    /**
+     * Вызывается из LabyrinthMod.registerChunkGenerator() во время RegisterEvent.
+     * Регистрирует тип контрапции ДО заморозки реестров.
+     */
+    public static void register(RegisterEvent event) {
+        if (event.getRegistryKey().equals(CreateBuiltInRegistries.CONTRAPTION_TYPE)) {
+            TYPE = Registry.registerForHolder(
+                    CreateBuiltInRegistries.CONTRAPTION_TYPE,
+                    new ResourceLocation("labyrinthmod", "labyrinth_shift"),
+                    new ContraptionType(LabyrinthContraption::new)
+            );
+            LabyrinthMod.LOGGER.info("[LabyrinthContraption] Registered contraption type");
+        }
+    }
 
     public static void init() {
+        // Пустой метод — можно использовать для форсирования загрузки класса
     }
 
     public void captureArea(Level world, BlockPos min, BlockPos max) {

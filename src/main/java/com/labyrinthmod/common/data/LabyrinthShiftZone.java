@@ -17,11 +17,10 @@ public class LabyrinthShiftZone {
     public final int offsetZ;
 
     public boolean isVariantB;
-
-    // НОВОЕ ПОЛЕ: UUID сущности-контрапции, когда она будет создана
     public UUID contraptionEntityId;
 
-    public LabyrinthShiftZone(UUID id, BlockPos minPos, BlockPos maxPos, int offsetX, int offsetY, int offsetZ) {
+    public LabyrinthShiftZone(UUID id, BlockPos minPos, BlockPos maxPos,
+                              int offsetX, int offsetY, int offsetZ) {
         this.id = id;
         this.minPos = minPos;
         this.maxPos = maxPos;
@@ -64,5 +63,26 @@ public class LabyrinthShiftZone {
 
     public void toggleState() {
         this.isVariantB = !this.isVariantB;
+    }
+
+    /**
+     * Проверка валидности смещения:
+     * - offsetY == 0
+     * - ровно один из offsetX, offsetZ ненулевой
+     */
+    public boolean isValidOffset() {
+        if (offsetY != 0) return false;
+        return (offsetX != 0) ^ (offsetZ != 0); // XOR: ровно один ненулевой
+    }
+
+    /**
+     * Возвращает направление сдвига для логирования.
+     */
+    public String getDirectionName() {
+        if (offsetX > 0) return "+X";
+        if (offsetX < 0) return "-X";
+        if (offsetZ > 0) return "+Z";
+        if (offsetZ < 0) return "-Z";
+        return "NONE";
     }
 }

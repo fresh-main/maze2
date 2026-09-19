@@ -7,6 +7,7 @@ import com.labyrinthmod.common.capability.PossessionData;
 import com.labyrinthmod.common.capability.PossessionProvider;
 import com.labyrinthmod.common.command.*;
 import com.labyrinthmod.common.config.ModConfig;
+import com.labyrinthmod.common.contraption.LabyrinthContraption;
 import com.labyrinthmod.common.entity.GriverEntity;
 import com.labyrinthmod.common.entity.GriverEntityType;
 import com.labyrinthmod.common.event.*;
@@ -232,7 +233,7 @@ public class LabyrinthMod {
     }
 
     private void registerChunkGenerator(RegisterEvent event) {
-
+        LabyrinthContraption.register(event);
         if (event.getRegistryKey().equals(Registries.BIOME_SOURCE)) {
             event.register(
                     Registries.BIOME_SOURCE,

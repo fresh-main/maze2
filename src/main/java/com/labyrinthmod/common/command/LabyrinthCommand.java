@@ -1,14 +1,20 @@
 package com.labyrinthmod.common.command;
 
+import com.labyrinthmod.LabyrinthMod;
 import com.labyrinthmod.common.config.ModConfig;
+import com.labyrinthmod.common.contraption.LabyrinthAssembler;
+import com.labyrinthmod.common.data.LabyrinthShiftZone;
+import com.labyrinthmod.common.data.LabyrinthZoneSavedData;
 import com.labyrinthmod.common.event.ConfigSyncHandler;
+import com.labyrinthmod.common.event.LabyrinthShiftAssemblyHandler;
+import com.labyrinthmod.common.generation.LabyrinthChunkGenerator;
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.Style;
-import net.minecraft.ChatFormatting;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.chunk.ChunkGenerator;
 
 public class LabyrinthCommand {
 
@@ -21,77 +27,195 @@ public class LabyrinthCommand {
                         .requires(source -> source.hasPermission(2))
                         .executes(context -> reloadConfig(context.getSource()))
                 )
+                .then(Commands.literal("shift")
+                        .requires(source -> source.hasPermission(2))
+                        .executes(context -> shiftToggle(context.getSource()))
+                        .then(Commands.literal("toggle")
+                                .executes(context -> shiftToggle(context.getSource()))
+                        )
+                        .then(Commands.literal("status")
+                                .executes(context -> shiftStatus(context.getSource()))
+                        )
+                )
         );
+    }
+
+    /**
+     * Переключает все зоны между вариантами A и B.
+     * Работает только на сервере.
+     *
+     * ВАЖНО: если зона ещё не собрана в контрапцию (contraptionEntityId == null),
+     * мы сначала пытаемся собрать её на текущей физической позиции. Если чанки
+     * не загружены или блоков нет — зона считается skipped и её isVariantB
+     * НЕ переключается, чтобы флаг isVariantB не расходился с реальным
+     * физическим положением блоков в мире.
+     */
+    private static int shiftToggle(CommandSourceStack source) {
+        if (source.getServer() == null) {
+            source.sendFailure(Component.literal("§cКоманда доступна только на сервере!"));
+            return 0;
+        }
+
+        // Работаем только с оверворлдом (или текущим измерением, если это лабиринт)
+        ServerLevel level = source.getLevel();
+        ChunkGenerator generator = level.getChunkSource().getGenerator();
+        if (!(generator instanceof LabyrinthChunkGenerator)) {
+            // Пробуем оверворлд
+            level = source.getServer().overworld();
+            generator = level.getChunkSource().getGenerator();
+            if (!(generator instanceof LabyrinthChunkGenerator)) {
+                source.sendFailure(Component.literal(
+                        "§cЭто измерение не использует LabyrinthChunkGenerator!"));
+                return 0;
+            }
+        }
+
+        LabyrinthZoneSavedData data = LabyrinthZoneSavedData.get(level);
+        if (data.getAllZones().isEmpty()) {
+            source.sendFailure(Component.literal("§cНет зон сдвига в этом мире."));
+            return 0;
+        }
+
+        // Определяем направление переключения по состоянию первой зоны
+        boolean anyVariantB = false;
+        for (LabyrinthShiftZone zone : data.getAllZones().values()) {
+            if (zone.isVariantB) {
+                anyVariantB = true;
+                break;
+            }
+        }
+
+        boolean toVariantB = !anyVariantB; // Если все в A — переключаем в B
+        int moved = 0;
+        int skipped = 0;
+        int failed = 0;
+
+        for (LabyrinthShiftZone zone : data.getAllZones().values()) {
+            // Определяем индивидуальное направление для каждой зоны
+            boolean zoneToB = !zone.isVariantB;
+
+            if (zone.contraptionEntityId == null) {
+                // Контрапции нет — сначала пытаемся собрать её на текущей
+                // (физической) позиции, прежде чем считать зону перемещённой.
+                if (!LabyrinthShiftAssemblyHandler.isAreaLoaded(level, zone.minPos, zone.maxPos)) {
+                    skipped++;
+                    LabyrinthMod.LOGGER.debug(
+                            "[LabyrinthCommand] Zone {} chunks not loaded, skip", zone.id);
+                    continue;
+                }
+                if (!LabyrinthShiftAssemblyHandler.hasBlocksInArea(level, zone.minPos, zone.maxPos)) {
+                    skipped++;
+                    LabyrinthMod.LOGGER.debug(
+                            "[LabyrinthCommand] Zone {} no blocks at {}, skip",
+                            zone.id, zone.minPos);
+                    continue;
+                }
+                if (LabyrinthAssembler.assembleZone(level, zone) == null) {
+                    failed++;
+                    LabyrinthMod.LOGGER.warn(
+                            "[LabyrinthCommand] Failed to assemble zone {} before move", zone.id);
+                    continue;
+                }
+            }
+
+            // Контрапция существует (либо только что собрана) — перемещаем её
+            boolean success = LabyrinthAssembler.moveZone(level, zone, zoneToB);
+            if (success) {
+                zone.toggleState();
+                moved++;
+            } else {
+                failed++;
+                LabyrinthMod.LOGGER.warn(
+                        "[LabyrinthCommand] Failed to move zone {}", zone.id);
+            }
+        }
+
+        data.setDirty();
+
+        final int finalMoved = moved;
+        final int finalSkipped = skipped;
+        final int finalFailed = failed;
+        final String direction = anyVariantB ? "B → A" : "A → B";
+
+        source.sendSuccess(() -> Component.literal(
+                "§aСдвиг лабиринта: §e" + direction +
+                        " §a| Перемещено: §f" + finalMoved +
+                        " §7Пропущено: §f" + finalSkipped +
+                        " §cОшибок: §f" + finalFailed), true);
+
+        LabyrinthMod.LOGGER.info(
+                "[LabyrinthCommand] Labyrinth shift {} executed by {}. Moved: {}, Skipped: {}, Failed: {}",
+                direction, source.getTextName(), moved, skipped, failed);
+
+        return moved;
+    }
+
+    /**
+     * Показывает текущее состояние зон сдвига.
+     */
+    private static int shiftStatus(CommandSourceStack source) {
+        ServerLevel level = source.getLevel();
+        ChunkGenerator generator = level.getChunkSource().getGenerator();
+        if (!(generator instanceof LabyrinthChunkGenerator)) {
+            level = source.getServer().overworld();
+            generator = level.getChunkSource().getGenerator();
+            if (!(generator instanceof LabyrinthChunkGenerator)) {
+                source.sendFailure(Component.literal(
+                        "§cЭто измерение не использует LabyrinthChunkGenerator!"));
+                return 0;
+            }
+        }
+
+        LabyrinthZoneSavedData data = LabyrinthZoneSavedData.get(level);
+        int total = data.getAllZones().size();
+        int variantB = 0;
+        int assembled = 0;
+
+        for (LabyrinthShiftZone zone : data.getAllZones().values()) {
+            if (zone.isVariantB) variantB++;
+            if (zone.contraptionEntityId != null) assembled++;
+        }
+        final int fVariantB = variantB;
+        final int fAssembled = assembled;
+
+        source.sendSuccess(() -> Component.literal("§6=== Labyrinth Shift Status ==="), false);
+        source.sendSuccess(() -> Component.literal(
+                "§7Всего зон: §f" + total), false);
+        source.sendSuccess(() -> Component.literal(
+                "§7В варианте B: §f" + fVariantB + " §7/ в варианте A: §f" + (total - fVariantB)), false);
+        source.sendSuccess(() -> Component.literal(
+                "§7Собрано контрапций: §f" + fAssembled + " §7/ " + total), false);
+
+        return 1;
     }
 
     private static int showHelp(CommandSourceStack source) {
         source.sendSuccess(() -> Component.literal(""), false);
         source.sendSuccess(() -> Component.literal("§6§l=== LABYRINTH MOD COMMANDS ==="), false);
         source.sendSuccess(() -> Component.literal(""), false);
-
-        // Команды фракций
-        source.sendSuccess(() -> Component.literal("§e§l【Фракции】"), false);
-        source.sendSuccess(() -> Component.literal("§7/fraction set <игрок> <фракция> §8- §fВыдать фракцию игроку"), false);
-        source.sendSuccess(() -> Component.literal("§7/fraction get <игрок> §8- §fПоказать фракцию игрока"), false);
-        source.sendSuccess(() -> Component.literal("§7/fraction list §8- §fСписок всех фракций"), false);
-        source.sendSuccess(() -> Component.literal("§7/fraction reload §8- §fПерезагрузить конфиг"), false);
+        source.sendSuccess(() -> Component.literal("§e§l【Сдвиг стен】"), false);
+        source.sendSuccess(() -> Component.literal(
+                "§7/labyrinth shift §8- §fПереключить все стены A ↔ B"), false);
+        source.sendSuccess(() -> Component.literal(
+                "§7/labyrinth shift toggle §8- §fТо же самое"), false);
+        source.sendSuccess(() -> Component.literal(
+                "§7/labyrinth shift status §8- §fПоказать состояние зон"), false);
         source.sendSuccess(() -> Component.literal(""), false);
-
-        // Команды зон
-        source.sendSuccess(() -> Component.literal("§e§l【Зоны】"), false);
-        source.sendSuccess(() -> Component.literal("§7/zone create <название> §8- §fСоздать зону на текущей позиции"), false);
-        source.sendSuccess(() -> Component.literal("§7/zone delete <название> §8- §fУдалить зону"), false);
-        source.sendSuccess(() -> Component.literal("§7/zone list §8- §fСписок всех зон"), false);
-        source.sendSuccess(() -> Component.literal("§7/zone info §8- §fИнформация о текущей зоне"), false);
-        source.sendSuccess(() -> Component.literal("§7/zone radius <размер> §8- §fУстановить радиус зоны"), false);
-        source.sendSuccess(() -> Component.literal("§7/zone tp <название> §8- §fТелепорт в зону"), false);
-        source.sendSuccess(() -> Component.literal("§7/zone enable §8- §fВключить систему зон"), false);
-        source.sendSuccess(() -> Component.literal("§7/zone disable §8- §fВыключить систему зон"), false);
-        source.sendSuccess(() -> Component.literal(""), false);
-
-        // Команды крафта
-        source.sendSuccess(() -> Component.literal("§e§l【Крафт】"), false);
-        source.sendSuccess(() -> Component.literal("§7/fraction craft <фракция> <предмет> §8- §fЗапретить крафт для всех, кроме указанной фракции"), false);
-        source.sendSuccess(() -> Component.literal("§7/fraction craft remove <предмет> §8- §fУдалить запрет на крафт"), false);
-        source.sendSuccess(() -> Component.literal("§7/fraction craft list §8- §fСписок запрещённых крафтов"), false);
-        source.sendSuccess(() -> Component.literal("§7/fraction craft clear §8- §fОчистить все запреты"), false);
-        source.sendSuccess(() -> Component.literal(""), false);
-
-        // Основные команды
         source.sendSuccess(() -> Component.literal("§e§l【Основные】"), false);
-        source.sendSuccess(() -> Component.literal("§7/labyrinth help §8- §fПоказать эту справку"), false);
-        source.sendSuccess(() -> Component.literal(""), false);
-
-        // Информация о фракциях
-        source.sendSuccess(() -> Component.literal("§6§l=== ДОСТУПНЫЕ ФРАКЦИИ ==="), false);
-        source.sendSuccess(() -> Component.literal("§7- §aFARMER §8(Фермер) §7- Работа с грядками, посадка и сбор урожая"), false);
-        source.sendSuccess(() -> Component.literal("§7- §cBUTCHER §8(Мясник) §7- Кормление животных, атака монстров, эффект Силы I"), false);
-        source.sendSuccess(() -> Component.literal("§7- §bRUNNER §8(Бегун) §7- Атака монстров, покидание зон, эффект Скорости I"), false);
-        source.sendSuccess(() -> Component.literal("§7- §6COOK §8(Повар) §7- Готовка еды (верстак, коптильня, костёр)"), false);
-        source.sendSuccess(() -> Component.literal("§7- §dMEDIC §8(Медик) §7- Эффект Регенерации I"), false);
-        source.sendSuccess(() -> Component.literal(""), false);
-
-        // Информация об ограничениях
-        source.sendSuccess(() -> Component.literal("§6§l=== ОГРАНИЧЕНИЯ ==="), false);
-        source.sendSuccess(() -> Component.literal("§7• §fОбычная печь §cНЕ готовит еду §fникому"), false);
-        source.sendSuccess(() -> Component.literal("§7• §fКоптильня и костёр §aтолько для поваров"), false);
-        source.sendSuccess(() -> Component.literal("§7• §fКрафт еды §aтолько для поваров"), false);
-        source.sendSuccess(() -> Component.literal("§7• §fАтака монстров/животных §aтолько для бегунов и мясников"), false);
-        source.sendSuccess(() -> Component.literal("§7• §fПокидание зон §aтолько для бегунов"), false);
-        source.sendSuccess(() -> Component.literal("§7• §fРабота с грядками §aтолько для фермеров"), false);
-        source.sendSuccess(() -> Component.literal("§7• §fКормление животных §aтолько для мясников"), false);
-
+        source.sendSuccess(() -> Component.literal(
+                "§7/labyrinth help §8- §fПоказать эту справку"), false);
+        source.sendSuccess(() -> Component.literal(
+                "§7/labyrinth reloadconfig §8- §fПерезагрузить конфиг"), false);
         return 1;
     }
+
     private static int reloadConfig(CommandSourceStack source) {
         ModConfig.reload();
-
         if (source.getEntity() instanceof ServerPlayer player) {
-            // Синхронизируем со всеми игроками
             ConfigSyncHandler.syncToAllPlayers(player);
         }
-
-        source.sendSuccess(() -> Component.literal("§aКонфиг перезагружен и синхронизирован с клиентами!"), true);
+        source.sendSuccess(
+                () -> Component.literal("§aКонфиг перезагружен и синхронизирован с клиентами!"), true);
         return 1;
     }
 }

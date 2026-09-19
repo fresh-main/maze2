@@ -33,6 +33,10 @@ set APP_HOME=%DIRNAME%
 @rem Resolve any "." and ".." in APP_HOME to make it shorter.
 for %%i in ("%APP_HOME%") do set APP_HOME=%%~fi
 
+@rem Keep the Gradle distribution and dependency cache off the system drive.
+@rem This is deliberately project-local: this wrapper always uses D:\.gradle-home.
+set "GRADLE_USER_HOME=D:\.gradle-home"
+
 @rem Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
 set DEFAULT_JVM_OPTS="-Xmx64m" "-Xms64m"
 

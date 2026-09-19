@@ -10,13 +10,13 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Управляет сохранением и загрузкой всех зон сдвига лабиринта для конкретного измерения (мира).
+ * Управляет сохранением и загрузкой всех зон сдвига лабиринта
+ * для конкретного измерения (мира).
  */
 public class LabyrinthZoneSavedData extends SavedData {
 
     private static final String DATA_NAME = "labyrinth_shift_zones";
 
-    // Хранилище всех зон по их UUID
     private final Map<UUID, LabyrinthShiftZone> zones = new HashMap<>();
     private boolean generatedFromMaze = false;
 
@@ -24,26 +24,18 @@ public class LabyrinthZoneSavedData extends SavedData {
         super();
     }
 
-    /**
-     * Получает экземпляр данных для текущего мира.
-     * Если его нет, создает новый.
-     * В 1.20.1 используется 3 аргумента: loader, factory, key
-     */
     public static LabyrinthZoneSavedData get(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(
-                LabyrinthZoneSavedData::load,   // 1. Функция загрузки из NBT
-                LabyrinthZoneSavedData::new,    // 2. Фабрика для создания нового экземпляра
-                DATA_NAME                       // 3. Имя файла сохранения
+                LabyrinthZoneSavedData::load,
+                LabyrinthZoneSavedData::new,
+                DATA_NAME
         );
     }
 
-    /**
-     * Загрузка из NBT
-     */
     public static LabyrinthZoneSavedData load(CompoundTag nbt) {
         LabyrinthZoneSavedData data = new LabyrinthZoneSavedData();
         data.generatedFromMaze = nbt.getBoolean("GeneratedFromMaze");
-        ListTag zonesList = nbt.getList("Zones", 10); // 10 = TAG_COMPOUND
+        ListTag zonesList = nbt.getList("Zones", 10);
 
         for (int i = 0; i < zonesList.size(); i++) {
             CompoundTag zoneNbt = zonesList.getCompound(i);
@@ -54,9 +46,6 @@ public class LabyrinthZoneSavedData extends SavedData {
         return data;
     }
 
-    /**
-     * Сохранение в NBT
-     */
     @Override
     public CompoundTag save(CompoundTag nbt) {
         ListTag zonesList = new ListTag();
@@ -68,11 +57,9 @@ public class LabyrinthZoneSavedData extends SavedData {
         return nbt;
     }
 
-    // --- Методы управления зонами ---
-
     public void addZone(LabyrinthShiftZone zone) {
         this.zones.put(zone.id, zone);
-        this.setDirty(); // Обязательно: сообщает Minecraft, что данные изменились и их нужно сохранить
+        this.setDirty();
     }
 
     public void removeZone(UUID id) {
@@ -97,14 +84,32 @@ public class LabyrinthZoneSavedData extends SavedData {
         this.setDirty();
     }
 
-    /**
-     * Переключает состояние конкретной зоны и помечает данные как измененные.
-     */
     public void toggleZoneState(UUID id) {
         LabyrinthShiftZone zone = this.zones.get(id);
         if (zone != null) {
             zone.toggleState();
             this.setDirty();
         }
+    }
+
+    /**
+     * Переключает ВСЕ зоны и помечает данные как изменённые.
+     */
+    public void toggleAllZones() {
+        for (LabyrinthShiftZone zone : zones.values()) {
+            zone.toggleState();
+        }
+        this.setDirty();
+    }
+
+    /**
+     * Возвращает количество зон в варианте B.
+     */
+    public int countVariantB() {
+        int count = 0;
+        for (LabyrinthShiftZone zone : zones.values()) {
+            if (zone.isVariantB) count++;
+        }
+        return count;
     }
 }
