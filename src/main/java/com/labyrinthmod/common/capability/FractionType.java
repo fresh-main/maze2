@@ -10,7 +10,11 @@ public enum FractionType {
         COOK("Повар", 0xFFFFFF, 3, null),         // Белый - §f
         MEDIC("Медик", 0xFF55FF, 4, null),        // Пурпурный - §d
         OPERATOR("Оператор", 0xAAAAAA, 5, null),  // Серый - §7
-        IMPOSTER("Предатель", 0xFF0000, 6, null); // Красный - §c
+        IMPOSTER("Предатель", 0xFF0000, 6, null), // Красный - §c
+        GLIDER("Глейдер", 0x77CCFF, 7, null),
+        SCIENTIST("Учёный", 0x66CCAA, 8, null),
+        SURVIVOR("Выживший", 0x88AA55, 9, null),
+        SOLDIER("Военный", 0x668899, 10, null);
 
 
 

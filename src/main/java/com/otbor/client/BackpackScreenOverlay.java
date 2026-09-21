@@ -16,6 +16,7 @@ import net.minecraft.client.gui.screens.inventory.HopperScreen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.gui.screens.inventory.ShulkerBoxScreen;
 import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.entity.player.Inventory;
 import net.p3pp3rf1y.sophisticatedcore.client.gui.StorageScreenBase;
 
 public final class BackpackScreenOverlay {
@@ -107,7 +108,14 @@ public final class BackpackScreenOverlay {
         int topPos = screen.getGuiTop();
         int iw = ((ContainerScreenAccessor) screen).otbor$getImageWidth();
         int ih = ((ContainerScreenAccessor) screen).otbor$getImageHeight();
+        // Sophisticated Core reserves 94 px for the full player inventory.
+        // This pack exposes only the hotbar, placed just below the storage slots.
         int fullH = ih + BACKPACK_PLAYER_INV_BLEED;
+        if (screen instanceof StorageScreenBase<?> storageScreen) {
+            int rows = storageScreen.getMenu().getNumberOfRows();
+            int hotbarBottom = 18 + rows * 18 + 4 + 18;
+            fullH = Math.min(fullH, hotbarBottom + 12);
+        }
 
         float t = PaperContainerRender.animProgress(screen);
 
@@ -141,7 +149,9 @@ public final class BackpackScreenOverlay {
 
         // Слот-рамки скетчатся каскадом
         Slot[] sortedSlots = screen.getMenu().slots.stream()
-                .filter(s -> s.isActive() && !(s instanceof LockedSlot) && s.x >= 0 && s.y >= 0)
+                .filter(s -> s.isActive() && !(s instanceof LockedSlot) && s.x >= 0 && s.y >= 0
+                        && !(screen instanceof StorageScreenBase<?> && s.container instanceof Inventory
+                        && s.getContainerSlot() < 9))
                 .sorted((a, b) -> {
                     int dy = Integer.compare(a.y, b.y);
                     return dy != 0 ? dy : Integer.compare(a.x, b.x);
@@ -156,6 +166,13 @@ public final class BackpackScreenOverlay {
             float st = slotsStart + i * slotSpacing;
             float local = PaperContainerRender.phase(t, st, st + 0.12f);
             PaperContainerRender.sketchSlotBox(gfx, leftPos + s.x, topPos + s.y, local);
+        }
+        if (screen instanceof StorageScreenBase<?> storageScreen) {
+            int hotbarY = 18 + storageScreen.getMenu().getNumberOfRows() * 18 + 4;
+            for (int i = 0; i < 9; i++) {
+                PaperContainerRender.sketchSlotBox(gfx, leftPos + 8 + i * 18, topPos + hotbarY,
+                        PaperContainerRender.phase(t, 0.55f + i * 0.025f, 0.75f + i * 0.025f));
+            }
         }
 
         // Штамп с overshoot-плюхой
@@ -247,13 +264,23 @@ public final class BackpackScreenOverlay {
     }
 
     public static void drawRightSidePaperCover(GuiGraphics gfx, AbstractContainerScreen<?> screen) {
-        if (!isBackpackScreen(screen)) return;
+        if (!isBackpackScreen(screen) || SIDE_EXTEND <= 0) return;
         int iw = ((ContainerScreenAccessor) screen).otbor$getImageWidth();
         int ih = ((ContainerScreenAccessor) screen).otbor$getImageHeight();
         PaperRender.drawPaperCard(gfx, iw, 0, SIDE_EXTEND, ih, 1.0f, PaperRender.PAPER_LIGHT);
     }
 
     public static void drawLockedCover(GuiGraphics gfx, AbstractContainerScreen<?> screen) {
+        if (!(screen instanceof StorageScreenBase<?> storageScreen)) return;
+        int rows = storageScreen.getMenu().getNumberOfRows();
+        int hotbarY = 18 + rows * 18 + 4;
+        int iw = ((ContainerScreenAccessor) screen).otbor$getImageWidth();
+        int ih = ((ContainerScreenAccessor) screen).otbor$getImageHeight();
+        int panelBottom = Math.min(ih + BACKPACK_PLAYER_INV_BLEED, hotbarY + 18 + 12);
+        // Cover the remnant of Sophisticated's hidden player-inventory texture below the hotbar.
+        if (hotbarY + 18 < panelBottom - 3) {
+            gfx.fill(4, hotbarY + 18, iw - 4, panelBottom - 3, PaperRender.PAPER_LIGHT);
+        }
     }
     /**
      * Универсальная отрисовка ВСЕХ табов (и левых апгрейдов, и правых настроек)

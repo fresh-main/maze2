@@ -468,6 +468,7 @@ public class LabyrinthMod {
         LOGGER.info("[MazeMap] storage initialized at {}", MazeMapStorage.getRoot());
 
         com.labyrinthmod.common.data.CraftRestrictionManager.load();
+        com.labyrinthmod.common.data.FractionRecipeManager.load();
         LOGGER.info("[LabyrinthMod] Craft restrictions loaded from JSON!");
 
         BiomeDebugChat.timed(

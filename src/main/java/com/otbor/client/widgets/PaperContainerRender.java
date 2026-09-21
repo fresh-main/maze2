@@ -67,10 +67,19 @@ public final class PaperContainerRender {
 
         Font font = Minecraft.getInstance().font;
         Layout layout = Layout.detect(screen);
+        boolean preserveModContent = isExternalModScreen(screen);
+        boolean customModHeader = screen instanceof com.simibubi.create.content.schematics.cannon.SchematicannonScreen
+                || screen instanceof com.simibubi.create.content.equipment.toolbox.ToolboxScreen
+                || screen instanceof vectorwing.farmersdelight.client.gui.CookingPotScreen;
 
         // === 1. Лист бумаги (с alpha по началу анимации) ===
         float paperAlpha = phase(t, 0.0f, 0.12f);
-        renderPaperBase(gfx, leftPos, topPos, imageWidth, imageHeight, paperAlpha);
+        if (preserveModContent) {
+            renderModPaperWash(gfx, leftPos, topPos, imageWidth, imageHeight,
+                    paperAlpha, customModHeader);
+        } else {
+            renderPaperBase(gfx, leftPos, topPos, imageWidth, imageHeight, paperAlpha);
+        }
 
         if (paperAlpha < 0.05f) return;
 
@@ -90,7 +99,7 @@ public final class PaperContainerRender {
 
         // === 4. Заголовок (typewriter) ===
         float headerProg = phase(t, 0.24f, 0.56f);
-        if (headerProg > 0f) {
+        if (headerProg > 0f && !layout.header.isEmpty() && (!preserveModContent || customModHeader)) {
             int headerY = topPos + 6;
             String header = layout.header;
             int hw = font.width(header);
@@ -133,7 +142,13 @@ public final class PaperContainerRender {
         }
 
         // === 6. Скетч-рамки слотов, волна сверху-слева вниз-вправо ===
-        renderSlotSketches(gfx, screen.getMenu(), leftPos, topPos, imageWidth, imageHeight, t);
+        if (!preserveModContent) {
+            renderSlotSketches(gfx, screen.getMenu(), leftPos, topPos, imageWidth, imageHeight, t);
+        }
+
+        // Modded screens may paint gauges, compartments and icons inside renderBg.
+        // Decorative stamps and arrows have no knowledge of those positions.
+        if (preserveModContent) return;
 
         // === 7. Стрелки между слот-группами (если есть) ===
         for (Layout.Arrow arr : layout.arrows) {
@@ -202,6 +217,31 @@ public final class PaperContainerRender {
         int a = (int) (alpha * 255);
         int paper = (a << 24) | (PaperRender.PAPER_LIGHT & 0xFFFFFF);
         gfx.fill(x, y, x + w, y + h, paper);
+    }
+
+    public static boolean isExternalModScreen(AbstractContainerScreen<?> screen) {
+        String name = screen.getClass().getName();
+        return !name.startsWith("net.minecraft.")
+                && !name.startsWith("com.labyrinthmod.")
+                && !name.startsWith("com.otbor.")
+                && !name.startsWith("com.mazemap.")
+                && !name.startsWith("com.infection.");
+    }
+
+    private static void renderModPaperWash(GuiGraphics gfx, int x, int y, int w, int h,
+                                           float progress, boolean customHeader) {
+        // The mod's renderBg already ran. A translucent wash keeps its controls visible.
+        gfx.fill(x, y, x + w, y + h,
+                PaperRender.withAlpha(PaperRender.PAPER_LIGHT, 0.48f * progress));
+        int edge = PaperRender.withAlpha(PaperRender.PAPER_EDGE, progress);
+        gfx.fill(x, y, x + w, y + 2, edge);
+        gfx.fill(x, y + h - 2, x + w, y + h, edge);
+        gfx.fill(x, y, x + 2, y + h, edge);
+        gfx.fill(x + w - 2, y, x + w, y + h, edge);
+        if (customHeader) {
+            gfx.fill(x + 4, y + 3, x + w - 4, y + 22,
+                    PaperRender.withAlpha(PaperRender.PAPER_LIGHT, progress));
+        }
     }
 
     /** Перо обводит прямоугольник по периметру: top → right → bottom → left. */
@@ -456,6 +496,7 @@ public final class PaperContainerRender {
             String cls = screen.getClass().getSimpleName();
             String title = screen.getTitle().getString();
             return switch (cls) {
+                case "CreativeModeInventoryScreen" -> creativeLayout();
                 case "CraftingScreen" -> craftingLayout();
                 case "FurnaceScreen" -> furnaceLayout("ПЕЧЬ", "СПЛАВ · ОБЖИГ");
                 case "BlastFurnaceScreen" -> furnaceLayout("ДОМНА", "ПЛАВКА · РУДА");
@@ -468,6 +509,8 @@ public final class PaperContainerRender {
                 case "StonecutterScreen" -> stonecutterLayout();
                 case "CartographyTableScreen" -> cartographyLayout();
                 case "SmithingScreen" -> smithingLayout();
+                case "SchematicannonScreen" -> schematicannonLayout();
+                case "ToolboxScreen" -> toolboxLayout();
                 case "ShulkerBoxScreen", "ChestScreen", "DispenserScreen", "HopperScreen" ->
                         storageLayout(title);
                 default -> genericLayout(title);
@@ -646,6 +689,28 @@ public final class PaperContainerRender {
                     new Stamp("ОПИСЬ", 132, 95, -6f, PaperRender.INK_RED, 0.78f),
             };
             return L;
+        }
+
+        private static Layout creativeLayout() {
+            Layout layout = new Layout();
+            // The search field occupies the title row on the search tab.
+            layout.header = "";
+            layout.kicker = "";
+            return layout;
+        }
+
+        private static Layout schematicannonLayout() {
+            Layout layout = new Layout();
+            layout.header = "СТРОИТЕЛЬНАЯ ПУШКА";
+            layout.kicker = "ЧЕРТЁЖ · ПЕЧАТЬ";
+            return layout;
+        }
+
+        private static Layout toolboxLayout() {
+            Layout layout = new Layout();
+            layout.header = "ИНСТРУМЕНТАЛЬНЫЙ ЯЩИК";
+            layout.kicker = "ИНСТРУМЕНТЫ · ХРАНЕНИЕ";
+            return layout;
         }
 
         /** Серийный номер на основе игрового дня — каждый день меняется, но стабилен в течение дня. */

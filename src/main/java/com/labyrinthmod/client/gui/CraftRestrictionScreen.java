@@ -2,6 +2,7 @@ package com.labyrinthmod.client.gui;
 
 import com.labyrinthmod.common.network.NetworkHandler;
 import com.labyrinthmod.common.network.packet.C2SSaveCraftRestrictionsPacket;
+import com.labyrinthmod.common.capability.FractionType;
 import com.labyrinthmod.gui.CraftRestrictionMenu;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -16,7 +17,9 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class CraftRestrictionScreen extends AbstractContainerScreen<CraftRestrictionMenu> {
-    private static final String[] FACTIONS = {"FARMER", "BUTCHER", "RUNNER", "COOK", "MEDIC", "OPERATOR", "NONE"};
+    private static final FractionType[] FACTIONS = FractionType.values();
+    private static final int VISIBLE_ROWS = 7;
+    private int scrollOffset;
     private final Set<String> checkedFactions = new HashSet<>();
 
     public CraftRestrictionScreen(CraftRestrictionMenu menu, Inventory inv, Component title) {
@@ -93,10 +96,10 @@ public class CraftRestrictionScreen extends AbstractContainerScreen<CraftRestric
         gfx.drawString(this.font, "Запрет крафта для фракций:", x + 160, y + 20, 0x404040, false);
 
         // Рисуем галочки (Чекбоксы) справа с увеличенным шагом
-        for (int i = 0; i < FACTIONS.length; i++) {
-            String faction = FACTIONS[i];
+        for (int row = 0; row < Math.min(VISIBLE_ROWS, FACTIONS.length - scrollOffset); row++) {
+            String faction = FACTIONS[scrollOffset + row].name();
             int boxX = x + 160;
-            int boxY = y + 35 + (i * 18); // ★ ШАГ УВЕЛИЧЕН ДО 18 ★
+            int boxY = y + 35 + (row * 18);
             boolean isChecked = checkedFactions.contains(faction);
 
             // Рамка чекбокса
@@ -111,6 +114,12 @@ public class CraftRestrictionScreen extends AbstractContainerScreen<CraftRestric
             gfx.drawString(this.font, faction, boxX + 16, boxY + 1, textColor, false);
         }
 
+        if (FACTIONS.length > VISIBLE_ROWS) {
+            gfx.drawString(this.font, "↑/↓ " + (scrollOffset + 1) + "–"
+                    + Math.min(FACTIONS.length, scrollOffset + VISIBLE_ROWS) + "/" + FACTIONS.length,
+                    x + 160, y + 166, 0x404040, false);
+        }
+
         this.renderTooltip(gfx, mouseX, mouseY);
     }
 
@@ -119,10 +128,10 @@ public class CraftRestrictionScreen extends AbstractContainerScreen<CraftRestric
         int x = this.leftPos;
         int y = this.topPos;
 
-        for (int i = 0; i < FACTIONS.length; i++) {
-            String faction = FACTIONS[i];
+        for (int row = 0; row < Math.min(VISIBLE_ROWS, FACTIONS.length - scrollOffset); row++) {
+            String faction = FACTIONS[scrollOffset + row].name();
             int boxX = x + 160;
-            int boxY = y + 35 + (i * 18);
+            int boxY = y + 35 + (row * 18);
 
             // Зона клика увеличена, чтобы было легко попасть мышкой
             if (mouseX >= boxX && mouseX <= boxX + 10 + this.font.width(faction) + 16 &&
@@ -138,5 +147,16 @@ public class CraftRestrictionScreen extends AbstractContainerScreen<CraftRestric
         }
 
         return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (mouseX >= leftPos + 155 && mouseX <= leftPos + imageWidth
+                && mouseY >= topPos + 30 && mouseY <= topPos + 180) {
+            scrollOffset = Math.max(0, Math.min(FACTIONS.length - VISIBLE_ROWS,
+                    scrollOffset + (delta < 0 ? 1 : -1)));
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, delta);
     }
 }

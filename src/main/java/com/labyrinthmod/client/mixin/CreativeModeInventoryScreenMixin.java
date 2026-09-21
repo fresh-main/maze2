@@ -2,6 +2,7 @@ package com.labyrinthmod.client.mixin;
 
 import com.otbor.client.ClientEvents;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraftforge.client.gui.CreativeTabsScreenPage;
@@ -20,6 +21,21 @@ public abstract class CreativeModeInventoryScreenMixin {
 
     // currentPage — это private поле экземпляра
     @Shadow private CreativeTabsScreenPage currentPage;
+    @Shadow private EditBox searchBox;
+
+    @Inject(method = "init", at = @At("TAIL"))
+    private void otbor$styleSearchField(CallbackInfo ci) {
+        if (searchBox != null) {
+            searchBox.setTextColor(0x352b22);
+            searchBox.setTextColorUneditable(0x6c5744);
+        }
+    }
+
+    @Inject(method = "renderLabels", at = @At("HEAD"), cancellable = true)
+    private void otbor$hideVanillaTabTitle(GuiGraphics gfx, int mouseX, int mouseY, CallbackInfo ci) {
+        // Vanilla puts every tab title at (8, 6), directly over the paper header/search row.
+        ci.cancel();
+    }
 
     // Приватные методы для получения относительных координат таба (относительно leftPos и topPos)
     @Invoker("getTabX")

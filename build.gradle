@@ -113,8 +113,8 @@ dependencies {
     implementation fg.deobf("com.tterrag.registrate:Registrate:${registrate_version}")
 
     // Curios
-    compileOnly fg.deobf("top.theillusivec4.curios:curios-forge:5.4.0+1.20.1:api")
-    runtimeOnly fg.deobf("top.theillusivec4.curios:curios-forge:5.4.0+1.20.1")
+    compileOnly fg.deobf("top.theillusivec4.curios:curios-forge:5.9.1+1.20.1:api")
+    runtimeOnly fg.deobf("top.theillusivec4.curios:curios-forge:5.9.1+1.20.1")
 
     // JEI
     compileOnly fg.deobf("mezz.jei:jei-1.20.1-forge:15.20.0.129")
@@ -129,6 +129,9 @@ dependencies {
     implementation fg.deobf("curse.maven:sophisticated-core-618298:7916595")
     implementation fg.deobf("curse.maven:sophisticated-backpacks-422301:7916619")
     implementation fg.deobf("curse.maven:first-aid-276837:5531834")
+    implementation fg.deobf("curse.maven:farmers-delight-398521:8765179")
+    implementation fg.deobf("curse.maven:scorched-guns-802940:7232063")
+    implementation fg.deobf("curse.maven:framework-549225:7573740")
     implementation fg.deobf("org.embeddedt:embeddium-1.20.1:0.3.31-beta.53+mc1.20.1")
     implementation fg.deobf("curse.maven:oculus-581495:6020952")
 }

@@ -5,6 +5,7 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.inventory.Slot;
+import net.p3pp3rf1y.sophisticatedcore.common.gui.StorageContainerMenuBase;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
@@ -26,6 +27,7 @@ public abstract class AbstractContainerMenuMixin {
     @ModifyVariable(method = "addSlot", at = @At("HEAD"), argsOnly = true)
     private Slot otbor$hidePlayerMain(Slot slot) {
         if ((Object) this instanceof InventoryMenu) return slot;
+        if ((Object) this instanceof StorageContainerMenuBase<?>) return slot;
         if (slot instanceof LockedSlot) return slot;
         if (!(slot.container instanceof Inventory inv)) return slot;
         int containerIdx = slot.getContainerSlot();

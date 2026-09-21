@@ -13,6 +13,7 @@ import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 public class CraftRestrictionManager {
@@ -81,8 +82,10 @@ public class CraftRestrictionManager {
 
     public static void load() {
         forbiddenFactions.clear();
+        installDefaults();
         if (!Files.exists(SAVE_FILE)) return;
 
+        boolean loaded = false;
         try (Reader reader = new FileReader(SAVE_FILE.toFile())) {
             Type type = new TypeToken<Map<String, Set<String>>>(){}.getType();
             Map<String, Set<String>> jsonMap = GSON.fromJson(reader, type);
@@ -99,8 +102,51 @@ public class CraftRestrictionManager {
                     }
                 }
             }
+            loaded = true;
         } catch (Exception e) {
             e.printStackTrace();
+        }
+        if (loaded && addMissingBundledRestrictions()) save();
+    }
+
+    private static boolean addMissingBundledRestrictions() {
+        boolean changed = false;
+        try (InputStream stream = CraftRestrictionManager.class.getResourceAsStream(
+                "/defaults/labyrinthmod/craft_restrictions.json")) {
+            if (stream == null) throw new IOException("Missing default craft restrictions");
+            try (Reader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
+                Type type = new TypeToken<Map<String, Set<String>>>(){}.getType();
+                Map<String, Set<String>> defaults = GSON.fromJson(reader, type);
+                if (defaults == null) return false;
+                for (Map.Entry<String, Set<String>> entry : defaults.entrySet()) {
+                    ResourceLocation id = ResourceLocation.tryParse(entry.getKey());
+                    if (id == null || entry.getValue() == null) continue;
+                    Item item = ForgeRegistries.ITEMS.getValue(id);
+                    if (item != null && item != Items.AIR && !forbiddenFactions.containsKey(item)) {
+                        forbiddenFactions.put(item, new HashSet<>(entry.getValue()));
+                        changed = true;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            org.slf4j.LoggerFactory.getLogger(CraftRestrictionManager.class)
+                    .error("Cannot merge default craft restrictions", e);
+        }
+        return changed;
+    }
+
+    private static void installDefaults() {
+        if (Files.exists(SAVE_FILE)) return;
+        try {
+            Files.createDirectories(SAVE_FILE.getParent());
+            try (InputStream defaults = CraftRestrictionManager.class.getResourceAsStream(
+                    "/defaults/labyrinthmod/craft_restrictions.json")) {
+                if (defaults == null) throw new IOException("Missing default craft restrictions");
+                Files.copy(defaults, SAVE_FILE);
+            }
+        } catch (IOException e) {
+            org.slf4j.LoggerFactory.getLogger(CraftRestrictionManager.class)
+                    .error("Cannot install default craft restrictions", e);
         }
     }
 }

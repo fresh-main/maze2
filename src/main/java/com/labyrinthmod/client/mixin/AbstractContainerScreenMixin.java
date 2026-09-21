@@ -38,6 +38,7 @@ public abstract class AbstractContainerScreenMixin<T extends AbstractContainerMe
     @Shadow @Final protected T menu;
 
     @Unique private boolean otbor$compactedLayout = false;
+    @Unique private boolean otbor$createHotbarOnly = false;
     @Unique private boolean otbor$soundPlayed = false;
 
     @Inject(method = "init", at = @At("TAIL"))
@@ -56,10 +57,15 @@ public abstract class AbstractContainerScreenMixin<T extends AbstractContainerMe
 
         if ((Object) this instanceof InventoryScreen) return;
 
-        this.titleLabelY = -9999;
-        this.inventoryLabelY = -9999;
-
         AbstractContainerScreen<?> selfScreen = (AbstractContainerScreen<?>) (Object) this;
+        if (BackpackScreenOverlay.isBackpackScreen(selfScreen)
+                || !PaperContainerRender.isExternalModScreen(selfScreen)
+                || selfScreen instanceof com.simibubi.create.content.schematics.cannon.SchematicannonScreen
+                || selfScreen instanceof com.simibubi.create.content.equipment.toolbox.ToolboxScreen
+                || selfScreen instanceof vectorwing.farmersdelight.client.gui.CookingPotScreen) {
+            this.titleLabelY = -9999;
+            this.inventoryLabelY = -9999;
+        }
         if (BackpackScreenOverlay.isBackpackScreen(selfScreen)) {
             return;
         }
@@ -82,9 +88,31 @@ public abstract class AbstractContainerScreenMixin<T extends AbstractContainerMe
         for (Slot s : hotbar) {
             ((SlotAccessor) s).setY(s.y - shift);
         }
+        if (selfScreen instanceof com.simibubi.create.content.schematics.cannon.SchematicannonScreen
+                || selfScreen instanceof com.simibubi.create.content.equipment.toolbox.ToolboxScreen) {
+            // Create positions its controls during init. Keep its window geometry intact.
+            otbor$createHotbarOnly = true;
+            otbor$compactedLayout = true;
+            return;
+        }
         this.imageHeight -= shift;
         this.topPos = (this.height - this.imageHeight) / 2;
         otbor$compactedLayout = true;
+    }
+
+    @Inject(
+            method = "render",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/client/gui/screens/inventory/AbstractContainerScreen;renderBg(Lnet/minecraft/client/gui/GuiGraphics;FII)V",
+                    shift = At.Shift.BEFORE))
+    private void otbor$paperBehindModContent(GuiGraphics gfx, int mx, int my, float partialTick, CallbackInfo ci) {
+        AbstractContainerScreen<?> self = (AbstractContainerScreen<?>) (Object) this;
+        if (BackpackScreenOverlay.isBackpackScreen(self)
+                || !PaperContainerRender.isExternalModScreen(self)) return;
+        int styledHeight = otbor$createHotbarOnly ? imageHeight - 58 : imageHeight;
+        PaperRender.drawPaperCard(gfx, leftPos, topPos, imageWidth, styledHeight,
+                1f, PaperRender.PAPER_LIGHT);
     }
 
     @Inject(
@@ -99,8 +127,18 @@ public abstract class AbstractContainerScreenMixin<T extends AbstractContainerMe
         if (BackpackScreenOverlay.isVanillaPapered(self)) return;
         if (BackpackScreenOverlay.isBackpackScreen(self)) return;
         long openedAt = PaperContainerRender.openedAtFor(this);
+        int styledHeight = otbor$createHotbarOnly ? imageHeight - 58 : imageHeight;
         PaperContainerRender.renderContainer(gfx, self,
-                this.leftPos, this.topPos, this.imageWidth, this.imageHeight,
+                this.leftPos, this.topPos, this.imageWidth, styledHeight,
                 openedAt);
+        if (otbor$createHotbarOnly) {
+            for (Slot slot : menu.slots) {
+                if (slot.container instanceof Inventory && slot.getContainerSlot() < 9
+                        && slot.isActive()) {
+                    PaperContainerRender.sketchSlotBox(gfx,
+                            leftPos + slot.x, topPos + slot.y, 1f);
+                }
+            }
+        }
     }
 }

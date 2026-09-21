@@ -52,15 +52,14 @@ public class SwitchFractionPacket {
             if (player == null) return;
 
             // Проверка на наличие OP-прав (уровень 2)
-            if (!player.hasPermissions(2)) {
-                player.sendSystemMessage(Component.literal("§cУ вас нет прав для переключения фракций!"));
+            if (!player.hasPermissions(2) || msg.targetFraction != FractionType.OPERATOR) {
+                player.sendSystemMessage(Component.literal("§cF3+F6 доступно только оператору для фракции Оператор."));
                 return;
             }
 
             player.getCapability(FractionProvider.FRACTION).ifPresent(data -> {
                 FractionType current = data.getFraction();
-                FractionType next = msg.targetFraction != null ? msg.targetFraction :
-                        FractionSwitcherData.getNext(current);
+                FractionType next = FractionType.OPERATOR;
 
                 if (next != current) {
                     data.setFraction(next);

@@ -25,11 +25,15 @@ public class StructureProtectionHandler {
     public static void onBlockBreak(BlockEvent.BreakEvent event) {
         BlockPos pos = event.getPos();
 
-        if (StructureGenerator.isBlockProtected(pos)) {
+        Player player = event.getPlayer();
+        boolean mayBuildInGlade = player != null
+                && com.labyrinthmod.common.event.FractionEvents.isInGlade(player.level(), pos)
+                && player.getCapability(com.labyrinthmod.common.capability.FractionProvider.FRACTION)
+                .map(data -> data.getFraction() != com.labyrinthmod.common.capability.FractionType.NONE).orElse(false);
+        if (StructureGenerator.isBlockProtected(pos) && !mayBuildInGlade) {
             event.setCanceled(true);
 
             // Опционально: сообщение игроку
-            Player player = event.getPlayer();
             if (player != null && !player.level().isClientSide) {
                 player.displayClientMessage(
                         Component.literal("§c⚠ Этот блок является частью защищённой структуры!"),

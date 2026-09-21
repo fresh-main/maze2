@@ -19,7 +19,7 @@ public class FractionSwitchOverlay {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
 
-        FractionType[] fractions = FractionType.values();
+        FractionType[] fractions = {FractionType.OPERATOR};
         int fractionCount = fractions.length;
 
         // Размеры слотов (предмет 16x16, слот 28x28)
@@ -63,12 +63,12 @@ public class FractionSwitchOverlay {
     }
 
     public static void nextFraction() {
-        FractionType[] fractions = FractionType.values();
+        FractionType[] fractions = {FractionType.OPERATOR};
         selectedIndex = (selectedIndex + 1) % fractions.length;
     }
 
     public static FractionType getSelectedFraction() {
-        return FractionType.values()[selectedIndex];
+        return FractionType.OPERATOR;
     }
 
     public static void hideOverlay() {

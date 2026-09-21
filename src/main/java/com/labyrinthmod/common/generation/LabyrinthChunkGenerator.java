@@ -38,6 +38,7 @@ import net.minecraft.data.worldgen.features.TreeFeatures;
 import net.minecraft.util.RandomSource;
 
 public class LabyrinthChunkGenerator extends ChunkGenerator {
+    private static volatile LabyrinthChunkGenerator activeGenerator;
     public static final Codec<LabyrinthChunkGenerator> CODEC = RecordCodecBuilder.create(inst ->
             inst.group(
                     BiomeSource.CODEC.fieldOf("biome_source").forGetter(LabyrinthChunkGenerator::getBiomeSource),
@@ -127,6 +128,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
     public LabyrinthChunkGenerator(BiomeSource biomeSource, long seed) {
         super(biomeSource);
         this.seed = seed;
+        activeGenerator = this;
 
         LabyrinthConfig cfg = LabyrinthConfig.getInstance();
         this.config = cfg;
@@ -159,6 +161,26 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             this.featureNoise = null;
             this.seedInitialized = false;
         }
+    }
+
+    /** Uses the exact river curve and width used by terrain generation. */
+    public static boolean isGeneratedRiverAt(int x, int z) {
+        LabyrinthChunkGenerator generator = activeGenerator;
+        return generator != null && generator.isInRiverZone(x, z);
+    }
+
+    public static boolean hasActiveGenerator() {
+        return activeGenerator != null;
+    }
+
+    /** The same area in which the decoration pass places the forest. */
+    public static boolean isGeneratedForestAt(int x, int z) {
+        LabyrinthChunkGenerator generator = activeGenerator;
+        if (generator == null) return false;
+        if (z >= -30) return false;
+        if (Math.sqrt((double) x * x + (double) z * z) < 20.0) return false;
+        if (Math.max(Math.abs(x), Math.abs(z)) > generator.GLADE_RADIUS - 5) return false;
+        return !generator.isInRiverZone(x, z);
     }
 
     private void generateMaze() {

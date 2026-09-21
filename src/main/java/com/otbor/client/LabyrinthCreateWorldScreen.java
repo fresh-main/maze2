@@ -833,12 +833,19 @@ public class LabyrinthCreateWorldScreen extends Screen {
                         net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome> plainsBiome =
                                 registryAccess.registryOrThrow(net.minecraft.core.registries.Registries.BIOME)
                                         .getHolderOrThrow(net.minecraft.world.level.biome.Biomes.PLAINS);
+                        var biomeRegistry = registryAccess.registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
+                        var riverBiome = biomeRegistry.getHolderOrThrow(net.minecraft.world.level.biome.Biomes.RIVER);
+                        var forestBiome = biomeRegistry.getHolderOrThrow(net.minecraft.world.level.biome.Biomes.FOREST);
+                        var desertBiome = biomeRegistry.getHolderOrThrow(net.minecraft.world.level.biome.Biomes.DESERT);
 
                         net.minecraft.core.Holder<net.minecraft.world.level.dimension.DimensionType> overworldType =
                                 registryAccess.registryOrThrow(net.minecraft.core.registries.Registries.DIMENSION_TYPE)
                                         .getHolderOrThrow(net.minecraft.world.level.dimension.BuiltinDimensionTypes.OVERWORLD);
 
-                        net.minecraft.world.level.biome.FixedBiomeSource biomeSource = new net.minecraft.world.level.biome.FixedBiomeSource(plainsBiome);
+                        net.minecraft.world.level.biome.FixedBiomeSource baseBiomeSource = new net.minecraft.world.level.biome.FixedBiomeSource(plainsBiome);
+                        com.labyrinthmod.common.generation.LabyrinthBiomeSource biomeSource =
+                                new com.labyrinthmod.common.generation.LabyrinthBiomeSource(
+                                        baseBiomeSource, seed, riverBiome, forestBiome, desertBiome);
                         com.labyrinthmod.common.generation.LabyrinthChunkGenerator chunkGen = new com.labyrinthmod.common.generation.LabyrinthChunkGenerator(biomeSource, seed);
                         net.minecraft.world.level.dimension.LevelStem overworldStem = new net.minecraft.world.level.dimension.LevelStem(overworldType, chunkGen);
 
