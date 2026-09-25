@@ -4,6 +4,7 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
 import net.minecraft.core.Vec3i;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
@@ -11,6 +12,7 @@ import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.*;
 import net.minecraft.world.level.biome.BiomeManager;
+import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.DoublePlantBlock;
@@ -25,6 +27,8 @@ import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.LegacyRandomSource;
 import net.minecraft.world.level.levelgen.RandomState;
+import net.minecraft.world.level.levelgen.RandomSupport;
+import net.minecraft.world.level.levelgen.WorldgenRandom;
 import net.minecraft.world.level.levelgen.blending.Blender;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 import org.jetbrains.annotations.NotNull;
@@ -993,7 +997,17 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
     }
 
     @Override
-    public void spawnOriginalMobs(@NotNull WorldGenRegion region) {}
+    public void spawnOriginalMobs(@NotNull WorldGenRegion region) {
+        // The custom generator used to suppress the vanilla chunk-generation spawn pass.
+        // That also suppressed water creatures even when the generated water correctly had
+        // the river biome. Mirror NoiseBasedChunkGenerator here so every newly generated
+        // river chunk gets the biome's normal fish population.
+        ChunkPos chunkPos = region.getCenter();
+        Holder<Biome> biome = region.getBiome(chunkPos.getWorldPosition().atY(region.getMaxBuildHeight() - 1));
+        WorldgenRandom random = new WorldgenRandom(new LegacyRandomSource(RandomSupport.generateUniqueSeed()));
+        random.setDecorationSeed(region.getSeed(), chunkPos.getMinBlockX(), chunkPos.getMinBlockZ());
+        NaturalSpawner.spawnMobsForChunkGeneration(region, biome, chunkPos, random);
+    }
 
 
 

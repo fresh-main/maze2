@@ -60,7 +60,6 @@ public abstract class MixinShaderPackScreenPaper extends Screen {
     @Shadow @Final public static Set<Runnable> TOP_LAYER_RENDER_QUEUE;
 
     @Shadow public abstract void applyChanges();
-    @Shadow public abstract void refreshScreenSwitchButton();
     @Shadow public abstract boolean isDisplayingComment();
     @Shadow public abstract void dropChangesAndClose();
 
@@ -265,13 +264,20 @@ public abstract class MixinShaderPackScreenPaper extends Screen {
             this.addRenderableWidget(this.openFolderButton);
 
             this.screenSwitchButton = new PaperButton(switchX, row2Y, folderButtonWidth, 20, Component.translatable("options.iris.shaderPackList"), (button) -> {
-                this.optionMenuOpen = !this.optionMenuOpen;
-                this.applyChanges();
-                this.setFocused(this.customShaderPackList != null ? this.customShaderPackList.getFocused() : null);
-                this.init();
+                switchShaderPage();
             });
             this.addRenderableWidget(this.screenSwitchButton);
             this.refreshScreenSwitchButton();
+
+            // The paper tabs used to be decoration only. Register invisible hit areas so the
+            // visible "ВЫБОР ПАКА" and "НАСТРОЙКИ" cards work as actual navigation buttons.
+            int tabsX = startX;
+            this.addWidget(Button.builder(Component.empty(), button -> openPackPage())
+                    .bounds(tabsX, this.cardY, TABS_W, TAB_H).build());
+            Button settingsTab = Button.builder(Component.empty(), button -> openSettingsPage())
+                    .bounds(tabsX, this.cardY + TAB_H + TAB_GAP, TABS_W, TAB_H).build();
+            settingsTab.active = canOpenSettings();
+            this.addWidget(settingsTab);
         }
 
         if (this.minecraft.level != null) {
@@ -284,6 +290,49 @@ public abstract class MixinShaderPackScreenPaper extends Screen {
 
         this.hoveredElement = null;
         this.hoveredElementCommentTimer = 0;
+    }
+
+    @Overwrite(remap = false)
+    public void refreshScreenSwitchButton() {
+        if (this.screenSwitchButton == null) {
+            return;
+        }
+        this.screenSwitchButton.setMessage(Component.translatable(
+                this.optionMenuOpen ? "options.iris.shaderPackList" : "options.iris.shaderPackSettings"));
+        this.screenSwitchButton.active = this.optionMenuOpen || canOpenSettings();
+    }
+
+    private boolean canOpenSettings() {
+        return Iris.getCurrentPack().isPresent()
+                || (this.shaderPackList != null
+                && this.shaderPackList.getSelected() instanceof ShaderPackSelectionList.ShaderPackEntry);
+    }
+
+    private void openPackPage() {
+        if (this.optionMenuOpen) {
+            this.optionMenuOpen = false;
+            this.init();
+        }
+    }
+
+    private void openSettingsPage() {
+        if (this.optionMenuOpen) {
+            return;
+        }
+        // Applying here loads the just-selected pack and creates Oculus' navigation model.
+        this.applyChanges();
+        if (Iris.getCurrentPack().isPresent() && this.navigation != null) {
+            this.optionMenuOpen = true;
+            this.init();
+        }
+    }
+
+    private void switchShaderPage() {
+        if (this.optionMenuOpen) {
+            openPackPage();
+        } else {
+            openSettingsPage();
+        }
     }
 
     private void drawPaperTitle(GuiGraphics gfx, Component text, int centerX, int y) {

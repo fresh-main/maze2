@@ -37,9 +37,7 @@ public class CompleteTaskPacket {
 
             BlockEntity blockEntity = player.level().getBlockEntity(packet.pos);
             if (blockEntity instanceof BulletinBoardBlockEntity board) {
-                // ИСПРАВЛЕНО: Метода completeTask не существует.
-                // Используем takeTaskAsScroll для корректного взаимодействия с доской.
-                board.takeTaskAsScroll(packet.slot, player);
+                board.completeTask(packet.slot, player);
             }
         });
         context.setPacketHandled(true);

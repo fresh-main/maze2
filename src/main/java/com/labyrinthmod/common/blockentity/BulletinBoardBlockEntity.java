@@ -80,6 +80,9 @@ public class BulletinBoardBlockEntity extends BlockEntity implements Container, 
         com.labyrinthmod.common.quest.QuestCompletionTracker.resetForNewDay();
 
         clearAllTasks();
+        if (level != null) {
+            lastSpawnedDay = level.getDayTime() / 24000L;
+        }
         for (int slot = 0; slot < MAX_TASKS && slot < questNbtList.size(); slot++) {
             ItemStack taskStack = createTaskItemStack(questNbtList.get(slot));
             if (!taskStack.isEmpty()) {
@@ -296,18 +299,8 @@ public class BulletinBoardBlockEntity extends BlockEntity implements Container, 
         }
 
         ItemStack scroll = new ItemStack(TaskScrollItem.TASK_SCROLL.get());
-        CompoundTag scrollTag = scroll.getOrCreateTag();
-
-        scrollTag.putString("Title", taskTag.getString("Title"));
-        scrollTag.putString("Description", taskTag.getString("Description"));
-        scrollTag.putString("Author", taskTag.getString("Author"));
-
-        if (taskTag.contains("RequiredItems", Tag.TAG_LIST)) {
-            scrollTag.put(
-                    "RequiredItems",
-                    taskTag.getList("RequiredItems", Tag.TAG_COMPOUND).copy()
-            );
-        }
+        CompoundTag scrollTag = taskTag.copy();
+        scroll.setTag(scrollTag);
 
         scrollTag.putBoolean("Completed", false);
         scrollTag.putInt("QuestSlotIndex", slot);
@@ -318,6 +311,7 @@ public class BulletinBoardBlockEntity extends BlockEntity implements Container, 
             return false;
         }
 
+        // Удаляем карточку только после успешной вставки свитка в инвентарь.
         tasks.set(slot, ItemStack.EMPTY);
         taskTaken.set(slot, true);
         setChanged();
@@ -325,10 +319,10 @@ public class BulletinBoardBlockEntity extends BlockEntity implements Container, 
         // Сразу обновляем открытый контейнер, чтобы свиток появился без задержки.
         if (player instanceof ServerPlayer serverPlayer) {
             serverPlayer.containerMenu.broadcastChanges();
+            serverPlayer.inventoryMenu.broadcastChanges();
+            serverPlayer.getInventory().setChanged();
             sendTasksToPlayer(serverPlayer);
         }
-
-        // Дополнительно синкаем всем рядом.
         sendTasksToNear();
 
         player.sendSystemMessage(Component.literal("§aЗадание взято! Свиток добавлен в инвентарь."));
@@ -621,9 +615,16 @@ public class BulletinBoardBlockEntity extends BlockEntity implements Container, 
         CompoundTag scrollTag = scroll.getTag();
         if (scrollTag == null) return false;
 
-        // Ищем свободный слот (пустой и не помеченный как "взятый")
+        // Сначала возвращаем карточку на её исходное место.
         int targetSlot = -1;
-        for (int i = 0; i < MAX_TASKS; i++) {
+        int originalSlot = scrollTag.contains("QuestSlotIndex", Tag.TAG_INT)
+                ? scrollTag.getInt("QuestSlotIndex") : -1;
+        if (originalSlot >= 0 && originalSlot < MAX_TASKS && tasks.get(originalSlot).isEmpty()) {
+            targetSlot = originalSlot;
+        }
+
+        // Если исходное место уже занято, используем любой свободный слот.
+        for (int i = 0; targetSlot == -1 && i < MAX_TASKS; i++) {
             if (tasks.get(i).isEmpty() && !taskTaken.get(i)) {
                 targetSlot = i;
                 break;
@@ -673,15 +674,9 @@ public class BulletinBoardBlockEntity extends BlockEntity implements Container, 
         if (item == null) return ItemStack.EMPTY;
 
         ItemStack stack = new ItemStack(item);
-        CompoundTag tag = new CompoundTag();
-
-        tag.putString("Title", scrollTag.getString("Title"));
-        tag.putString("Description", scrollTag.getString("Description"));
-        tag.putString("Author", scrollTag.getString("Author"));
-
-        if (scrollTag.contains("RequiredItems", Tag.TAG_LIST)) {
-            tag.put("RequiredItems", scrollTag.getList("RequiredItems", Tag.TAG_COMPOUND).copy());
-        }
+        CompoundTag tag = scrollTag.copy();
+        tag.remove("Completed");
+        tag.remove("QuestSlotIndex");
 
         stack.setTag(tag);
         return stack;

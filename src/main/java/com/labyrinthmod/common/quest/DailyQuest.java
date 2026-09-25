@@ -34,6 +34,7 @@ public class DailyQuest {
     public CompoundTag toNbt() {
         CompoundTag root = new CompoundTag();
         CompoundTag tag = new CompoundTag();
+        tag.putString("QuestId", id != null ? id : "");
         tag.putString("Title", title != null ? title : "");
         tag.putString("Description", description != null ? description : "");
         tag.putString("Author", author != null ? author : "");

@@ -34,6 +34,22 @@ public abstract class CreativeModeInventoryScreenMixin {
     @Inject(method = "renderLabels", at = @At("HEAD"), cancellable = true)
     private void otbor$hideVanillaTabTitle(GuiGraphics gfx, int mouseX, int mouseY, CallbackInfo ci) {
         // Vanilla puts every tab title at (8, 6), directly over the paper header/search row.
+        // На вкладке инвентаря renderLabels также рисует крестик удаления. После
+        // отмены ванильного заголовка возвращаем этот значок вручную в том же слоте.
+        if (selectedTab != null && selectedTab.getType() == CreativeModeTab.Type.INVENTORY) {
+            int x = 177;
+            int y = 116;
+            int color = 0xFF35261C;
+            // Пиксельный крест 5×5, увеличенный до 10×10 пикселей.
+            for (int row = 0; row < 5; row++) {
+                int left = row <= 2 ? row : 4 - row;
+                int right = 4 - left;
+                gfx.fill(x + left * 2, y + row * 2, x + left * 2 + 2, y + row * 2 + 2, color);
+                if (right != left) {
+                    gfx.fill(x + right * 2, y + row * 2, x + right * 2 + 2, y + row * 2 + 2, color);
+                }
+            }
+        }
         ci.cancel();
     }
 

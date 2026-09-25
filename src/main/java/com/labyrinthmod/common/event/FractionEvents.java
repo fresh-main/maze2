@@ -16,6 +16,7 @@ import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.eventbus.api.Event;
@@ -86,6 +87,13 @@ public class FractionEvents {
         if (player.level().isClientSide) return;
 
         int tick = player.tickCount;
+
+        // Встроенный сервер может быть открыт для локальной сети уже после входа
+        // хозяина мира. Проверка раз в секунду переводит его с GLIDER на одну из
+        // серверных фракций сразу после публикации LAN-мира.
+        if (tick % 20 == 0 && player instanceof ServerPlayer serverPlayer) {
+            ensureAutomaticFraction(serverPlayer);
+        }
 
         // Атрибуты — пересоздаём ТОЛЬКО при смене фракции (кэшируем по UUID).
         java.util.UUID uuid = player.getUUID();
@@ -334,11 +342,62 @@ public class FractionEvents {
         updateGameModeByZone(player);
 
         if (player instanceof ServerPlayer serverPlayer) {
+            ensureAutomaticFraction(serverPlayer);
             // Только синхронизируем capability — записка-личное-дело будет видеть текущую роль.
             // Атмосферный экран показываем ТОЛЬКО при выдаче командой (см. onFractionChanged),
             // а не при каждом заходе на сервер.
             syncFractionToClient(serverPlayer);
         }
+    }
+
+    /**
+     * Автоматически выдаёт стартовую фракцию.
+     * Обычный одиночный мир получает GLIDER. Выделенный сервер и мир,
+     * опубликованный в LAN, используют FARMER / COOK / MEDIC.
+     */
+    private static void ensureAutomaticFraction(ServerPlayer player) {
+        MinecraftServer server = player.getServer();
+        if (server == null) return;
+
+        boolean serverGame = server.isDedicatedServer() || server.isPublished();
+        player.getCapability(FractionProvider.FRACTION).ifPresent(data -> {
+            FractionType current = data.getFraction();
+
+            // Ручные и специальные фракции не перезаписываем. GLIDER меняется
+            // только когда одиночный мир был открыт для локальной сети.
+            if (serverGame) {
+                if (current != FractionType.NONE && current != FractionType.GLIDER) return;
+                FractionType assigned = leastPopulatedServerFraction(server);
+                data.setFraction(assigned);
+                onFractionChanged(player, current, assigned);
+            } else if (current == FractionType.NONE) {
+                data.setFraction(FractionType.GLIDER);
+                onFractionChanged(player, current, FractionType.GLIDER);
+            }
+        });
+    }
+
+    /** Выбирает наименее заполненную серверную фракцию; ничьи чередуются случайно. */
+    private static FractionType leastPopulatedServerFraction(MinecraftServer server) {
+        FractionType[] available = {FractionType.FARMER, FractionType.COOK, FractionType.MEDIC};
+        int[] counts = new int[available.length];
+
+        for (ServerPlayer online : server.getPlayerList().getPlayers()) {
+            FractionType fraction = online.getCapability(FractionProvider.FRACTION)
+                    .map(PlayerFractionData::getFraction).orElse(FractionType.NONE);
+            for (int i = 0; i < available.length; i++) {
+                if (fraction == available[i]) counts[i]++;
+            }
+        }
+
+        int minimum = Math.min(counts[0], Math.min(counts[1], counts[2]));
+        int tied = 0;
+        for (int count : counts) if (count == minimum) tied++;
+        int selectedTie = java.util.concurrent.ThreadLocalRandom.current().nextInt(tied);
+        for (int i = 0; i < counts.length; i++) {
+            if (counts[i] == minimum && selectedTie-- == 0) return available[i];
+        }
+        return FractionType.FARMER;
     }
 
     @SubscribeEvent
@@ -812,7 +871,9 @@ public class FractionEvents {
 
     // ========== АТАКИ ==========
 
-    private static boolean canAttackEntity(Player player) {
+    private static boolean canAttackEntity(Player player, net.minecraft.world.entity.Entity target) {
+        // Ограничение относится только к PvP. Мобов могут атаковать все фракции.
+        if (!(target instanceof Player)) return true;
         if (isOperator(player)) return true;
         return player.getCapability(FractionProvider.FRACTION)
                 .map(data -> {
@@ -826,7 +887,7 @@ public class FractionEvents {
     public static void onAttackEntity(AttackEntityEvent event) {
         Player player = event.getEntity();
         if (player.level().isClientSide) return;
-        if (!canAttackEntity(player)) {
+        if (!canAttackEntity(player, event.getTarget())) {
             event.setCanceled(true);
         }
     }
@@ -834,7 +895,7 @@ public class FractionEvents {
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingAttack(LivingAttackEvent event) {
         if (event.getSource().getEntity() instanceof Player player && event.getEntity() instanceof LivingEntity) {
-            if (!canAttackEntity(player)) {
+            if (!canAttackEntity(player, event.getEntity())) {
                 event.setCanceled(true);
             }
         }
@@ -855,9 +916,8 @@ public class FractionEvents {
                 item.is(Items.ENDER_PEARL) || item.is(Items.SPLASH_POTION) ||
                 item.is(Items.LINGERING_POTION);
 
-        if (isWeapon && !canAttackEntity(player)) {
-            event.setCanceled(true);
-        }
+        // Использование оружия не блокируем: попадание по игроку проверяется в
+        // onLivingAttack, а стрелять по мобам разрешено любой фракции.
     }
 
     // ========== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ==========

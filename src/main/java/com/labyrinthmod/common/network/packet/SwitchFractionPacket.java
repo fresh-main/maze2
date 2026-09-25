@@ -64,8 +64,7 @@ public class SwitchFractionPacket {
                 if (next != current) {
                     data.setFraction(next);
 
-                    // Применяем изменения без анимации (silent)
-                    FractionEvents.onFractionChangedSilent(player, current, next);
+                    FractionEvents.onFractionChanged(player, current, next);
                 }
             });
         });

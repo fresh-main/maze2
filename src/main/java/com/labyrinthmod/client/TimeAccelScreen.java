@@ -1,6 +1,8 @@
 package com.labyrinthmod.client;
 
 import com.labyrinthmod.common.event.TimeAccelHandler;
+import com.labyrinthmod.common.network.NetworkHandler;
+import com.labyrinthmod.common.network.packet.TimeSpeedPacket;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -24,7 +26,7 @@ public class TimeAccelScreen extends Screen {
         for (double s : fast) {
             addRenderableWidget(new PaperButton(x, y, bw, 20,
                     Component.literal("x" + (int) s),
-                    btn -> { TimeAccelHandler.setSpeed(s); onClose(); }));
+                    btn -> { applySpeed(s); onClose(); }));
             x += bw + gap;
         }
 
@@ -36,14 +38,21 @@ public class TimeAccelScreen extends Screen {
             String label = s == 0.5 ? "x1/2" : (s == 0.25 ? "x1/4" : "x1/8");
             addRenderableWidget(new PaperButton(x, y, bw, 20,
                     Component.literal(label),
-                    btn -> { TimeAccelHandler.setSpeed(s); onClose(); }));
+                    btn -> { applySpeed(s); onClose(); }));
             x += bw + gap;
         }
 
         // КНОПКА СБРОСА
         addRenderableWidget(new PaperButton(centerX - 60, y + 34, 120, 20,
                 Component.literal("СБРОС"),
-                btn -> { TimeAccelHandler.setSpeed(1.0); onClose(); }));
+                btn -> { applySpeed(1.0); onClose(); }));
+    }
+
+    private void applySpeed(double value) {
+        TimeAccelHandler.speed = value;
+        com.labyrinthmod.common.event.TimeSpeedHandler.setTimeSpeed(value);
+        com.labyrinthmod.common.event.TimeSpeedHandler.setEnabled(Math.abs(value - 1.0) > 0.000001);
+        NetworkHandler.CHANNEL.sendToServer(new TimeSpeedPacket(value, Math.abs(value - 1.0) > 0.000001));
     }
 
     @Override
