@@ -122,6 +122,8 @@ public final class LabyrinthShiftAssemblyHandler {
         ChunkGenerator generator = level.getChunkSource().getGenerator();
         if (!(generator instanceof LabyrinthChunkGenerator)) return;
 
+        LabyrinthAssembler.tick(level);
+
         // Ограничиваем частоту проверки — сканировать площадь каждой зоны
         // на каждый тик было бы неоправданно дорого.
         if (level.getGameTime() % ASSEMBLY_CHECK_INTERVAL_TICKS != 0) return;

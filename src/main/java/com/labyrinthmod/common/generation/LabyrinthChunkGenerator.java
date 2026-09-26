@@ -23,7 +23,6 @@ import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.level.levelgen.Heightmap;
-import net.minecraft.world.level.levelgen.LegacyRandomSource;
 import net.minecraft.world.level.levelgen.RandomState;
 import net.minecraft.world.level.levelgen.blending.Blender;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
@@ -34,7 +33,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import net.minecraft.world.level.levelgen.synth.ImprovedNoise;
-import net.minecraft.data.worldgen.features.TreeFeatures;
 import net.minecraft.util.RandomSource;
 
 public class LabyrinthChunkGenerator extends ChunkGenerator {
@@ -113,15 +111,14 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
     private final Set<Long> passageZones = new HashSet<>();// ★ РАСШИРЕННЫЕ ЗОНЫ ★
     /** Local, axis-aligned wall moves which define variant B. */
     private final List<ShiftDefinition> plannedShifts = new ArrayList<>();
-    private static final int MAX_SHIFT_ZONES = 12;
+    private static final int MAX_SHIFT_ZONES = 40;
+    private static final int MIN_SECTIONS_PER_ZONE = 4;
+    private static final int MAX_SECTIONS_PER_ZONE = 10;
     private volatile ImprovedNoise terrainNoise;
     private volatile ImprovedNoise featureNoise;
     private final LabyrinthConfig config;
-    // ★ ПЕЩЕРНАЯ СИСТЕМА ★
-    private int caveEntranceX = 0;
-    private int caveEntranceZ = 0;
-    private int caveEntranceTopY = 0; // Высота вершины холма
-    private boolean caveInitialized = false;
+    private final Set<Long> movingWallCells = new HashSet<>();
+
 
 
     public LabyrinthChunkGenerator(BiomeSource biomeSource, long seed) {
@@ -340,79 +337,212 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         }
     }
 
-    /**
-     * Builds B by exchanging opposite parallel edges of a 2x2 room square.
-     * A square with three corridors and one wall stays a tree fragment after
-     * this exchange, so each variant remains a complete connected maze.
-     */
     private void planLocalVariantBShifts(boolean[][] grid, boolean[][] isValid, int center) {
+        for (ShiftDefinition shift : plannedShifts) {
+            for (int dx = 0; dx < shift.sizeX(); dx++) {
+                for (int dz = 0; dz < shift.sizeZ(); dz++) {
+                    movingWallCells.add(hash(shift.sourceX() + dx, shift.sourceZ() + dz));
+                }
+            }
+        }
         int size = grid.length;
-        boolean[][] variantB = new boolean[size][size];
-        boolean[][] variantA = new boolean[size][size];
+        boolean[] open = new boolean[size * size];
+        boolean[] wall = new boolean[size * size];
         for (int i = 0; i < size; i++) {
-            variantB[i] = Arrays.copyOf(grid[i], size);
-            variantA[i] = Arrays.copyOf(grid[i], size);
+            for (int j = 0; j < size; j++) {
+                open[i * size + j] = isValid[i][j] && !grid[i][j];
+                wall[i * size + j] = isValid[i][j] && grid[i][j];
+            }
+        }
+        BridgeIndex bridges = new BridgeIndex(open, size);
+
+        int firstLength = MIN_SECTIONS_PER_ZONE + MIN_SECTIONS_PER_ZONE % 2;
+        int lastLength = MAX_SECTIONS_PER_ZONE - MAX_SECTIONS_PER_ZONE % 2;
+        List<SlideCandidate> candidates = new ArrayList<>();
+        for (int axis = 0; axis < 2; axis++) {
+            for (int line = 1; line + 1 < size; line += 2) {
+                for (int slot = 0; slot < size; slot += 2) {
+                    for (int length = firstLength; length <= lastLength; length += 2) {
+                        for (int sign = 1; sign >= -1; sign -= 2) {
+                            SlideCandidate candidate =
+                                    buildCandidate(open, wall, bridges, size, axis, line, slot, length, sign);
+                            if (candidate != null) candidates.add(candidate);
+                        }
+                    }
+                }
+            }
         }
 
-        Set<Integer> usedEdges = new HashSet<>();
         Random shiftRandom = new Random(seed ^ 0x6A09E667F3BCC909L);
+        Collections.shuffle(candidates, shiftRandom);
 
+        boolean[] taken = new boolean[size * size];
+        List<SlideCandidate> chosen = new ArrayList<>();
+        int lengthChoices = (lastLength - firstLength) / 2 + 1;
         for (int shift = 0; shift < MAX_SHIFT_ZONES; shift++) {
-            List<int[]> squares = new ArrayList<>();
-            for (int i = 0; i + 2 < size; i += 2) {
-                for (int j = 0; j + 2 < size; j += 2) {
-                    if (isValid[i][j] && isValid[i + 2][j]
-                            && isValid[i][j + 2] && isValid[i + 2][j + 2]) {
-                        squares.add(new int[]{i, j});
+            int wanted = firstLength + 2 * shiftRandom.nextInt(lengthChoices);
+            SlideCandidate pick = null;
+            for (int pass = 0; pass < 2 && pick == null; pass++) {
+                for (SlideCandidate candidate : candidates) {
+                    if (pass == 0 && candidate.length() != wanted) continue;
+                    if (isFree(candidate, taken, size) && isIndependent(candidate, chosen, bridges)) {
+                        pick = candidate;
+                        break;
                     }
                 }
             }
-            Collections.shuffle(squares, shiftRandom);
+            if (pick == null) break;
 
-            boolean changed = false;
-            for (int[] square : squares) {
-                int i = square[0];
-                int j = square[1];
-                int[][] squareEdges = {{i + 1, j}, {i + 1, j + 2}, {i, j + 1}, {i + 2, j + 1}};
-                int closedCount = 0;
-                int closed = -1;
-                for (int edge = 0; edge < squareEdges.length; edge++) {
-                    int[] p = squareEdges[edge];
-                    if (variantB[p[0]][p[1]]) {
-                        closedCount++;
-                        closed = edge;
+            chosen.add(pick);
+            for (int t = pick.first(); t < pick.first() + pick.length(); t++) {
+                taken[cellAt(pick.axis(), pick.line(), t, size)] = true;
+            }
+            taken[pick.lead()] = true;
+
+            int sourceAlong = (pick.first() - center) * 5;
+            int sourceLine = (pick.line() - center) * 5;
+            int span = pick.length() * 5;
+            if (pick.axis() == 0) {
+                plannedShifts.add(new ShiftDefinition(sourceAlong, sourceLine, span, 5, pick.sign() * 5, 0));
+            } else {
+                plannedShifts.add(new ShiftDefinition(sourceLine, sourceAlong, 5, span, 0, pick.sign() * 5));
+            }
+        }
+    }
+
+    private record SlideCandidate(int axis, int line, int first, int length, int sign,
+                                  int roomA, int roomB, int lead, int child) {
+    }
+
+    private static int cellAt(int axis, int line, int along, int size) {
+        return axis == 0 ? along * size + line : line * size + along;
+    }
+
+    private static int roomAcross(int axis, int line, int along, int side, int size) {
+        return axis == 0 ? along * size + line + side : (line + side) * size + along;
+    }
+
+    private static SlideCandidate buildCandidate(boolean[] open, boolean[] wall, BridgeIndex bridges, int size,
+                                                 int axis, int line, int slot, int length, int sign) {
+        int first = sign > 0 ? slot : slot - length + 1;
+        int last = first + length - 1;
+        int leadAlong = slot + sign * length;
+        int behind = slot - sign;
+        int beyond = leadAlong + sign;
+        if (first < 0 || last >= size || leadAlong < 0 || leadAlong >= size) return null;
+
+        for (int t = first; t <= last; t++) {
+            if (!wall[cellAt(axis, line, t, size)]) return null;
+        }
+        int lead = cellAt(axis, line, leadAlong, size);
+        if (!open[lead]) return null;
+        if (beyond >= 0 && beyond < size && open[cellAt(axis, line, beyond, size)]) return null;
+        if (behind >= 0 && behind < size && open[cellAt(axis, line, behind, size)]) return null;
+
+        int leadA = roomAcross(axis, line, leadAlong, -1, size);
+        int leadB = roomAcross(axis, line, leadAlong, 1, size);
+        int roomA = roomAcross(axis, line, slot, -1, size);
+        int roomB = roomAcross(axis, line, slot, 1, size);
+        if (!open[leadA] || !open[leadB] || !open[roomA] || !open[roomB]) return null;
+
+        int component = bridges.component[lead];
+        if (bridges.component[roomA] != component || bridges.component[roomB] != component) return null;
+
+        int parent = bridges.parent[lead];
+        if (parent != leadA && parent != leadB) return null;
+        int child = parent == leadA ? leadB : leadA;
+        if (bridges.parent[child] != lead || bridges.low[child] <= bridges.tin[lead]) return null;
+        if (!bridges.separates(roomA, roomB, child)) return null;
+
+        return new SlideCandidate(axis, line, first, length, sign, roomA, roomB, lead, child);
+    }
+
+    private static boolean isFree(SlideCandidate candidate, boolean[] taken, int size) {
+        for (int t = candidate.first(); t < candidate.first() + candidate.length(); t++) {
+            if (taken[cellAt(candidate.axis(), candidate.line(), t, size)]) return false;
+        }
+        return !taken[candidate.lead()];
+    }
+
+    private static boolean isIndependent(SlideCandidate candidate, List<SlideCandidate> chosen,
+                                         BridgeIndex bridges) {
+        for (SlideCandidate other : chosen) {
+            if (bridges.separates(other.roomA(), other.roomB(), candidate.child())) return false;
+            if (bridges.separates(candidate.roomA(), candidate.roomB(), other.child())) return false;
+        }
+        return true;
+    }
+
+    private static final class BridgeIndex {
+        final int[] tin;
+        final int[] tout;
+        final int[] low;
+        final int[] parent;
+        final int[] component;
+
+        BridgeIndex(boolean[] open, int size) {
+            int cells = open.length;
+            tin = new int[cells];
+            tout = new int[cells];
+            low = new int[cells];
+            parent = new int[cells];
+            component = new int[cells];
+            Arrays.fill(tin, -1);
+            Arrays.fill(parent, -1);
+            Arrays.fill(component, -1);
+
+            int[] next = new int[cells];
+            int[] stack = new int[cells];
+            int timer = 0;
+            int components = 0;
+            for (int root = 0; root < cells; root++) {
+                if (!open[root] || tin[root] >= 0) continue;
+                int top = 0;
+                stack[top++] = root;
+                tin[root] = timer;
+                low[root] = timer++;
+                component[root] = components;
+                while (top > 0) {
+                    int cell = stack[top - 1];
+                    if (next[cell] < 4) {
+                        int neighbor = neighborOf(cell, next[cell]++, size);
+                        if (neighbor < 0 || !open[neighbor] || neighbor == parent[cell]) continue;
+                        if (tin[neighbor] >= 0) {
+                            low[cell] = Math.min(low[cell], tin[neighbor]);
+                        } else {
+                            parent[neighbor] = cell;
+                            component[neighbor] = components;
+                            tin[neighbor] = timer;
+                            low[neighbor] = timer++;
+                            stack[top++] = neighbor;
+                        }
+                    } else {
+                        top--;
+                        tout[cell] = timer - 1;
+                        if (parent[cell] >= 0) low[parent[cell]] = Math.min(low[parent[cell]], low[cell]);
                     }
                 }
-                if (closedCount != 1) continue;
-
-                int target = switch (closed) {
-                    case 0 -> 1;
-                    case 1 -> 0;
-                    case 2 -> 3;
-                    default -> 2;
-                };
-                int[] sourcePos = squareEdges[closed];
-                int[] targetPos = squareEdges[target];
-                int sourceKey = sourcePos[0] * size + sourcePos[1];
-                int targetKey = targetPos[0] * size + targetPos[1];
-                if (usedEdges.contains(sourceKey) || usedEdges.contains(targetKey)
-                        || !variantA[sourcePos[0]][sourcePos[1]]
-                        || variantA[targetPos[0]][targetPos[1]]) continue;
-
-                variantB[sourcePos[0]][sourcePos[1]] = false;
-                variantB[targetPos[0]][targetPos[1]] = true;
-                usedEdges.add(sourceKey);
-                usedEdges.add(targetKey);
-
-                int sourceX = (sourcePos[0] - center) * 5;
-                int sourceZ = (sourcePos[1] - center) * 5;
-                plannedShifts.add(new ShiftDefinition(sourceX, sourceZ,
-                        (targetPos[0] - sourcePos[0]) * 5,
-                        (targetPos[1] - sourcePos[1]) * 5));
-                changed = true;
-                break;
+                components++;
             }
-            if (!changed) break;
+        }
+
+        private static int neighborOf(int cell, int direction, int size) {
+            int i = cell / size;
+            int j = cell % size;
+            switch (direction) {
+                case 0: return i + 1 < size ? cell + size : -1;
+                case 1: return i > 0 ? cell - size : -1;
+                case 2: return j + 1 < size ? cell + 1 : -1;
+                default: return j > 0 ? cell - 1 : -1;
+            }
+        }
+
+        boolean inSubtree(int cell, int root) {
+            return tin[cell] >= tin[root] && tin[cell] <= tout[root];
+        }
+
+        boolean separates(int a, int b, int root) {
+            return inSubtree(a, root) != inSubtree(b, root);
         }
     }
 
@@ -425,14 +555,15 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             UUID id = UUID.nameUUIDFromBytes(("labyrinth-shift:" + seed + ":" + index + ":"
                     + shift.sourceX + ":" + shift.sourceZ).getBytes(StandardCharsets.UTF_8));
             BlockPos min = new BlockPos(shift.sourceX, FLOOR_Y + 1, shift.sourceZ);
-            BlockPos max = new BlockPos(shift.sourceX + 4, FLOOR_Y + MAZE_HEIGHT, shift.sourceZ + 4);
+            BlockPos max = new BlockPos(shift.sourceX + shift.sizeX - 1, FLOOR_Y + MAZE_HEIGHT,
+                    shift.sourceZ + shift.sizeZ - 1);
             zones.add(new com.labyrinthmod.common.data.LabyrinthShiftZone(
                     id, min, max, shift.offsetX, 0, shift.offsetZ));
         }
         return zones;
     }
 
-    private record ShiftDefinition(int sourceX, int sourceZ, int offsetX, int offsetZ) {
+    private record ShiftDefinition(int sourceX, int sourceZ, int sizeX, int sizeZ, int offsetX, int offsetZ) {
     }
 
     // ===== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ДЛЯ КРУСКАЛА =====
@@ -644,14 +775,6 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         return small > -0.35 + densityBias * 0.4;
     }
 
-    /**
-     * ★ РЕГИОНАЛЬНОЕ СМЕЩЕНИЕ ПЛОТНОСТИ ЛИАН ★
-     * Делит мир на крупные (~71 блок) регионы и назначает каждому
-     * один из 5 "характеров" зарастания: от очень густого до почти
-     * голого камня. Детерминировано от seed мира — при одном и том же
-     * seed картина всегда одинаковая, но разные места мира выглядят
-     * по-разному (требование "не покрывать всю поверхность одинаково").
-     */
     private double vineDensityBias(int x, int z) {
         int regionX = Math.floorDiv(x, 71);
         int regionZ = Math.floorDiv(z, 71);
@@ -663,9 +786,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         switch (bucket) {
             case 0: return -0.35; // очень густо заросший участок
             case 1: return -0.15; // заросший
-            case 2: return 0.05;  // умеренно
-            case 3: return 0.25;  // скудная растительность
-            default: return 0.45; // почти голый камень
+            default: return 0.05;  // умеренно
         }
     }
 
@@ -700,6 +821,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         // ★ ЗАЩИТА 3: стена существует НА ЭТОЙ ВЫСОТЕ (на своей грани) ★
         int wx = x + (dir == 0 ? depth : dir == 1 ? -depth : 0);
         int wz = z + (dir == 2 ? depth : dir == 3 ? -depth : 0);
+        if (movingWallCells.contains(hash(wx, wz))) return null;
         if (!isSolidWall(wx, y, wz)) return null;
 
         if (!isLianaRope(x, z)) return null;
@@ -730,12 +852,12 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         if (dist > 2) return null;
         int wallTop = wall[1];
 
-        // Колонка вдоль стены, якорь куста каждые 9 блоков (было 6 — пятна сливались в ковёр)
+        int capWx = x + (dir == 0 ? dist : dir == 1 ? -dist : 0);
+        int capWz = z + (dir == 2 ? dist : dir == 3 ? -dist : 0);
+        if (movingWallCells.contains(hash(capWx, capWz))) return null;
         int t = (dir == 0 || dir == 1) ? z : x;
         int anchor = Math.floorDiv(t, 9) * 9 + 4;
 
-        // Гейт: шапки редкими пятнами, не через сегмент.
-        // noise ~[-1..1], порог 0.35 отсеивает ~2/3 сегментов вместо ~1/2.
         double gate = featureNoise.noise(anchor * 0.37 + dir * 91, 0, anchor * 0.19);
         if (gate < 0.35) return null;
 
@@ -756,6 +878,139 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         }
         return null;
     }
+    private int[] findPassageSpan(int x, int z) {
+        for (int d = 1; d <= 8; d++) {
+            if (isLogicalWall(x - d, z)) {
+                for (int e = 1; e <= 8; e++) {
+                    if (isLogicalWall(x + e, z)) return new int[]{0, x - d, x + e};
+                }
+                break;
+            }
+        }
+        for (int d = 1; d <= 8; d++) {
+            if (isLogicalWall(x, z - d)) {
+                for (int e = 1; e <= 8; e++) {
+                    if (isLogicalWall(x, z + e)) return new int[]{1, z - d, z + e};
+                }
+                break;
+            }
+        }
+        return null;
+    }
+    /**
+     * ★ ЛИАНЫ ДУГОЙ ОТ СТЕНЫ К СТЕНЕ (v2 - КРИВАЯ БЕЗЬЕ) ★
+     * Генерирует объемную дугу из тропической листвы, перекидывающуюся через проход.
+     * Использует квадратичную кривую Безье для создания естественного провисания
+     * и случайного отклонения (смещения) от 2 до 5 блоков в обе стороны.
+     * Детерминирована: не рвется на границах чанков.
+     */
+    private BlockState tryGenerateSpanningVine(int x, int y, int z) {
+        int localTop = wallTopAt(x, z);
+        // Ограничиваем высоту генерации: только в зоне свисания от верха стены
+        if (y < localTop - 15 || y > localTop + 2) return null;
+
+        int[] span = findPassageSpan(x, z);
+        if (span == null) return null;
+
+        int axis = span[0];
+        int lo = span[1];
+        int hi = span[2];
+        int width = hi - lo;
+
+        // Не генерируем дуги в слишком узких или слишком широких проходах
+        if (width < 3 || width > 16) return null;
+
+        // T - координата ВДОЛЬ прохода, S - координата ПОПЕРЕК (ширина прохода)
+        int t_coord = (axis == 0) ? z : x;
+        int s_coord = (axis == 0) ? x : z;
+
+        // ★ РАЗБИЕНИЕ НА СЕГМЕНТЫ ★
+        // Каждый сегмент — это одна независимая дуга.
+        // Используем floorDiv, чтобы сегменты были одинаковыми во всех чанках.
+        int segLen = 12; // Базовая длина сегмента вдоль прохода
+        int segStart = Math.floorDiv(t_coord, segLen) * segLen;
+
+        // Детерминированный хэш для сегмента (гарантирует непрерывность между чанками)
+        long segHash = hash(axis == 0 ? lo : segStart, axis == 0 ? segStart : lo);
+        segHash ^= (segHash >>> 33);
+        segHash *= 0xFF51AFD7ED558CCDL;
+        segHash ^= (segHash >>> 33);
+
+        Random segRand = new Random(segHash);
+
+        // 1. Параметры дуги
+        int actualLen = 10 + segRand.nextInt(8); // Длина дуги вдоль прохода (10-17 блоков)
+        int segEnd = segStart + actualLen;
+
+        // Если текущий блок не в пределах этого сегмента, он не относится к этой дуге
+        if (t_coord < segStart || t_coord > segEnd) return null;
+
+        // 2. ★ ОТКЛОНЕНИЕ (СМЕЩЕНИЕ) ОТ 2 ДО 5 БЛОКОВ ★
+        // Смещение поперек прохода (S) и вдоль прохода (T), чтобы дуга была косой/органичной
+        int offsetMagS = 2 + segRand.nextInt(4); // 2, 3, 4 или 5
+        int offsetS = segRand.nextBoolean() ? offsetMagS : -offsetMagS;
+
+        int offsetMagT = 2 + segRand.nextInt(4); // 2, 3, 4 или 5
+        int offsetT = segRand.nextBoolean() ? offsetMagT : -offsetMagT;
+
+        // 3. Провисание дуги вниз
+        int sag = 2 + segRand.nextInt(4); // 2..5 блоков вниз
+
+        // Реальная высота стен в точках крепления (с учетом ruinOffset)
+        int wallTopLo, wallTopHi;
+        if (axis == 0) {
+            wallTopLo = wallTopAt(lo, z);
+            wallTopHi = wallTopAt(hi, z);
+        } else {
+            wallTopLo = wallTopAt(x, lo);
+            wallTopHi = wallTopAt(x, hi);
+        }
+
+        // ★ ТОЧКИ КРИВОЙ БЕЗЬЕ ★
+        // P0: Крепление на стене 1
+        // P2: Крепление на стене 2
+        // P1: Контрольная точка (середина + случайные отклонения)
+        double midS = (lo + hi) / 2.0;
+        double midT = (segStart + segEnd) / 2.0;
+        double midY = (wallTopLo + wallTopHi) / 2.0;
+
+        double p1_s = midS + offsetS; // Смещение поперек
+        double p1_t = midT + offsetT; // Смещение вдоль (делаем дугу диагональной)
+        double p1_y = midY - sag;     // Провисание
+
+        // Параметр t для кривой Безье (от 0.0 до 1.0) на основе позиции вдоль прохода
+        double t_param = (double) (t_coord - segStart) / (segEnd - segStart);
+
+        // Формула квадратичной кривой Безье: B(t) = (1-t)^2*P0 + 2*(1-t)*t*P1 + t^2*P2
+        double u = 1.0 - t_param;
+        double u2 = u * u;
+        double t2 = t_param * t_param;
+        double ut2 = 2.0 * u * t_param;
+
+        // Вычисляем теоретические координаты центра лианы в этой точке
+        double curveS = u2 * lo + ut2 * p1_s + t2 * hi;
+        double curveY = u2 * wallTopLo + ut2 * p1_y + t2 * wallTopHi;
+
+        // Расстояние от текущего блока до идеальной кривой
+        double ds = s_coord - curveS;
+        double dy = y - curveY;
+
+        // ★ ТОЛЩИНА ЛИАНЫ ★
+        // Добавляем 3D шум, чтобы края листвы были рваными и органичными
+        double noise = featureNoise.noise(x * 0.5, y * 0.5, z * 0.5) * 0.35;
+        double radius = 0.85 + noise;
+
+        // Эллиптическая проверка расстояния (чуть сплюснута по вертикали)
+        double distSq = (ds * ds) + (dy * dy * 1.25);
+
+        if (distSq <= radius * radius) {
+            // Возвращаем тропическую листву (она не осыпается благодаря PERSISTENT=true)
+            return getJungleLeafBlock();
+        }
+
+        return null;
+    }
+
 
     private BlockState generateSectorBlock(int x, int y, int z, long hash) {
         if (y == FLOOR_Y) return randomFloorBlock(x, z);
@@ -790,11 +1045,6 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         return Blocks.AIR.defaultBlockState();
     }
 
-    /**
-     * ★ ВСПОМОГАТЕЛЬНЫЙ МЕТОД ★
-     * Вычисляет физическую стартовую координату для логического индекса k,
-     * учитывая разную ширину комнат (7) и стен (5).
-     */
     private int getPhysicalStart(int k, int corridorWidth, int wallThickness) {
         if (k % 2 == 0) {
             // Комната: каждая пара (комната+стена) занимает 12 блоков
@@ -854,8 +1104,6 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
     private void createPassage(int offsetX, int offsetZ, int dirX, int dirZ) {
         int halfWidth = PASSAGE_WIDTH / 2;
 
-        // ★ ДИНАМИЧЕСКИЙ РАСЧЕТ ГРАНИЦ ПРОХОДА ★
-        // Стартуем внутри основного лабиринта
         int startDist = MAIN_MAZE_END - 15;
         // Заканчиваем за внешней границей секторов (чтобы гарантированно пробить внешнюю стену секторов)
         int endDist = SEPARATOR_WALL_END + 15;
@@ -910,16 +1158,9 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             }
         }
     }
-
-    /**
-     * ★ СОЗДАНИЕ ПРОХОДА ЧЕРЕЗ СТЕНУ ГЛЕЙДА ★
-     * Прорубает стену глейда и соединяет её с сеткой основного лабиринта.
-     */
     private void createGladePassage(int centerX, int centerZ, int dirX, int dirZ) {
         int halfWidth = 7; // Ширина 15 блоков (идеально совпадает с 3 клетками сетки лабиринта)
 
-        // step от -10 до 25 покрывает диапазон от 65 до 90 по оси направления.
-        // Это гарантированно прорывает стену глейда (70-77) и соединяется с сеткой лабиринта (начинается на 85).
         for (int step = -10; step <= 25; step++) {
             int px = centerX + dirX * step;
             int pz = centerZ + dirZ * step;
@@ -1010,29 +1251,21 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         int topY = getTopY(worldX, worldZ);
         boolean isNatural = (dist <= GLADE_RADIUS || dist > OUTER_WALL_END);
 
+
         double riverDist = -1;
         if (isNatural && dist <= GLADE_RADIUS) {
             riverDist = distanceToRiverCurve(worldX, worldZ);
         }
 
-        // ★ ЛИАНЫ ВНУТРИ ГЛЕЙДА ★
-        // generateNaturalTerrain() никогда не размещает лианы — из-за этого
-        // внутренняя сторона стены Глейда (видимая изнутри поляны) оставалась
-        // голой, хотя сама стена и снаружи, и изнутри одинаково распознаётся
-        // как "логическая стена" (isLogicalWall/findNearestWall). Не хватало
-        // только вызова генератора лиан для внутренних колонок. Проверяем
-        // лишь колонки в пределах досягаемости findNearestWall (макс. радиус
-        // поиска — 4 блока от границы Глейда) и только там, где природный
-        // рельеф и так оставил бы воздух — форма и рельеф самого Глейда не
-        // меняются, лианы лишь дополняют пустое пространство у стены.
         boolean nearGladeWall = dist <= GLADE_RADIUS && dist >= GLADE_RADIUS - 4;
+        boolean nearOuterWall = dist > OUTER_WALL_END && dist <= OUTER_WALL_END + 4;
 
         for (int localY = 0; localY < 16; localY++) {
             int worldY = baseY + localY;
             BlockState state;
             if (isNatural) {
                 state = generateNaturalTerrain(worldX, worldY, worldZ, dist, riverDist);
-                if (nearGladeWall && (state == null || state.isAir())) {
+                if ((nearGladeWall || nearOuterWall) && (state == null || state.isAir())) {
                     BlockState vines = tryGenerateWallVines(worldX, worldY, worldZ);
                     if (vines != null) state = vines;
                 }
@@ -1049,16 +1282,21 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
     }
 
     private BlockState generateLabyrinthFast(int x, int y, int z, int dist, long hash, int topY) {
+        boolean isMovingWall = movingWallCells.contains(hash);
         if (y > topY) {
             // ★ ЛИСТВА ТОРЧИТ НАД КРОМКОЙ ★
-            BlockState vines = tryGenerateWallVines(x, y, z);
-            if (vines != null) return vines;
+            if (!isMovingWall) {
+                BlockState vines = tryGenerateWallVines(x, y, z);
+                if (vines != null) return vines;
+            }
             return Blocks.AIR.defaultBlockState();
         }
 
-        // ★ ЛИАНЫ И КУСТЫ — до всех зон ★
-        BlockState vines = tryGenerateWallVines(x, y, z);
-        if (vines != null) return vines;
+        // ★ ЛИАНЫ И КУСТЫ — до всех зон (кроме движущихся стен) ★
+        if (!isMovingWall) {
+            BlockState vines = tryGenerateWallVines(x, y, z);
+            if (vines != null) return vines;
+        }
 
         BlockState state = Blocks.AIR.defaultBlockState();
 
@@ -1314,13 +1552,6 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         }
     }
 
-    /**
-     * Итоговое смещение высоты стены в конкретной колонке (x,z).
-     * Отрицательное значение — просевший/обрушенный участок,
-     * положительное — уцелевший выступающий зубец.
-     * Несколько октав шума разного масштаба (крупные проломы + мелкая
-     * рябь по кромке) плюс редкие резкие провалы (крупные обвалы).
-     */
     private int ruinHeightOffset(int x, int z) {
         int variant = ruinProfileVariant(x, z);
 
@@ -1441,7 +1672,6 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             return Blocks.AIR.defaultBlockState();
         }
 
-        // Соединяем с каждой стороной где есть опора
         BlockState bars = Blocks.IRON_BARS.defaultBlockState();
         if (north) bars = bars.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.NORTH, true);
         if (south) bars = bars.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.SOUTH, true);
@@ -1548,11 +1778,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
 
         return weatheredSurface(x, y, z, vein, base);
     }
-    /**
-     * ★ СОЗДАНИЕ ОСЕВОГО ПРОХОДА ★
-     * Генерирует прямой проход вдоль оси X или Z, пробивая все стены на своем пути.
-     * Ширина прохода 7 блоков (как в секторах), чтобы обеспечить плавный переход.
-     */
+
     private void createAxisPassage(int centerX, int centerZ, int dirX, int dirZ, int length) {
         int halfWidth = 6; // Ширина 7 блоков (от -3 до 3)
 
@@ -1583,10 +1809,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             }
         }
     }
-    /**
-     * ★ ПРОВЕРКА: ЯВЛЯЕТСЯ ЛИ БЛОК СТENOЙ ★
-     * Используется для определения границ стен без вызова тяжелых методов генерации.
-     */
+
     private boolean isWallBlock(int x, int z) {
         long h = hash(x, z);
         int dist = Math.max(Math.abs(x), Math.abs(z));
@@ -1642,13 +1865,16 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         // 1. Ближайшая стена (1-2 блока)
         int depth = 3;
         int sideCoord = 0;
+        int wallX = x;
+        int wallZ = z;
         for (int d = 1; d <= 2; d++) {
-            if (isLogicalWall(x + d, z)) { depth = d; sideCoord = z; break; }
-            if (isLogicalWall(x - d, z)) { depth = d; sideCoord = z; break; }
-            if (isLogicalWall(x, z + d)) { depth = d; sideCoord = x; break; }
-            if (isLogicalWall(x, z - d)) { depth = d; sideCoord = x; break; }
+            if (isLogicalWall(x + d, z)) { depth = d; sideCoord = z; wallX = x + d; wallZ = z; break; }
+            if (isLogicalWall(x - d, z)) { depth = d; sideCoord = z; wallX = x - d; wallZ = z; break; }
+            if (isLogicalWall(x, z + d)) { depth = d; sideCoord = x; wallX = x; wallZ = z + d; break; }
+            if (isLogicalWall(x, z - d)) { depth = d; sideCoord = x; wallX = x; wallZ = z - d; break; }
         }
         if (depth > 2) return null;
+        if (movingWallCells.contains(hash(wallX, wallZ))) return null;
 
         // 2. Центры кустов каждые 5 блоков вдоль стены (~70% мест)
         int centerSide = (int) (Math.round(sideCoord / 5.0) * 5.0);
@@ -1714,8 +1940,12 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         int wallTop = wall[1];
         int dir = wall[2];
 
+        int wallVineWx = x + (dir == 0 ? depth : dir == 1 ? -depth : 0);
+        int wallVineWz = z + (dir == 2 ? depth : dir == 3 ? -depth : 0);
+        if (movingWallCells.contains(hash(wallVineWx, wallVineWz))) return null;
+
         int hang = wallTop - y;
-        if (hang < 1 || hang > 20) return null;          // только ниже кромки
+        if (hang < 1 || hang > 45) return null;          // только ниже кромки
 
         // Крупная региональная плотность зарослей — те же густые/редкие/
         // почти голые участки, что и у остальных лиан, а не отдельная
@@ -1750,7 +1980,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
     // только, ставить ли блок листвы в уже "воздушной" клетке рядом
     // со стеной.
     // =====================================================================
-    private static final int VINE_CELL_LEN = 7;
+    private static final int VINE_CELL_LEN = 3;
 
     /** Детерминированный (от seed мира) хэш для конкретной ячейки вдоль стены. */
     private long vineGroupHash(int cellIdx, int dir, long salt) {
@@ -1770,12 +2000,6 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         return (shifted & 0xFFFFL) / 65535.0;
     }
 
-    /**
-     * Проверяет, попадает ли блок (x,y,z) в какую-либо из ближайших
-     * "групп" лиан вдоль стены. Смотрит на свою ячейку и двух соседей,
-     * потому что якорь соседней ячейки из-за джиттера может дотянуться
-     * и до текущей колонки.
-     */
     private boolean organicVineShape(int x, int y, int z, int dir, int t, int hang, int depth) {
         if (depth < 1 || depth > 2) return false;
 
@@ -1783,9 +2007,6 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         for (int co = -1; co <= 1; co++) {
             int cellIdx = baseCell + co;
             long gh = vineGroupHash(cellIdx, dir, 0x51A5L);
-
-            // Не в каждой ячейке есть группа — настоящие разрывы между
-            // скоплениями лиан, а не непрерывная стена из листвы.
             if (vineRnd(gh, 0) < 0.24) continue;
 
             // Якорь "гуляет" внутри ячейки — расстояния между соседними
@@ -1831,16 +2052,20 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
 
         switch (style) {
             case 0: {
-                // Тонкая длинная извивающаяся плеть — не идеальная вертикаль,
-                // слегка "змеится" по высоте.
-                int len = (int) Math.round((8 + vineRnd(gh, 4) * 10) * sizeScale);
+                // Тонкая короткая плеть с крючком-завитком на конце —
+                // почти прямая у корня, закручивается ближе к кончику,
+                // как на образце. Толщина в один блок, без раздутых пятен.
+                int len = (int) Math.round((8 + vineRnd(gh, 6) * 7) * sizeScale);
                 if (len <= 0 || hang > len) return false;
                 if (depth > 1) return false;
-                double taper = 1.0 - (double) hang / len;
+                double progress = (double) hang / len;
                 double swayPhase = vineRnd(gh, 5) * 6.283;
-                double sway = Math.sin(hang * 0.33 + swayPhase) * 0.9;
-                double radius = (0.5 + taper * 0.55) * sizeScale;
-                double d = Math.abs(dt - sway) - ripple;
+                double turns = 0.6 + vineRnd(gh, 2) * 0.6;
+                double amp = 1.6 + vineRnd(gh, 3) * 1.0;
+                double curl = Math.pow(progress, 1.4);
+                double sway = Math.sin(progress * turns * 6.283 + swayPhase) * amp * curl;
+                double radius = 1 + (1.0 - progress) * 1;
+                double d = Math.abs(dt - sway) - ripple * 0.5;
                 return d <= radius;
             }
             case 1: {
@@ -1905,10 +2130,6 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         }
     }
 
-    /**
-     * ★ ПОЛУЧЕНИЕ БЛОКА ЛИСТВЫ ★
-     * Делает листву "постоянной" (PERSISTENT), чтобы она не облетала без бревен.
-     */
     private BlockState getLeafBlock() {
         try {
             return Blocks.OAK_LEAVES.defaultBlockState().setValue(
@@ -2273,6 +2494,15 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
                 if (vine != null) return vine;
                 return Blocks.AIR.defaultBlockState();
             }
+            if (passages.contains(hash) || passageZones.contains(hash)) {
+                BlockState spanning = tryGenerateSpanningVine(x, y, z);
+                if (spanning != null) return spanning;
+                BlockState bush = tryGenerateBush(x, y, z);
+                if (bush != null) return bush;
+                BlockState vine = tryGenerateVine(x, y, z, FLOOR_Y + MAZE_HEIGHT);
+                if (vine != null) return vine;
+                return Blocks.AIR.defaultBlockState();
+            }
             int modX = Math.floorMod(x, 5);
             int modZ = Math.floorMod(z, 5);
             int depthXZ = Math.min(modX, 4 - modX);
@@ -2421,33 +2651,19 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         return true; // Всё остальное в зонах лабиринта — стена
     }
 
-    /**
-     * ★ ГЕНЕРАЦИЯ ГУСТЫХ ЛИАН, ПАДАЮЩИХ ДУГОЙ СО СТЕН ★
-     * Лианы жестко привязаны к поверхности стены и свисают в проход.
-     */
-    /**
-     * ★ 寻找最近的墙壁及其顶部高度 ★
-     * 返回数组: {距离, 墙顶Y坐标, 墙壁方向(0=X+, 1=X-, 2=Z+, 3=Z-)}
-     */
     private int[] findNearestWall(int x, int z) {
-        for (int d = 1; d <= 4; d++) { // 最大影响半径 4 格，彻底杜绝大立方体
-            // ★ ВАЖНО: используем wallTopAt(), а НЕ getTopY() ★
-            // getTopY() врёт для внутренних стен лабиринта (даёт высоту разделительной
-            // стены вместо реальной высоты стены основного лабиринта), из-за чего лианы
-            // подвешивались от фантомной кромки на 15-20 блоков выше настоящей стены
-            // и "летали" в воздухе. wallTopAt() уже был написан именно для этого случая,
-            // просто не был подключён — подключаем.
+        for (int d = 1; d <= 8; d++) { // ★ Увеличено с 4 до 8 для широких лиан
             if (isLogicalWall(x + d, z)) return new int[]{d, wallTopAt(x + d, z), 0};
             if (isLogicalWall(x - d, z)) return new int[]{d, wallTopAt(x - d, z), 1};
             if (isLogicalWall(x, z + d)) return new int[]{d, wallTopAt(x, z + d), 2};
             if (isLogicalWall(x, z - d)) return new int[]{d, wallTopAt(x, z - d), 3};
-            // 对角线检查（适配扇区的斜墙）
+            // Диагональные проверки
             if (isLogicalWall(x + d, z + d)) return new int[]{d, wallTopAt(x + d, z + d), 0};
             if (isLogicalWall(x - d, z - d)) return new int[]{d, wallTopAt(x - d, z - d), 1};
             if (isLogicalWall(x + d, z - d)) return new int[]{d, wallTopAt(x + d, z - d), 0};
             if (isLogicalWall(x - d, z + d)) return new int[]{d, wallTopAt(x - d, z + d), 1};
         }
-        return null; // 周围没有墙，绝对不生成
+        return null;
     }
 
 
@@ -3485,7 +3701,6 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             }
 
             if (s == 0) {
-                // Fallback, чтобы точно не было полностью нулевого сида.
                 s = 0x9E3779B97F4A7C15L;
             }
 
@@ -3658,10 +3873,6 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         return terrainHeight;
     }
 
-    /**
-     * ★ ПОИСК САМОГО ВЫСОКОГО ХОЛМА ★
-     * Сканирует зону холмов (dist 30-55) с помощью точной формулы.
-     */
     private int[] findHighestHill() {
         int bestX = 0, bestZ = 0, maxY = FLOOR_Y;
 
