@@ -27,8 +27,8 @@ public class TimeAccelHandler {
 
     public static void setSpeed(double s) {
         speed = Math.max(0.05, Math.min(1000, s));
-        virtualTime = -1;
-        lastApplied = -1;
+        TimeSpeedHandler.setTimeSpeed(speed);
+        TimeSpeedHandler.setEnabled(Math.abs(speed - 1.0) > 0.000001);
     }
 
     public static String formatStatus() {
@@ -67,28 +67,6 @@ public class TimeAccelHandler {
     // ===== ПЛАВНОЕ И УСКОРЕНИЕ, И ЗАМЕДЛЕНИЕ =====
     @SubscribeEvent
     public static void onLevelTick(TickEvent.LevelTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) return;
-        if (event.level.isClientSide()) return;
-        if (!(event.level instanceof ServerLevel serverLevel)) return;
-        if (!event.level.dimension().equals(Level.OVERWORLD)) return;
-
-        if (speed == 1.0) {
-            virtualTime = -1;
-            lastApplied = -1;
-            return;
-        }
-
-        long current = serverLevel.getDayTime();
-        // Если время поменяли извне (/time set, сон) — синхронизируемся
-        if (virtualTime < 0 || Math.abs(current - lastApplied) > 4) {
-            virtualTime = current;
-        }
-
-        // virtualTime += speed: при speed>1 время летит быстрее,
-        // при speed<1 — ползёт медленнее, всегда ПЛАВНО
-        virtualTime += speed;
-        long target = (long) virtualTime;
-        serverLevel.setDayTime(target);
-        lastApplied = target;
+        // Вся коррекция времени выполняется одним TimeSpeedHandler.
     }
 }

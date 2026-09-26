@@ -8,6 +8,9 @@
         "type": "minecraft:fixed",
         "biome": "minecraft:plains"
       },
+      "river_biome": "minecraft:river",
+      "forest_biome": "minecraft:forest",
+      "desert_biome": "minecraft:desert",
       "seed": 0
     },
     "seed": 0

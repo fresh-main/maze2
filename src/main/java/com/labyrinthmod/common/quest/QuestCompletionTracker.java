@@ -1,5 +1,6 @@
 package com.labyrinthmod.common.quest;
 
+import com.labyrinthmod.LabyrinthMod;
 import com.labyrinthmod.common.blockentity.BulletinBoardBlockEntity;
 import com.labyrinthmod.common.event.LiftCommandHandler;
 import com.labyrinthmod.common.event.LiftLockManager;
@@ -41,7 +42,7 @@ public class QuestCompletionTracker {
     public static void resetForNewDay() {
         completedSlots.clear();
         liftEventTriggered = false;
-        System.out.println("[QuestTracker] Сброс трекера заданий для нового дня.");
+        LabyrinthMod.LOGGER.info("[QuestTracker] Сброс трекера заданий для нового дня.");
     }
 
     /**
@@ -52,9 +53,13 @@ public class QuestCompletionTracker {
         if (slotIndex < 0 || slotIndex >= TOTAL_QUESTS) return;
         if (liftEventTriggered) return; // уже запущено, не дублируем
 
-        completedSlots.add(slotIndex);
-        System.out.println("[QuestTracker] Задание #" + slotIndex + " выполнено. " +
-                "Прогресс: " + completedSlots.size() + "/" + TOTAL_QUESTS);
+        if (!completedSlots.add(slotIndex)) {
+            LabyrinthMod.LOGGER.info("[QuestTracker] Задание #{} уже учтено. Прогресс: {}/{}",
+                    slotIndex + 1, completedSlots.size(), TOTAL_QUESTS);
+            return;
+        }
+        LabyrinthMod.LOGGER.info("[QuestTracker] Задание #{} выполнено. Прогресс: {}/{}",
+                slotIndex + 1, completedSlots.size(), TOTAL_QUESTS);
 
         if (completedSlots.size() >= TOTAL_QUESTS) {
             tryTriggerLiftEvent();

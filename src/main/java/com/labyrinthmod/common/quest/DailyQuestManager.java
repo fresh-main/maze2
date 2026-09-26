@@ -12,6 +12,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -92,13 +93,14 @@ public class DailyQuestManager {
         Collections.shuffle(shuffled);
         return shuffled.subList(0, Math.min(count, shuffled.size()));
     }
-    public static void saveQuestToJson(DailyQuest quest) {
+    public static synchronized boolean saveQuestToJson(DailyQuest quest) {
         // Генерируем уникальный ID, если он не задан
         if (quest.id == null || quest.id.isEmpty()) {
             quest.id = "custom_quest_" + System.currentTimeMillis();
         }
 
-        Path filePath = QUEST_DIR.resolve(quest.id + ".json");
+        String safeId = quest.id.replaceAll("[^a-zA-Z0-9_.-]", "_");
+        Path filePath = QUEST_DIR.resolve(safeId + ".json");
 
         com.google.gson.JsonObject json = new com.google.gson.JsonObject();
         json.addProperty("id", quest.id);
@@ -115,14 +117,23 @@ public class DailyQuestManager {
         }
         json.add("requiredItems", reqArray);
 
-        try (java.io.FileWriter writer = new java.io.FileWriter(filePath.toFile())) {
+        try {
+            Files.createDirectories(QUEST_DIR);
+        } catch (IOException e) {
+            LabyrinthMod.LOGGER.error("[DailyQuest] Не удалось создать папку заданий {}", QUEST_DIR.toAbsolutePath(), e);
+            return false;
+        }
+
+        try (java.io.Writer writer = Files.newBufferedWriter(filePath, StandardCharsets.UTF_8)) {
             GSON.toJson(json, writer);
             LabyrinthMod.LOGGER.info("[DailyQuest] Сохранено новое задание в {}", filePath.toAbsolutePath());
 
             // Перезагружаем пул, чтобы новое задание сразу стало доступно для спавна
             loadQuests();
+            return true;
         } catch (IOException e) {
             LabyrinthMod.LOGGER.error("[DailyQuest] Ошибка сохранения задания в JSON", e);
+            return false;
         }
     }
 }

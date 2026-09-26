@@ -142,23 +142,11 @@ public class BulletinBoardScreen extends AbstractContainerScreen<BulletinBoardMe
                     final BulletinBoardBlockEntity board = blockEntity;
                     final ItemStack clickedStack = taskStack.copy();
 
-                    // ===============================
-                    // Кнопка "Взять задание"
-                    // ===============================
                     Runnable takeCallback = () -> {
                         NetworkHandler.CHANNEL.sendToServer(
                                 new TakeTaskPacket(board.getBlockPos(), slotIndex)
                         );
-
-                        if (this.minecraft != null && this.minecraft.player != null) {
-                            if (this.minecraft.player.getInventory().getFreeSlot() != -1) {
-                                board.clearTaskVisual(slotIndex);
-                            }
-                        }
-
-                        if (this.minecraft != null) {
-                            this.minecraft.setScreen(this);
-                        }
+                        if (this.minecraft != null) this.minecraft.setScreen(this);
                     };
 
                     // ===============================

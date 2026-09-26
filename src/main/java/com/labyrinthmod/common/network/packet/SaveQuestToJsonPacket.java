@@ -73,10 +73,12 @@ public class SaveQuestToJsonPacket {
                     quest.requiredItems.add(req);
                 }
 
-                // Сохраняем в JSON и обновляем пул
-                DailyQuestManager.saveQuestToJson(quest);
-
-                player.sendSystemMessage(Component.literal("§aЗадание успешно сохранено в конфиг!"));
+                // Сохраняем на сервере в JSON и обновляем пул только после успешной записи.
+                if (DailyQuestManager.saveQuestToJson(quest)) {
+                    player.sendSystemMessage(Component.literal("§aЗадание успешно сохранено в JSON!"));
+                } else {
+                    player.sendSystemMessage(Component.literal("§cНе удалось сохранить задание. Подробности есть в логе сервера."));
+                }
             }
         });
         context.setPacketHandled(true);

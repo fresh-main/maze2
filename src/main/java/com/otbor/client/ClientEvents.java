@@ -3,6 +3,7 @@ package com.otbor.client;
 import com.labyrinthmod.client.mixin.DisconnectedScreenAccessor;
 import com.labyrinthmod.LabyrinthMod;
 import com.otbor.client.widgets.PaperRender;
+import com.otbor.client.widgets.PaperRecipeBookButton;
 import com.otbor.client.widgets.PaperWidgets;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -260,6 +261,19 @@ public class ClientEvents {
         for (GuiEventListener child : new ArrayList<>(screen.children())) {
             if (child instanceof net.minecraft.client.gui.components.ImageButton btn) {
                 event.removeListener(btn);
+            }
+        }
+    }
+
+    @SubscribeEvent(priority = net.minecraftforge.eventbus.api.EventPriority.LOWEST)
+    public static void onRecipeBookButtonInit(ScreenEvent.Init.Post event) {
+        Screen screen = event.getScreen();
+        if (!(screen instanceof net.minecraft.client.gui.screens.inventory.CraftingScreen)
+                && !(screen instanceof vectorwing.farmersdelight.client.gui.CookingPotScreen)) return;
+        for (GuiEventListener child : new ArrayList<>(screen.children())) {
+            if (child instanceof net.minecraft.client.gui.components.ImageButton original) {
+                event.removeListener(original);
+                event.addListener(new PaperRecipeBookButton(original));
             }
         }
     }

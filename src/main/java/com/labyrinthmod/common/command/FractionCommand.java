@@ -22,7 +22,9 @@ public class FractionCommand {
                                 .then(Commands.argument("fraction", StringArgumentType.word())
                                         .suggests((ctx, builder) -> {
                                             for (FractionType type : FractionType.values()) {
-                                                if (type != FractionType.NONE && type != FractionType.IMPOSTER) {
+                                                if (type != FractionType.NONE && type != FractionType.IMPOSTER
+                                                        && type != FractionType.OPERATOR && type != FractionType.RUNNER
+                                                        && type != FractionType.BUTCHER) {
                                                     builder.suggest(type.name());
                                                 }
                                             }
@@ -70,8 +72,10 @@ public class FractionCommand {
             String fractionName = StringArgumentType.getString(ctx, "fraction");
             FractionType fraction = FractionType.fromName(fractionName);
 
-            if (fraction == null || fraction == FractionType.NONE || fraction == FractionType.IMPOSTER) {
-                ctx.getSource().sendFailure(Component.literal("§cНеверный тип фракции. Используйте /fraction traitor для выдачи предателя"));
+            if (fraction == FractionType.NONE || fraction == FractionType.IMPOSTER
+                    || fraction == FractionType.OPERATOR || fraction == FractionType.RUNNER
+                    || fraction == FractionType.BUTCHER) {
+                ctx.getSource().sendFailure(Component.literal("§cНедоступная фракция. Предатель: /fraction traitor; Оператор: F3+F6."));
                 return 0;
             }
 
@@ -158,10 +162,12 @@ public class FractionCommand {
     private static int listFractions(CommandContext<CommandSourceStack> ctx) {
         ctx.getSource().sendSuccess(() -> Component.literal("§6=== Доступные фракции ==="), false);
         ctx.getSource().sendSuccess(() -> Component.literal("§e- FARMER §7(Фермер) - работа с грядками"), false);
-        ctx.getSource().sendSuccess(() -> Component.literal("§6- BUTCHER §7(Мясник) - кормление животных, атака монстров, сила I"), false);
-        ctx.getSource().sendSuccess(() -> Component.literal("§b- RUNNER §7(Бегун) - атака монстров, покидание зон, скорость I"), false);
         ctx.getSource().sendSuccess(() -> Component.literal("§f- COOK §7(Повар) - готовка еды"), false);
-        ctx.getSource().sendSuccess(() -> Component.literal("§d- MEDIC §7(Медик) - регенерация I"), false);
+        ctx.getSource().sendSuccess(() -> Component.literal("§d- MEDIC §7(Медик)"), false);
+        ctx.getSource().sendSuccess(() -> Component.literal("§b- GLIDER §7(Глейдер)"), false);
+        ctx.getSource().sendSuccess(() -> Component.literal("§a- SCIENTIST §7(Учёный)"), false);
+        ctx.getSource().sendSuccess(() -> Component.literal("§2- SURVIVOR §7(Выживший)"), false);
+        ctx.getSource().sendSuccess(() -> Component.literal("§9- SOLDIER §7(Военный)"), false);
         ctx.getSource().sendSuccess(() -> Component.literal("§7- OPERATOR §7(Оператор) - нет ограничений"), false);
         ctx.getSource().sendSuccess(() -> Component.literal("§c- IMPOSTER §7(Предатель) - скрытая фракция"), false);
         return 1;

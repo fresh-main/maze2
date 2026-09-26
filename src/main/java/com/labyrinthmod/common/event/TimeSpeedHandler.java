@@ -6,20 +6,23 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.server.ServerLifecycleHooks;
+import java.util.HashMap;
+import java.util.Map;
 
 @Mod.EventBusSubscriber(modid = "labyrinthmod")
 public class TimeSpeedHandler {
 
     private static double timeSpeed = 1.0;
     private static boolean enabled = false;
-    private static int tickCounter = 0;
+    private static final Map<net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level>, Double> remainders = new HashMap<>();
 
     public static double getTimeSpeed() {
         return timeSpeed;
     }
 
     public static void setTimeSpeed(double speed) {
-        timeSpeed = Math.max(0.1, Math.min(10.0, speed));
+        timeSpeed = Math.max(0.05, Math.min(1000.0, speed));
+        remainders.clear();
         System.out.println("[TimeSpeed] Установлена скорость: " + timeSpeed);
     }
 
@@ -29,6 +32,7 @@ public class TimeSpeedHandler {
 
     public static void setEnabled(boolean enabled) {
         TimeSpeedHandler.enabled = enabled;
+        if (!enabled) remainders.clear();
         System.out.println("[TimeSpeed] Enabled: " + enabled);
     }
 
@@ -40,25 +44,13 @@ public class TimeSpeedHandler {
         MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
         if (server == null) return;
 
-        tickCounter++;
-
-        // Логируем каждые 100 тиков (5 секунд)
-        if (tickCounter % 100 == 0) {
-            System.out.println("[TimeSpeed] Тик #" + tickCounter + ", speed=" + timeSpeed + ", enabled=" + enabled);
-        }
-
         for (ServerLevel level : server.getAllLevels()) {
-            long currentTime = level.getDayTime();
-            long ticksToAdd = (long) Math.ceil(timeSpeed);
-
-            if (ticksToAdd > 1) {
-                level.setDayTime(currentTime + ticksToAdd);
-
-                // Логируем изменение времени каждые 100 тиков
-                if (tickCounter % 100 == 0) {
-                    System.out.println("[TimeSpeed] Время изменено: " + currentTime + " -> " + (currentTime + ticksToAdd));
-                }
-            }
+            // Minecraft уже прибавляет один тик времени. Накапливаем только
+            // разницу до требуемого множителя, сохраняя дробную часть между тиками.
+            double accumulated = remainders.getOrDefault(level.dimension(), 0.0) + (timeSpeed - 1.0);
+            long correction = accumulated >= 0.0 ? (long) Math.floor(accumulated) : (long) Math.ceil(accumulated);
+            remainders.put(level.dimension(), accumulated - correction);
+            if (correction != 0L) level.setDayTime(level.getDayTime() + correction);
         }
     }
 }

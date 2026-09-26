@@ -26,6 +26,10 @@ public class BlockRestrictionHandler {
         BlockPos pos = event.getPos();
 
         if (level.isClientSide) return;
+        if (com.labyrinthmod.common.event.FractionEvents.isInGlade(level, pos)
+                && event.getItemStack().getItem() instanceof net.minecraft.world.item.BlockItem
+                && player.getCapability(FractionProvider.FRACTION)
+                .map(data -> data.getFraction() != FractionType.NONE).orElse(false)) return;
 
         BlockState state = level.getBlockState(pos);
         Block block = state.getBlock();

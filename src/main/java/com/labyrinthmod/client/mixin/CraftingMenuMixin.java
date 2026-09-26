@@ -1,6 +1,7 @@
 package com.labyrinthmod.client.mixin;
 
 import com.labyrinthmod.common.data.CraftRestrictionManager;
+import com.labyrinthmod.common.data.FractionRecipeManager;
 import com.labyrinthmod.common.capability.FractionProvider;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Player;
@@ -30,7 +31,12 @@ public class CraftingMenuMixin {
                     .map(data -> data.hasFraction() ? data.getFraction().name() : "NONE")
                     .orElse("NONE");
 
-            if (!CraftRestrictionManager.canCraft(result.getItem(), fraction)) {
+            var recipe = this.resultSlots.getRecipeUsed();
+            var itemId = net.minecraftforge.registries.ForgeRegistries.ITEMS.getKey(result.getItem());
+            if ((itemId != null && itemId.toString().equals("labyrinthmod:personal_map")
+                    && !fraction.equals("SURVIVOR"))
+                    || !CraftRestrictionManager.canCraft(result.getItem(), fraction)
+                    || (recipe != null && !FractionRecipeManager.canUse(recipe.getId(), fraction))) {
                 // Очищаем слот, чтобы игрок не видел запрещенный предмет
                 this.resultSlots.setItem(0, ItemStack.EMPTY);
             }

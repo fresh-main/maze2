@@ -1,0 +1,18 @@
+{
+  "labyrinthmod:personal_map": [
+    "NONE", "FARMER", "BUTCHER", "RUNNER", "COOK", "MEDIC",
+    "OPERATOR", "IMPOSTER", "GLIDER", "SCIENTIST", "SOLDIER"
+  ],
+  "firstaid:plaster": [
+    "NONE", "FARMER", "BUTCHER", "RUNNER", "COOK", "OPERATOR",
+    "IMPOSTER", "GLIDER", "SCIENTIST", "SURVIVOR", "SOLDIER"
+  ],
+  "firstaid:morphine": [
+    "NONE", "FARMER", "BUTCHER", "RUNNER", "COOK", "OPERATOR",
+    "IMPOSTER", "GLIDER", "SCIENTIST", "SURVIVOR", "SOLDIER"
+  ],
+  "firstaid:bandage": [
+    "NONE", "FARMER", "BUTCHER", "RUNNER", "COOK", "OPERATOR",
+    "IMPOSTER", "GLIDER", "SCIENTIST", "SURVIVOR", "SOLDIER"
+  ]
+}

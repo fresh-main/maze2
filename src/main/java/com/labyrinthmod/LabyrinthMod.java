@@ -324,6 +324,8 @@ public class LabyrinthMod {
         WindZoneCommand.register(event.getDispatcher());
         InfectionCommand.register(event.getDispatcher());
         LiftCommand.register(event.getDispatcher());
+        com.labyrinthmod.common.command.LiftProtectionCommand.register(event.getDispatcher());
+        com.labyrinthmod.common.command.QuestAdminCommand.register(event.getDispatcher());
         BiomeDebugCommand.register(event.getDispatcher());
         SetBiomeCommand.register(event.getDispatcher());
     }
@@ -468,6 +470,7 @@ public class LabyrinthMod {
         LOGGER.info("[MazeMap] storage initialized at {}", MazeMapStorage.getRoot());
 
         com.labyrinthmod.common.data.CraftRestrictionManager.load();
+        com.labyrinthmod.common.data.FractionRecipeManager.load();
         LOGGER.info("[LabyrinthMod] Craft restrictions loaded from JSON!");
 
         BiomeDebugChat.timed(

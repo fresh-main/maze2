@@ -1,6 +1,7 @@
 package com.labyrinthmod.common.network.packet;
 
 import com.labyrinthmod.common.item.TaskScrollItem;
+import com.labyrinthmod.common.quest.QuestCompletionTracker;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -69,6 +70,7 @@ public class CompleteScrollPacket {
             if (!tag.contains("RequiredItems", Tag.TAG_LIST)) {
                 // Если нет требуемых предметов, просто выполняем
                 tag.putBoolean("Completed", true);
+                markCompleted(tag);
                 player.getInventory().setItem(slot, ItemStack.EMPTY);
                 player.sendSystemMessage(Component.literal("§aЗадание выполнено!"));
                 return;
@@ -125,12 +127,20 @@ public class CompleteScrollPacket {
             }
 
             // Удаляем свиток из инвентаря
+            tag.putBoolean("Completed", true);
+            markCompleted(tag);
             player.getInventory().setItem(slot, ItemStack.EMPTY);
 
             player.sendSystemMessage(Component.literal("§aЗадание выполнено!"));
         });
 
         context.setPacketHandled(true);
+    }
+
+    private static void markCompleted(CompoundTag tag) {
+        if (tag.contains("QuestSlotIndex", Tag.TAG_INT)) {
+            QuestCompletionTracker.markQuestCompleted(tag.getInt("QuestSlotIndex"));
+        }
     }
 
     private static int countItem(ServerPlayer player, Item item) {

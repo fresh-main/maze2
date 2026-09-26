@@ -228,15 +228,20 @@ public class NetworkHandler {
                 .decoder(S2CLiftLockPacket::decode)
                 .consumerMainThread(S2CLiftLockPacket::handle)
                 .add();
-        CHANNEL.messageBuilder(SaveQuestToJsonPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+        CHANNEL.messageBuilder(SaveQuestToJsonPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
                 .encoder(SaveQuestToJsonPacket::encode)
                 .decoder(SaveQuestToJsonPacket::decode)
                 .consumerMainThread(SaveQuestToJsonPacket::handle)
                 .add();
-        CHANNEL.messageBuilder(CompleteScrollPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+        CHANNEL.messageBuilder(CompleteScrollPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
                 .encoder(CompleteScrollPacket::encode)
                 .decoder(CompleteScrollPacket::decode)
                 .consumerMainThread(CompleteScrollPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(OpenQuestAdminPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(OpenQuestAdminPacket::encode)
+                .decoder(OpenQuestAdminPacket::decode)
+                .consumerMainThread(OpenQuestAdminPacket::handle)
                 .add();
 
     }

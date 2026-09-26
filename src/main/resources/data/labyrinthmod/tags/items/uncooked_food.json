@@ -1,0 +1,21 @@
+{
+  "replace": false,
+  "values": [
+    { "id": "#forge:raw_meat", "required": false },
+    { "id": "#forge:raw_fishes", "required": false },
+    "minecraft:beef", "minecraft:porkchop", "minecraft:chicken", "minecraft:mutton",
+    "minecraft:rabbit", "minecraft:cod", "minecraft:salmon", "minecraft:potato",
+    "minecraft:carrot", "minecraft:beetroot", "minecraft:apple", "minecraft:melon_slice",
+    "minecraft:sweet_berries", "minecraft:glow_berries", "minecraft:chorus_fruit",
+    { "id": "farmersdelight:minced_beef", "required": false },
+    { "id": "farmersdelight:chicken_cuts", "required": false },
+    { "id": "farmersdelight:bacon", "required": false },
+    { "id": "farmersdelight:mutton_chops", "required": false },
+    { "id": "farmersdelight:cod_slice", "required": false },
+    { "id": "farmersdelight:salmon_slice", "required": false },
+    { "id": "farmersdelight:cabbage", "required": false },
+    { "id": "farmersdelight:cabbage_leaf", "required": false },
+    { "id": "farmersdelight:onion", "required": false },
+    { "id": "farmersdelight:tomato", "required": false }
+  ]
+}

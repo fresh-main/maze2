@@ -16,6 +16,7 @@ import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.eventbus.api.Event;
@@ -87,6 +88,13 @@ public class FractionEvents {
 
         int tick = player.tickCount;
 
+        // Встроенный сервер может быть открыт для локальной сети уже после входа
+        // хозяина мира. Проверка раз в секунду переводит его с GLIDER на одну из
+        // серверных фракций сразу после публикации LAN-мира.
+        if (tick % 20 == 0 && player instanceof ServerPlayer serverPlayer) {
+            ensureAutomaticFraction(serverPlayer);
+        }
+
         // Атрибуты — пересоздаём ТОЛЬКО при смене фракции (кэшируем по UUID).
         java.util.UUID uuid = player.getUUID();
         FractionType currentFraction = player.getCapability(FractionProvider.FRACTION)
@@ -131,24 +139,11 @@ public class FractionEvents {
             }
         }
 
-        // Регенерация для медика — без эффект-иконки. Каждые 50 тиков (2.5с) +1 HP при
-        // неполном здоровье. Работает только в живом и не-зрительском режиме.
-        if (currentFraction == FractionType.MEDIC && tick % 50 == 0
-                && player.isAlive() && !player.isSpectator()
-                && player.getHealth() < player.getMaxHealth()) {
-            player.heal(1.0f);
-        }
-
         // Зоны — каждые 10 тиков (полсекунды). Достаточно, чтобы не выпустить из зоны.
         if (tick % 10 == 0 && !isOperator(player)) {
             checkZoneRestriction(player);
         }
         messageCooldown.put(player, Math.max(0, messageCooldown.getOrDefault(player, 0) - 1));
-
-        // Печь — только если игрок реально открыл печь.
-        if (!isOperator(player) && player.containerMenu instanceof FurnaceMenu) {
-            returnFoodFromFurnace(player);
-        }
 
         // Имя — раз в секунду (20 тиков), не каждый тик.
         if (tick % 20 == 0) {
@@ -259,39 +254,6 @@ public class FractionEvents {
         }
     }
 
-    // ========== ПЕЧЬ ==========
-
-    private static void returnFoodFromFurnace(Player player) {
-        if (player.containerMenu instanceof FurnaceMenu furnaceMenu) {
-            Slot inputSlot = furnaceMenu.slots.get(0);
-            Slot resultSlot = furnaceMenu.slots.get(2);
-
-            ItemStack input = inputSlot.getItem();
-            ItemStack result = resultSlot.getItem();
-
-            if (isRawFood(input)) {
-                ItemStack toReturn = input.copy();
-                if (!player.getInventory().add(toReturn)) {
-                    player.drop(toReturn, false);
-                }
-                inputSlot.set(ItemStack.EMPTY);
-            }
-
-            if (!result.isEmpty() && result.getItem().isEdible()) {
-                resultSlot.set(ItemStack.EMPTY);
-            }
-        }
-    }
-
-    private static boolean isRawFood(ItemStack stack) {
-        if (stack.isEmpty()) return false;
-        return stack.is(Items.BEEF) || stack.is(Items.PORKCHOP) ||
-                stack.is(Items.MUTTON) || stack.is(Items.CHICKEN) ||
-                stack.is(Items.RABBIT) || stack.is(Items.COD) ||
-                stack.is(Items.SALMON) || stack.is(Items.POTATO) ||
-                stack.is(Items.KELP);
-    }
-
     // ========== ЗОНЫ ==========
 
     private static void checkZoneRestriction(Player player) {
@@ -310,6 +272,12 @@ public class FractionEvents {
 
         player.getCapability(FractionProvider.FRACTION).ifPresent(data -> {
             FractionType fraction = data.getFraction();
+
+            if (fraction != FractionType.NONE && isInGlade(player.level(), currentPos)) {
+                lastSafePositions.put(player, currentPos);
+                updateGameModeByZone(player);
+                return;
+            }
 
             // Раньше «кто может выходить из зон» был ХАРДКОДЕН (RUNNER/IMPOSTER/OPERATOR).
             // Теперь это per-fraction-флаг в ZoneManager — админ настраивает через
@@ -374,11 +342,62 @@ public class FractionEvents {
         updateGameModeByZone(player);
 
         if (player instanceof ServerPlayer serverPlayer) {
+            ensureAutomaticFraction(serverPlayer);
             // Только синхронизируем capability — записка-личное-дело будет видеть текущую роль.
             // Атмосферный экран показываем ТОЛЬКО при выдаче командой (см. onFractionChanged),
             // а не при каждом заходе на сервер.
             syncFractionToClient(serverPlayer);
         }
+    }
+
+    /**
+     * Автоматически выдаёт стартовую фракцию.
+     * Обычный одиночный мир получает GLIDER. Выделенный сервер и мир,
+     * опубликованный в LAN, используют FARMER / COOK / MEDIC.
+     */
+    private static void ensureAutomaticFraction(ServerPlayer player) {
+        MinecraftServer server = player.getServer();
+        if (server == null) return;
+
+        boolean serverGame = server.isDedicatedServer() || server.isPublished();
+        player.getCapability(FractionProvider.FRACTION).ifPresent(data -> {
+            FractionType current = data.getFraction();
+
+            // Ручные и специальные фракции не перезаписываем. GLIDER меняется
+            // только когда одиночный мир был открыт для локальной сети.
+            if (serverGame) {
+                if (current != FractionType.NONE && current != FractionType.GLIDER) return;
+                FractionType assigned = leastPopulatedServerFraction(server);
+                data.setFraction(assigned);
+                onFractionChanged(player, current, assigned);
+            } else if (current == FractionType.NONE) {
+                data.setFraction(FractionType.GLIDER);
+                onFractionChanged(player, current, FractionType.GLIDER);
+            }
+        });
+    }
+
+    /** Выбирает наименее заполненную серверную фракцию; ничьи чередуются случайно. */
+    private static FractionType leastPopulatedServerFraction(MinecraftServer server) {
+        FractionType[] available = {FractionType.FARMER, FractionType.COOK, FractionType.MEDIC};
+        int[] counts = new int[available.length];
+
+        for (ServerPlayer online : server.getPlayerList().getPlayers()) {
+            FractionType fraction = online.getCapability(FractionProvider.FRACTION)
+                    .map(PlayerFractionData::getFraction).orElse(FractionType.NONE);
+            for (int i = 0; i < available.length; i++) {
+                if (fraction == available[i]) counts[i]++;
+            }
+        }
+
+        int minimum = Math.min(counts[0], Math.min(counts[1], counts[2]));
+        int tied = 0;
+        for (int count : counts) if (count == minimum) tied++;
+        int selectedTie = java.util.concurrent.ThreadLocalRandom.current().nextInt(tied);
+        for (int i = 0; i < counts.length; i++) {
+            if (counts[i] == minimum && selectedTie-- == 0) return available[i];
+        }
+        return FractionType.FARMER;
     }
 
     @SubscribeEvent
@@ -505,6 +524,12 @@ public class FractionEvents {
             return;
         }
 
+        if (isInGlade(player.level(), player.blockPosition())) {
+            lastZoneStatus.remove(player);
+            if (current != GameType.SURVIVAL) serverPlayer.setGameMode(GameType.SURVIVAL);
+            return;
+        }
+
         ZoneManager manager = ZoneManager.get(player.level());
         if (manager == null) return;
 
@@ -576,6 +601,7 @@ public class FractionEvents {
         Player player = event.getEntity();
         if (player.level().isClientSide) return;
         if (isOperator(player)) return;
+        if (hasAssignedFraction(player) && isInGlade(player.level(), event.getPos())) return;
 
         BlockState state = player.level().getBlockState(event.getPos());
         if (state.getBlock() instanceof FarmBlock) {
@@ -592,6 +618,7 @@ public class FractionEvents {
         Player player = event.getEntity();
         if (player.level().isClientSide) return;
         if (isOperator(player)) return;
+        if (hasAssignedFraction(player) && isInGlade(player.level(), event.getPos())) return;
 
         ItemStack item = event.getItemStack();
         boolean isSeed = item.is(Items.WHEAT_SEEDS) || item.is(Items.CARROT) || item.is(Items.POTATO) ||
@@ -611,6 +638,7 @@ public class FractionEvents {
         Player player = event.getEntity();
         if (player.level().isClientSide) return;
         if (isOperator(player)) return;
+        if (hasAssignedFraction(player) && isInGlade(player.level(), event.getPos())) return;
 
         BlockState state = player.level().getBlockState(event.getPos());
         if (state.getBlock() instanceof CropBlock) {
@@ -637,6 +665,8 @@ public class FractionEvents {
             event.setCancellationResult(InteractionResult.FAIL);
             return;
         }
+
+        if (hasAssignedFraction(player) && isInGlade(level, blockPos)) return;
 
         // Проверяем фракцию игрока
         boolean isOperatorFraction = player.getCapability(FractionProvider.FRACTION)
@@ -682,6 +712,8 @@ public class FractionEvents {
 
         BlockPos blockPos = event.getPos();
         Level level = player.level();
+
+        if (hasAssignedFraction(player) && isInGlade(level, blockPos)) return;
 
         // Проверяем фракцию игрока
         boolean isOperatorFraction = player.getCapability(FractionProvider.FRACTION)
@@ -776,42 +808,6 @@ public class FractionEvents {
                 .orElse(false);
     }
 
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onSmokerInteract(PlayerInteractEvent.RightClickBlock event) {
-        Player player = event.getEntity();
-        if (player.level().isClientSide) return;
-        if (isOperator(player)) return;
-
-        BlockState state = player.level().getBlockState(event.getPos());
-        if (state.getBlock() instanceof SmokerBlock && !isCook(player)) {
-            event.setCanceled(true);
-        }
-    }
-
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onCampfireInteract(PlayerInteractEvent.RightClickBlock event) {
-        Player player = event.getEntity();
-        if (player.level().isClientSide) return;
-        if (isOperator(player)) return;
-
-        BlockState state = player.level().getBlockState(event.getPos());
-        if (state.getBlock() instanceof CampfireBlock && !isCook(player)) {
-            event.setCanceled(true);
-        }
-    }
-
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onFurnaceInteract(PlayerInteractEvent.RightClickBlock event) {
-        Player player = event.getEntity();
-        if (player.level().isClientSide) return;
-        if (isOperator(player)) return;
-
-        BlockState state = player.level().getBlockState(event.getPos());
-        if (state.getBlock() == Blocks.FURNACE && isRawFood(player.getMainHandItem())) {
-            event.setCanceled(true);
-        }
-    }
-
     // ========== КРАФТ ==========
 
     private static boolean isFoodItem(ItemStack stack) {
@@ -822,17 +818,25 @@ public class FractionEvents {
     public static void onCraftItem(PlayerEvent.ItemCraftedEvent event) {
         Player player = event.getEntity();
         if (player.level().isClientSide) return;
-        if (isOperator(player)) return;
 
         ItemStack result = event.getCrafting();
-        if (isFoodItem(result) && !isCook(player)) {
-            event.getInventory().setItem(0, ItemStack.EMPTY);
+        var resultId = net.minecraftforge.registries.ForgeRegistries.ITEMS.getKey(result.getItem());
+        if (resultId != null && resultId.toString().equals("labyrinthmod:personal_map")
+                && player.getCapability(FractionProvider.FRACTION)
+                .map(data -> data.getFraction() != FractionType.SURVIVOR).orElse(true)) {
+            result.setCount(0);
             return;
         }
+        if (isOperator(player)) return;
 
         String playerFraction = getPlayerFraction(player);
         if (!CraftRestrictionManager.canCraft(result.getItem(), playerFraction)) {
             event.getInventory().setItem(0, ItemStack.EMPTY);
+        } else if (isFoodItem(result) && !NewFractionAbilities.isUncookedFood(result)
+                && isCook(player) && player.getRandom().nextFloat() < 0.10f) {
+            ItemStack bonus = result.copy();
+            bonus.setCount(1);
+            if (!player.addItem(bonus)) player.drop(bonus, false);
         }
     }
 
@@ -843,17 +847,20 @@ public class FractionEvents {
         if (player.level().isClientSide) return;
         // Достаточно проверять крафт-результат раз в 5 тиков — игрок не успеет забрать предмет.
         if (player.tickCount % 5 != 0) return;
-        if (isOperator(player)) return;
 
         if (player.containerMenu != null && !player.containerMenu.slots.isEmpty()) {
             Slot resultSlot = player.containerMenu.slots.get(0);
             ItemStack result = resultSlot.getItem();
 
             if (!result.isEmpty()) {
-                if (isFoodItem(result) && !isCook(player)) {
+                var resultId = net.minecraftforge.registries.ForgeRegistries.ITEMS.getKey(result.getItem());
+                if (resultId != null && resultId.toString().equals("labyrinthmod:personal_map")
+                        && player.getCapability(FractionProvider.FRACTION)
+                        .map(data -> data.getFraction() != FractionType.SURVIVOR).orElse(true)) {
                     resultSlot.set(ItemStack.EMPTY);
                     return;
                 }
+                if (isOperator(player)) return;
 
                 if (!CraftRestrictionManager.canCraft(result.getItem(), getPlayerFraction(player))) {
                     resultSlot.set(ItemStack.EMPTY);
@@ -864,7 +871,9 @@ public class FractionEvents {
 
     // ========== АТАКИ ==========
 
-    private static boolean canAttackEntity(Player player) {
+    private static boolean canAttackEntity(Player player, net.minecraft.world.entity.Entity target) {
+        // Ограничение относится только к PvP. Мобов могут атаковать все фракции.
+        if (!(target instanceof Player)) return true;
         if (isOperator(player)) return true;
         return player.getCapability(FractionProvider.FRACTION)
                 .map(data -> {
@@ -878,7 +887,7 @@ public class FractionEvents {
     public static void onAttackEntity(AttackEntityEvent event) {
         Player player = event.getEntity();
         if (player.level().isClientSide) return;
-        if (!canAttackEntity(player)) {
+        if (!canAttackEntity(player, event.getTarget())) {
             event.setCanceled(true);
         }
     }
@@ -886,7 +895,7 @@ public class FractionEvents {
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingAttack(LivingAttackEvent event) {
         if (event.getSource().getEntity() instanceof Player player && event.getEntity() instanceof LivingEntity) {
-            if (!canAttackEntity(player)) {
+            if (!canAttackEntity(player, event.getEntity())) {
                 event.setCanceled(true);
             }
         }
@@ -907,9 +916,8 @@ public class FractionEvents {
                 item.is(Items.ENDER_PEARL) || item.is(Items.SPLASH_POTION) ||
                 item.is(Items.LINGERING_POTION);
 
-        if (isWeapon && !canAttackEntity(player)) {
-            event.setCanceled(true);
-        }
+        // Использование оружия не блокируем: попадание по игроку проверяется в
+        // onLivingAttack, а стрелять по мобам разрешено любой фракции.
     }
 
     // ========== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ==========
@@ -960,6 +968,8 @@ public class FractionEvents {
         BlockPos blockPos = event.getPos();
         Level level = player.level();
 
+        if (hasAssignedFraction(player) && isInGlade(level, blockPos)) return;
+
         // Проверяем, находится ли блок ВНЕ зоны
         ZoneManager manager = ZoneManager.get(level);
         if (manager == null) return;
@@ -977,6 +987,18 @@ public class FractionEvents {
             }
         }
     }
+    private static boolean hasAssignedFraction(Player player) {
+        return player.getCapability(FractionProvider.FRACTION)
+                .map(data -> data.getFraction() != FractionType.NONE).orElse(false);
+    }
+
+    public static boolean isInGlade(Level level, BlockPos pos) {
+        if (!(level instanceof ServerLevel serverLevel)) return false;
+        if (!(serverLevel.getChunkSource().getGenerator()
+                instanceof com.labyrinthmod.common.generation.LabyrinthChunkGenerator generator)) return false;
+        return Math.max(Math.abs(pos.getX()), Math.abs(pos.getZ())) <= generator.GLADE_RADIUS;
+    }
+
     // ========== ТИХОЕ ПЕРЕКЛЮЧЕНИЕ (F3+F6) ==========
 
     public static void onFractionChangedSilent(Player player, FractionType oldFraction, FractionType newFraction) {

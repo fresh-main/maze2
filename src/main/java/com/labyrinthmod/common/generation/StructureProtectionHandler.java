@@ -19,22 +19,50 @@ import java.util.Iterator;
  */
 @Mod.EventBusSubscriber(modid = "labyrinthmod")
 public class StructureProtectionHandler {
+    private static boolean protectionEnabled = true;
+
+    public static boolean isProtectionEnabled() { return protectionEnabled; }
+    public static void setProtectionEnabled(boolean enabled) { protectionEnabled = enabled; }
 
     // ★ ЗАЩИТА ОТ РАЗРУШЕНИЯ ИГРОКОМ ★
     @SubscribeEvent
     public static void onBlockBreak(BlockEvent.BreakEvent event) {
         BlockPos pos = event.getPos();
 
-        if (StructureGenerator.isBlockProtected(pos)) {
+        Player player = event.getPlayer();
+        boolean isOperator = player != null && player.getCapability(
+                com.labyrinthmod.common.capability.FractionProvider.FRACTION)
+                .map(data -> data.getFraction() == com.labyrinthmod.common.capability.FractionType.OPERATOR)
+                .orElse(false);
+        if (protectionEnabled && StructureGenerator.isBlockProtected(pos) && !isOperator) {
             event.setCanceled(true);
 
             // Опционально: сообщение игроку
-            Player player = event.getPlayer();
             if (player != null && !player.level().isClientSide) {
                 player.displayClientMessage(
                         Component.literal("§c⚠ Этот блок является частью защищённой структуры!"),
                         true // true = action bar (ненавязчивое сообщение)
                 );
+            }
+        }
+    }
+
+    // ★ ЗАЩИТА ОТ УСТАНОВКИ БЛОКОВ ★
+    @SubscribeEvent
+    public static void onBlockPlace(BlockEvent.EntityPlaceEvent event) {
+        if (!protectionEnabled || !StructureGenerator.isBlockProtected(event.getPos())) return;
+        if (!(event.getEntity() instanceof Player player)) {
+            event.setCanceled(true);
+            return;
+        }
+        boolean isOperator = player.getCapability(
+                com.labyrinthmod.common.capability.FractionProvider.FRACTION)
+                .map(data -> data.getFraction() == com.labyrinthmod.common.capability.FractionType.OPERATOR)
+                .orElse(false);
+        if (!isOperator) {
+            event.setCanceled(true);
+            if (!player.level().isClientSide) {
+                player.displayClientMessage(Component.literal("§c⚠ В защищённой структуре нельзя ставить блоки!"), true);
             }
         }
     }
@@ -46,7 +74,7 @@ public class StructureProtectionHandler {
         Iterator<BlockPos> iterator = event.getAffectedBlocks().iterator();
         while (iterator.hasNext()) {
             BlockPos pos = iterator.next();
-            if (StructureGenerator.isBlockProtected(pos)) {
+            if (protectionEnabled && StructureGenerator.isBlockProtected(pos)) {
                 iterator.remove();
             }
         }

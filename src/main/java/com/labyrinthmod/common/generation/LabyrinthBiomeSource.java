@@ -13,6 +13,7 @@ import net.minecraft.world.level.levelgen.synth.ImprovedNoise;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
@@ -22,7 +23,10 @@ public class LabyrinthBiomeSource extends BiomeSource {
     public static final Codec<LabyrinthBiomeSource> CODEC = RecordCodecBuilder.create(inst ->
             inst.group(
                     BiomeSource.CODEC.fieldOf("base_biome_source").forGetter(s -> s.baseSource),
-                    Codec.LONG.optionalFieldOf("seed", 0L).forGetter(s -> s.seed)
+                    Codec.LONG.optionalFieldOf("seed", 0L).forGetter(s -> s.seed),
+                    Biome.CODEC.optionalFieldOf("river_biome").forGetter(s -> Optional.ofNullable(s.riverHolder)),
+                    Biome.CODEC.optionalFieldOf("forest_biome").forGetter(s -> Optional.ofNullable(s.forestHolder)),
+                    Biome.CODEC.optionalFieldOf("desert_biome").forGetter(s -> Optional.ofNullable(s.desertHolder))
             ).apply(inst, inst.stable(LabyrinthBiomeSource::new))
     );
 
@@ -34,6 +38,7 @@ public class LabyrinthBiomeSource extends BiomeSource {
     private Holder<Biome> riverHolder;
     private Holder<Biome> plainsHolder;
     private Holder<Biome> forestHolder;
+    private Holder<Biome> desertHolder;
 
     private volatile double[][] riverCurvePoints = null;
     private volatile long riverSeedUsed = Long.MIN_VALUE;
@@ -66,9 +71,24 @@ public class LabyrinthBiomeSource extends BiomeSource {
     // ===================================================
 
     public LabyrinthBiomeSource(BiomeSource baseSource, long seed) {
+        this(baseSource, seed, Optional.empty(), Optional.empty(), Optional.empty());
+    }
+
+    public LabyrinthBiomeSource(BiomeSource baseSource, long seed,
+                                Holder<Biome> river, Holder<Biome> forest, Holder<Biome> desert) {
+        this(baseSource, seed, Optional.of(river), Optional.of(forest), Optional.of(desert));
+    }
+
+    private LabyrinthBiomeSource(BiomeSource baseSource, long seed,
+                                 Optional<Holder<Biome>> river,
+                                 Optional<Holder<Biome>> forest,
+                                 Optional<Holder<Biome>> desert) {
         INSTANCE = this;
         this.baseSource = baseSource;
         this.seed = seed;
+        this.riverHolder = river.orElse(null);
+        this.forestHolder = forest.orElse(null);
+        this.desertHolder = desert.orElse(null);
         System.out.println("[LabyrinthBiomeSource] Created with seed: " + seed);
     }
 
@@ -98,7 +118,11 @@ public class LabyrinthBiomeSource extends BiomeSource {
         }
 
         // ВАЖНО: река должна проверяться раньше леса.
-        if (isRiverBiomeAt(realX, realZ, radius)) {
+        boolean hasGenerator = LabyrinthChunkGenerator.hasActiveGenerator();
+        boolean riverAtPosition = hasGenerator
+                ? LabyrinthChunkGenerator.isGeneratedRiverAt(realX, realZ)
+                : isRiverBiomeAt(realX, realZ, radius);
+        if (riverAtPosition) {
             RIVER_CONDITION_PASS.incrementAndGet();
             Holder<Biome> river = getRiverHolder();
             if (river != null) {
@@ -109,7 +133,10 @@ public class LabyrinthBiomeSource extends BiomeSource {
             }
         }
 
-        if (isForestBiomeAt(realX, realZ, radius)) {
+        boolean forestAtPosition = hasGenerator
+                ? LabyrinthChunkGenerator.isGeneratedForestAt(realX, realZ)
+                : isForestBiomeAt(realX, realZ, radius);
+        if (forestAtPosition) {
             FOREST_NOISE_PASS.incrementAndGet();
             Holder<Biome> forest = getForestHolder();
             if (forest != null) {
@@ -117,6 +144,15 @@ public class LabyrinthBiomeSource extends BiomeSource {
                 lastResult = "forest";
                 lastPos = realX + "," + realZ;
                 return forest;
+            }
+        }
+
+        if (dist > getSectorsEnd()) {
+            Holder<Biome> desert = getDesertHolder();
+            if (desert != null) {
+                lastResult = "desert";
+                lastPos = realX + "," + realZ;
+                return desert;
             }
         }
 
@@ -131,7 +167,7 @@ public class LabyrinthBiomeSource extends BiomeSource {
         return Stream.concat(
                 // possibleBiomes() возвращает Set, поэтому вызываем .stream()
                 baseSource.possibleBiomes().stream(),
-                Stream.of(getPlainsHolder(), getRiverHolder(), getForestHolder()).filter(Objects::nonNull)
+                Stream.of(getPlainsHolder(), getRiverHolder(), getForestHolder(), getDesertHolder()).filter(Objects::nonNull)
         ).distinct();
     }
 
@@ -193,6 +229,13 @@ public class LabyrinthBiomeSource extends BiomeSource {
         }
         return forestHolder;
     }
+
+    private Holder<Biome> getDesertHolder() {
+        if (desertHolder == null) {
+            desertHolder = ForgeRegistries.BIOMES.getHolder(Biomes.DESERT.location()).orElse(null);
+        }
+        return desertHolder;
+    }
     // ==========================================================
 
     private int getGladeRadius() {
@@ -207,6 +250,14 @@ public class LabyrinthBiomeSource extends BiomeSource {
         } catch (Throwable ignored) {
         }
         return 70;
+    }
+
+    private int getSectorsEnd() {
+        LabyrinthConfig cfg = LabyrinthConfig.getInstance();
+        int gladeRadius = cfg != null ? cfg.gleydRadius : 70;
+        int mainMazeWidth = (cfg != null ? cfg.mainMazeWidth : 10) * 10;
+        int sectorWidth = (cfg != null ? cfg.sectorWidth : 6) * 12;
+        return gladeRadius + mainMazeWidth + 7 + sectorWidth;
     }
 
     private int getForestZLimit(int radius) {

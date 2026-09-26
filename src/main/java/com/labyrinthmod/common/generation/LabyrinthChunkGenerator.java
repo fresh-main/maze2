@@ -4,6 +4,7 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
 import net.minecraft.core.Vec3i;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
@@ -11,6 +12,7 @@ import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.*;
 import net.minecraft.world.level.biome.BiomeManager;
+import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.DoublePlantBlock;
@@ -24,6 +26,8 @@ import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.RandomState;
+import net.minecraft.world.level.levelgen.RandomSupport;
+import net.minecraft.world.level.levelgen.WorldgenRandom;
 import net.minecraft.world.level.levelgen.blending.Blender;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 import org.jetbrains.annotations.NotNull;
@@ -36,6 +40,7 @@ import net.minecraft.world.level.levelgen.synth.ImprovedNoise;
 import net.minecraft.util.RandomSource;
 
 public class LabyrinthChunkGenerator extends ChunkGenerator {
+    private static volatile LabyrinthChunkGenerator activeGenerator;
     public static final Codec<LabyrinthChunkGenerator> CODEC = RecordCodecBuilder.create(inst ->
             inst.group(
                     BiomeSource.CODEC.fieldOf("biome_source").forGetter(LabyrinthChunkGenerator::getBiomeSource),
@@ -124,6 +129,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
     public LabyrinthChunkGenerator(BiomeSource biomeSource, long seed) {
         super(biomeSource);
         this.seed = seed;
+        activeGenerator = this;
 
         LabyrinthConfig cfg = LabyrinthConfig.getInstance();
         this.config = cfg;
@@ -156,6 +162,26 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             this.featureNoise = null;
             this.seedInitialized = false;
         }
+    }
+
+    /** Uses the exact river curve and width used by terrain generation. */
+    public static boolean isGeneratedRiverAt(int x, int z) {
+        LabyrinthChunkGenerator generator = activeGenerator;
+        return generator != null && generator.isInRiverZone(x, z);
+    }
+
+    public static boolean hasActiveGenerator() {
+        return activeGenerator != null;
+    }
+
+    /** The same area in which the decoration pass places the forest. */
+    public static boolean isGeneratedForestAt(int x, int z) {
+        LabyrinthChunkGenerator generator = activeGenerator;
+        if (generator == null) return false;
+        if (z >= -30) return false;
+        if (Math.sqrt((double) x * x + (double) z * z) < 20.0) return false;
+        if (Math.max(Math.abs(x), Math.abs(z)) > generator.GLADE_RADIUS - 5) return false;
+        return !generator.isInRiverZone(x, z);
     }
 
     private void generateMaze() {
@@ -1212,7 +1238,17 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
     }
 
     @Override
-    public void spawnOriginalMobs(@NotNull WorldGenRegion region) {}
+    public void spawnOriginalMobs(@NotNull WorldGenRegion region) {
+        // The custom generator used to suppress the vanilla chunk-generation spawn pass.
+        // That also suppressed water creatures even when the generated water correctly had
+        // the river biome. Mirror NoiseBasedChunkGenerator here so every newly generated
+        // river chunk gets the biome's normal fish population.
+        ChunkPos chunkPos = region.getCenter();
+        Holder<Biome> biome = region.getBiome(chunkPos.getWorldPosition().atY(region.getMaxBuildHeight() - 1));
+        WorldgenRandom random = new WorldgenRandom(new LegacyRandomSource(RandomSupport.generateUniqueSeed()));
+        random.setDecorationSeed(region.getSeed(), chunkPos.getMinBlockX(), chunkPos.getMinBlockZ());
+        NaturalSpawner.spawnMobsForChunkGeneration(region, biome, chunkPos, random);
+    }
 
 
 

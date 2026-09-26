@@ -21,6 +21,7 @@ import java.util.List;
 public class TaskViewScreen extends Screen {
     private final ItemStack taskStack;
     private final Runnable onTakeCallback;
+    private final Runnable onCompleteCallback;
     private final int taskSlotIndex;
     private Button takeButton;
 
@@ -28,23 +29,21 @@ public class TaskViewScreen extends Screen {
         this(taskStack, null, -1);
     }
 
-    public TaskViewScreen(ItemStack taskStack, Runnable onTakeCallback, int slotIndex) {
+    public TaskViewScreen(ItemStack taskStack, Runnable onCompleteCallback, int slotIndex) {
         super(Component.literal("Задание"));
         this.taskStack = taskStack;
-        this.onTakeCallback = onTakeCallback;
+        this.onTakeCallback = null;
+        this.onCompleteCallback = onCompleteCallback;
         this.taskSlotIndex = slotIndex;
     }
 
-    // Конструктор оставлен для обратной совместимости, чтобы не сломать код в других классах (например, TaskScrollItem).
-    // Параметр onCompleteCallback больше не используется и игнорируется.
-    @Deprecated
-    public TaskViewScreen(
-            ItemStack taskStack,
-            Runnable onTakeCallback,
-            Runnable onCompleteCallback,
-            int slotIndex
-    ) {
-        this(taskStack, onTakeCallback, slotIndex);
+    public TaskViewScreen(ItemStack taskStack, Runnable onTakeCallback,
+                          Runnable onCompleteCallback, int slotIndex) {
+        super(Component.literal("Задание"));
+        this.taskStack = taskStack;
+        this.onTakeCallback = onTakeCallback;
+        this.onCompleteCallback = onCompleteCallback;
+        this.taskSlotIndex = slotIndex;
     }
 
     @Override
@@ -56,22 +55,29 @@ public class TaskViewScreen extends Screen {
         int x = (this.width - paperW) / 2;
         int y = (this.height - paperH) / 2;
 
-        // Кнопка "Закрыть" теперь находится выше, так как кнопки "Выполнить" больше нет
-        int buttonY = y + paperH - 65;
+        int buttonY = y + paperH - (onTakeCallback != null ? 95 : 65);
 
-        // ==========================================================
-        // КНОПКА "ВЗЯТЬ ЗАДАНИЕ"
-        // Показываем только если экран открыт из доски объявлений
-        // ==========================================================
         if (onTakeCallback != null && taskSlotIndex >= 0) {
+            this.addRenderableWidget(new PaperButton(
+                    x + 30, buttonY, 240, 24,
+                    Component.literal("Взять свиток"),
+                    btn -> {
+                        onTakeCallback.run();
+                        this.onClose();
+                    }
+            ));
+            buttonY += 30;
+        }
+
+        if (onCompleteCallback != null && taskSlotIndex >= 0) {
             takeButton = new PaperButton(
                     x + 30,
                     buttonY,
                     240,
                     24,
-                    Component.literal("Взять задание"),
+                    Component.literal("Выполнить задание"),
                     btn -> {
-                        onTakeCallback.run();
+                        onCompleteCallback.run();
                         this.onClose();
                     }
             );
