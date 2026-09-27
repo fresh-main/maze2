@@ -9,6 +9,9 @@ import net.minecraft.core.Vec3i;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.WorldGenRegion;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.*;
 import net.minecraft.world.level.biome.BiomeManager;
@@ -1997,9 +2000,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
 
             // ★ РЕКА через расстояние до кривой Безье ★
             if (riverDist >= 0 && structureBlend.factor < 0.35) {
-                double widthNoise = featureNoise.noise(x * 0.05, 0, z * 0.05) * 1.5;
-                double waterHalfWidth = 8.5 + widthNoise;
-                waterHalfWidth = Math.max(7.0, waterHalfWidth);
+                double waterHalfWidth = getTerrainWaterHalfWidth(x, z);
 
                 double bankHalfWidth = 3.0;
                 double totalHalfWidth = waterHalfWidth + bankHalfWidth;
@@ -2085,6 +2086,10 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
 
                         // ★ РАСТИТЕЛЬНОСТЬ НА БЕРЕГУ: как в остальном глейде ★
                         if (y > bankHeight) {
+                            int caneHeight = getSugarCaneHeight(x, z, bankHeight, waterLevel);
+                            if (caneHeight > 0 && y <= bankHeight + caneHeight) {
+                                return Blocks.SUGAR_CANE.defaultBlockState();
+                            }
                             if (y == bankHeight + 1 || y == bankHeight + 2) {
                                 long mixed = ((long) x * 73856093L) ^ ((long) z * 83492791L) ^ this.seed;
                                 mixed ^= (mixed >>> 32);
@@ -2933,6 +2938,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         }
 
         ChunkPos chunkPos = chunk.getPos();
+        spawnRiverFish(level, chunkPos);
 
         int minX = chunkPos.getMinBlockX();
         int minZ = chunkPos.getMinBlockZ();
@@ -3061,6 +3067,83 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
                 if (x == chosenFlowerX && z == chosenFlowerZ && flowerGridRand.nextDouble() < 0.10) {
                     generateFlowerCluster(level, flowerGridRand, x, z, minX, maxX, minZ, maxZ);
                 }
+            }
+        }
+    }
+
+    private double getTerrainWaterHalfWidth(int x, int z) {
+        double widthNoise = featureNoise.noise(x * 0.05, 0, z * 0.05) * 1.5;
+        return Math.max(7.0, 8.5 + widthNoise);
+    }
+
+    private int getSugarCaneHeight(int x, int z, int bankHeight, int waterLevel) {
+        // Cane survives only when the bank block has water next to it at the same height.
+        if (bankHeight != waterLevel || !hasAdjacentRiverWater(x, z)) {
+            return 0;
+        }
+
+        long mixed = ((long) Math.floorDiv(x, 2) * 341873128712L)
+                ^ ((long) Math.floorDiv(z, 2) * 132897987541L)
+                ^ this.seed ^ 0x5A6A7CA9EL;
+        mixed ^= mixed >>> 33;
+        mixed *= 0xff51afd7ed558ccdL;
+        mixed ^= mixed >>> 33;
+
+        // Sparse two-column clusters, normally 1-2 blocks tall and occasionally 3.
+        if ((mixed & 0xFFL) >= 72L) {
+            return 0;
+        }
+        int heightRoll = (int) ((mixed >>> 8) & 0xFFL);
+        return heightRoll < 28 ? 3 : (heightRoll < 150 ? 2 : 1);
+    }
+
+    private boolean hasAdjacentRiverWater(int x, int z) {
+        for (Direction direction : Direction.Plane.HORIZONTAL) {
+            int nx = x + direction.getStepX();
+            int nz = z + direction.getStepZ();
+            if (distanceToRiverCurve(nx, nz) < getTerrainWaterHalfWidth(nx, nz)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void spawnRiverFish(WorldGenLevel level, ChunkPos chunkPos) {
+        long schoolSeed = level.getSeed()
+                ^ ((long) chunkPos.x * 341873128712L)
+                ^ ((long) chunkPos.z * 132897987541L)
+                ^ 0xF15CA11L;
+        RandomSource random = RandomSource.create(schoolSeed);
+        if (random.nextFloat() > 0.72F) {
+            return;
+        }
+
+        int schoolSize = 2 + random.nextInt(3);
+        int spawned = 0;
+        for (int attempt = 0; attempt < 18 && spawned < schoolSize; attempt++) {
+            int x = chunkPos.getMinBlockX() + random.nextInt(16);
+            int z = chunkPos.getMinBlockZ() + random.nextInt(16);
+            if (Math.max(Math.abs(x), Math.abs(z)) > GLADE_RADIUS
+                    || distanceToRiverCurve(x, z) >= getTerrainWaterHalfWidth(x, z) * 0.78) {
+                continue;
+            }
+
+            int y = FLOOR_Y - 2 - random.nextInt(2);
+            BlockPos pos = new BlockPos(x, y, z);
+            if (!level.getBlockState(pos).is(Blocks.WATER)
+                    || !level.getBlockState(pos.above()).is(Blocks.WATER)) {
+                continue;
+            }
+
+            EntityType<? extends Mob> type = random.nextFloat() < 0.65F ? EntityType.SALMON : EntityType.COD;
+            Mob fish = type.create(level.getLevel());
+            if (fish == null) {
+                continue;
+            }
+            fish.moveTo(x + 0.5D, y + 0.25D, z + 0.5D, random.nextFloat() * 360.0F, 0.0F);
+            fish.finalizeSpawn(level, level.getCurrentDifficultyAt(pos), MobSpawnType.CHUNK_GENERATION, null, null);
+            if (level.addFreshEntity(fish)) {
+                spawned++;
             }
         }
     }
