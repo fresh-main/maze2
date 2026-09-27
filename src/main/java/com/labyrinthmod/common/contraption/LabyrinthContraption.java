@@ -14,45 +14,46 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
+import net.minecraft.world.phys.AABB;
 import net.minecraftforge.registries.RegisterEvent;
 import org.apache.commons.lang3.tuple.Pair;
 
 public class LabyrinthContraption extends Contraption {
 
-    // ★ ИСПРАВЛЕНИЕ: регистрация через RegisterEvent, а не статический инициализатор.
-    // Раньше было: public static final Holder.Reference<ContraptionType> TYPE = Registry.registerForHolder(...)
-    // Это вызывало "Registry is already frozen" при первом обращении к классу после загрузки мира.
+    public static final ResourceLocation TYPE_ID = new ResourceLocation("labyrinthmod", "labyrinth_shift");
     public static Holder.Reference<ContraptionType> TYPE;
 
-    /**
-     * Вызывается из LabyrinthMod.registerChunkGenerator() во время RegisterEvent.
-     * Регистрирует тип контрапции ДО заморозки реестров.
-     */
     public static void register(RegisterEvent event) {
-        if (event.getRegistryKey().equals(CreateBuiltInRegistries.CONTRAPTION_TYPE)) {
-            TYPE = Registry.registerForHolder(
-                    CreateBuiltInRegistries.CONTRAPTION_TYPE,
-                    new ResourceLocation("labyrinthmod", "labyrinth_shift"),
-                    new ContraptionType(LabyrinthContraption::new)
-            );
-            LabyrinthMod.LOGGER.info("[LabyrinthContraption] Registered contraption type");
-        }
+        if (!event.getRegistryKey().equals(CreateBuiltInRegistries.CONTRAPTION_TYPE.key())) return;
+        if (TYPE != null) return;
+        TYPE = Registry.registerForHolder(
+                CreateBuiltInRegistries.CONTRAPTION_TYPE,
+                TYPE_ID,
+                new ContraptionType(LabyrinthContraption::new)
+        );
+        LabyrinthMod.LOGGER.info("[LabyrinthContraption] Registered contraption type {}", TYPE_ID);
+    }
+
+    public static boolean isRegistered() {
+        return TYPE != null || CreateBuiltInRegistries.CONTRAPTION_TYPE.containsKey(TYPE_ID);
     }
 
     public static void init() {
-        // Пустой метод — можно использовать для форсирования загрузки класса
     }
 
     public void captureArea(Level world, BlockPos min, BlockPos max) {
         this.anchor = min;
-
+        this.bounds = new AABB(min);
         for (BlockPos pos : BlockPos.betweenClosed(min, max)) {
             BlockState state = world.getBlockState(pos);
             if (state.isAir()) continue;
-
             Pair<StructureTemplate.StructureBlockInfo, BlockEntity> pair = capture(world, pos);
             addBlock(world, pos, pair);
         }
+
+        // ★ ИСПРАВЛЕНИЕ: Убираем вызов refreshLighting отсюда.
+        // На этом этапе блоки ещё не удалены из мира, поэтому обновление света бессмысленно.
+        // Свет будет обновлён в LabyrinthAssembler.assembleZone строго после removeBlocksFromWorld.
 
         startMoving(world);
     }
@@ -64,7 +65,12 @@ public class LabyrinthContraption extends Contraption {
 
     @Override
     public ContraptionType getType() {
-        return TYPE.value();
+        if (TYPE != null) return TYPE.value();
+        ContraptionType type = CreateBuiltInRegistries.CONTRAPTION_TYPE.get(TYPE_ID);
+        if (type == null) {
+            throw new IllegalStateException("Contraption type " + TYPE_ID + " is not registered");
+        }
+        return type;
     }
 
     @Override
