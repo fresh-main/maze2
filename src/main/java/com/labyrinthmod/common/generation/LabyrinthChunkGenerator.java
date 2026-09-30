@@ -28,6 +28,7 @@ import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.LegacyRandomSource;
 import net.minecraft.world.level.levelgen.RandomState;
 import net.minecraft.world.level.levelgen.RandomSupport;
 import net.minecraft.world.level.levelgen.WorldgenRandom;
@@ -175,6 +176,46 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
 
     public static boolean hasActiveGenerator() {
         return activeGenerator != null;
+    }
+
+    /** Returns a random walkable floor cell in the main maze. */
+    public static BlockPos findRandomMainMazeCorridor(RandomSource random, BlockPos center, int radius, int attempts) {
+        LabyrinthChunkGenerator generator = activeGenerator;
+        if (generator == null) return null;
+        generator.ensureGenerated();
+
+        for (int i = 0; i < attempts; i++) {
+            int x;
+            int z;
+            if (center != null && radius > 0) {
+                x = center.getX() + random.nextInt(radius * 2 + 1) - radius;
+                z = center.getZ() + random.nextInt(radius * 2 + 1) - radius;
+            } else {
+                int bound = Math.max(1, generator.MAIN_MAZE_END - generator.GLADE_WALL_END - 2);
+                int side = random.nextInt(4);
+                int along = random.nextInt(generator.MAIN_MAZE_END * 2 + 1) - generator.MAIN_MAZE_END;
+                int radial = generator.GLADE_WALL_END + 2 + random.nextInt(bound);
+                x = side == 0 ? radial : side == 1 ? -radial : along;
+                z = side == 2 ? radial : side == 3 ? -radial : along;
+            }
+            if (generator.isMainMazeCorridor(x, z)) {
+                return new BlockPos(x, generator.FLOOR_Y + 1, z);
+            }
+        }
+        return null;
+    }
+
+    public static boolean isGeneratedMainMazeCorridor(int x, int z) {
+        LabyrinthChunkGenerator generator = activeGenerator;
+        return generator != null && generator.isMainMazeCorridor(x, z);
+    }
+
+    private boolean isMainMazeCorridor(int x, int z) {
+        int dist = Math.max(Math.abs(x), Math.abs(z));
+        return dist > GLADE_WALL_END && dist < MAIN_MAZE_END
+                && (mazeCorridors.contains(hash(x, z))
+                || passages.contains(hash(x, z))
+                || passageZones.contains(hash(x, z)));
     }
 
     /** The same area in which the decoration pass places the forest. */

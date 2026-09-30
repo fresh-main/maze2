@@ -2,9 +2,11 @@ package com.labyrinthmod.common.entity;
 
 import com.labyrinthmod.common.capability.FractionProvider;
 import com.labyrinthmod.common.capability.FractionType;
+import com.labyrinthmod.common.generation.LabyrinthChunkGenerator;
 import com.labyrinthmod.common.init.ModSounds;
 import com.labyrinthmod.common.patrol.PatrolManager;
 import com.labyrinthmod.common.util.ModLogger;
+import com.simibubi.create.content.contraptions.AbstractContraptionEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -14,6 +16,8 @@ import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.core.particles.BlockParticleOption;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.InteractionHand;
@@ -36,6 +40,8 @@ import net.minecraft.world.level.Level;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.ServerLevelAccessor;
 import net.minecraft.world.level.pathfinder.BlockPathTypes;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
@@ -59,6 +65,10 @@ public class GriverEntity extends Animal implements GeoEntity {
             SynchedEntityData.defineId(GriverEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> IS_SADDLED =
             SynchedEntityData.defineId(GriverEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Integer> GROUND_PHASE =
+            SynchedEntityData.defineId(GriverEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Integer> GROUND_PHASE_START =
+            SynchedEntityData.defineId(GriverEntity.class, EntityDataSerializers.INT);
     public boolean isPatrolling() {
         return this.entityData.get(IS_PATROLLING);
     }
@@ -148,6 +158,13 @@ public class GriverEntity extends Animal implements GeoEntity {
     private int recoveryAttempts = 0;
     private int successfulMoveTicks = 0;
     private int noclipTicks = 0;
+    private int naturalPatrolStationaryTicks = 0;
+
+    // Create removes moving blocks from the vanilla world and renders/collides them
+    // through an entity. Vanilla and our block pathfinder therefore see air. Keep a
+    // short lived set of world cells occupied by every nearby Create contraption.
+    private final Set<Long> createObstacleCells = new HashSet<>();
+    private int createObstacleCacheTick = Integer.MIN_VALUE;
 
     private int ridingSoundCooldown = 0;
     private static final int RIDING_SOUND_DELAY = 10;
@@ -168,7 +185,23 @@ public class GriverEntity extends Animal implements GeoEntity {
     private boolean isChasingPlayer = false;      // Режим преследования игрока
     private LivingEntity currentTarget = null;    // Текущая цель для преследования
     private int chaseTimeout = 0;                 // Таймаут преследования (если цель потеряна)
+    private List<BlockPos> chaseMicroPath = Collections.emptyList();
+    private int chaseMicroIndex = 0;
+    private int chaseReplanTicks = 0;
     private BlockPos spawnerBlockPos = null;
+    private boolean naturalNightSpawn = false;
+    private BlockPos dawnRetreatTarget = null;
+    private int dawnRetreatTicks = 0;
+    private List<BlockPos> dawnRetreatPath = Collections.emptyList();
+    private int dawnRetreatPathIndex = 0;
+    private int dawnRetreatReplanTicks = 0;
+    private int dawnRetreatStationaryTicks = 0;
+    private BlockPos dawnRetreatLastPos = null;
+    private List<BlockPos> pendingNightRoute = Collections.emptyList();
+    private static final int GROUND_NONE = 0;
+    private static final int GROUND_EMERGING = 1;
+    private static final int GROUND_BURROWING = 2;
+    private static final int GROUND_ANIMATION_TICKS = 40;
 
     /** GeckoLib instance cache — на каждой entity свой, иначе анимации игроков смешиваются. */
     private final AnimatableInstanceCache geoCache = GeckoLibUtil.createInstanceCache(this);
@@ -264,7 +297,9 @@ public class GriverEntity extends Animal implements GeoEntity {
 
     @Override
     protected void registerGoals() {
-        this.goalSelector.addGoal(1, new GriverAttackAllGoal());
+        // Combat and movement are driven by the state machine in tick(). Running the
+        // old attack Goal at the same time lets vanilla navigation stop or replace the
+        // custom A* route, which produced one-step patrols and visible jerks.
         this.goalSelector.addGoal(2, new SharedPatrolGoal());
         this.goalSelector.addGoal(3, new LookAtPlayerGoal(this, Player.class, 8.0F));
     }
@@ -275,6 +310,169 @@ public class GriverEntity extends Animal implements GeoEntity {
         this.entityData.define(IS_POSSESSED, false);
         this.entityData.define(IS_PATROLLING, false);
         this.entityData.define(IS_SADDLED, false);
+        this.entityData.define(GROUND_PHASE, GROUND_NONE);
+        this.entityData.define(GROUND_PHASE_START, 0);
+    }
+
+    public boolean isNaturalNightSpawn() {
+        return naturalNightSpawn;
+    }
+
+    public boolean canReachNaturalPoint(BlockPos target) {
+        if (target == null || this.level().isClientSide) return false;
+        List<BlockPos> path = buildMicroPath(this.blockPosition(), target);
+        return path != null && !path.isEmpty();
+    }
+
+    public float getGroundAnimationOffset(float partialTick) {
+        int phase = this.entityData.get(GROUND_PHASE);
+        if (phase == GROUND_NONE) return 0.0F;
+        float progress = Math.min(1.0F, Math.max(0.0F,
+                (this.tickCount - this.entityData.get(GROUND_PHASE_START) + partialTick) / GROUND_ANIMATION_TICKS));
+        return phase == GROUND_EMERGING ? -3.2F * (1.0F - progress) : -3.2F * progress;
+    }
+
+    public void beginNaturalNightPatrol(List<BlockPos> route) {
+        if (this.level().isClientSide || route == null || route.isEmpty()) return;
+        naturalNightSpawn = true;
+        pendingNightRoute = filterReachableNaturalRoute(route);
+        if (pendingNightRoute.isEmpty()) {
+            pendingNightRoute = createNextNaturalNightRoute();
+        }
+        this.entityData.set(GROUND_PHASE, GROUND_EMERGING);
+        this.entityData.set(GROUND_PHASE_START, this.tickCount);
+        this.setInvulnerable(true);
+        this.getNavigation().stop();
+        this.setTarget(null);
+    }
+
+    public void beginDawnRetreat(BlockPos retreatTarget) {
+        if (this.level().isClientSide || !naturalNightSpawn) return;
+        dawnRetreatTarget = retreatTarget;
+        dawnRetreatTicks = 0;
+        dawnRetreatPath = Collections.emptyList();
+        dawnRetreatPathIndex = 0;
+        dawnRetreatReplanTicks = 20;
+        dawnRetreatStationaryTicks = 0;
+        dawnRetreatLastPos = this.blockPosition();
+        pendingNightRoute = Collections.emptyList();
+        plannedTargets.clear();
+        waypointChain = null;
+        microPath = null;
+        microIdx = 0;
+        this.entityData.set(IS_PATROLLING, false);
+        this.setTarget(null);
+        this.currentTarget = null;
+        this.forcedAttackTarget = null;
+        this.lastHurtByMob = null;
+        this.getNavigation().stop();
+        dawnRetreatPath = buildMicroPath(this.blockPosition(), retreatTarget);
+        if (dawnRetreatPath == null || dawnRetreatPath.isEmpty()) {
+            beginImmediateBurrow();
+        }
+    }
+
+    public void beginImmediateBurrow() {
+        if (this.level().isClientSide || !naturalNightSpawn) return;
+        dawnRetreatTarget = null;
+        pendingNightRoute = Collections.emptyList();
+        plannedTargets.clear();
+        waypointChain = null;
+        microPath = null;
+        this.entityData.set(IS_PATROLLING, false);
+        this.setTarget(null);
+        this.currentTarget = null;
+        this.forcedAttackTarget = null;
+        this.lastHurtByMob = null;
+        this.entityData.set(GROUND_PHASE, GROUND_BURROWING);
+        this.entityData.set(GROUND_PHASE_START, this.tickCount);
+        this.setInvulnerable(true);
+        this.getNavigation().stop();
+        this.setDeltaMovement(Vec3.ZERO);
+    }
+
+    private boolean tickNaturalNightLifecycle() {
+        int phase = this.entityData.get(GROUND_PHASE);
+        if (phase == GROUND_EMERGING) {
+            this.getNavigation().stop();
+            this.setDeltaMovement(Vec3.ZERO);
+            spawnGroundParticles();
+            if (this.tickCount - this.entityData.get(GROUND_PHASE_START) >= GROUND_ANIMATION_TICKS) {
+                this.entityData.set(GROUND_PHASE, GROUND_NONE);
+                this.setInvulnerable(false);
+                if (!pendingNightRoute.isEmpty()) {
+                    applyExternalPlan(pendingNightRoute);
+                    pendingNightRoute = Collections.emptyList();
+                }
+            }
+            return true;
+        }
+        if (phase == GROUND_BURROWING) {
+            this.getNavigation().stop();
+            this.setDeltaMovement(Vec3.ZERO);
+            spawnGroundParticles();
+            if (this.tickCount - this.entityData.get(GROUND_PHASE_START) >= GROUND_ANIMATION_TICKS) {
+                this.discard();
+            }
+            return true;
+        }
+        if (dawnRetreatTarget != null) {
+            dawnRetreatTicks++;
+            this.setTarget(null);
+            this.currentTarget = null;
+            if (this.distanceToSqr(Vec3.atCenterOf(dawnRetreatTarget)) <= 4.0D || dawnRetreatTicks >= 1200) {
+                this.entityData.set(GROUND_PHASE, GROUND_BURROWING);
+                this.entityData.set(GROUND_PHASE_START, this.tickCount);
+                this.setInvulnerable(true);
+                this.getNavigation().stop();
+            } else {
+                if (this.tickCount % 10 == 0) {
+                    BlockPos current = this.blockPosition();
+                    if (dawnRetreatLastPos != null && current.equals(dawnRetreatLastPos)) {
+                        dawnRetreatStationaryTicks += 10;
+                    } else {
+                        dawnRetreatStationaryTicks = 0;
+                    }
+                    dawnRetreatLastPos = current;
+                    if (dawnRetreatStationaryTicks >= 100) {
+                        beginImmediateBurrow();
+                        return true;
+                    }
+                }
+                this.getNavigation().stop();
+                if (dawnRetreatReplanTicks-- <= 0
+                        || dawnRetreatPathIndex >= dawnRetreatPath.size()) {
+                    dawnRetreatPath = buildMicroPath(this.blockPosition(), dawnRetreatTarget);
+                    dawnRetreatPathIndex = 0;
+                    dawnRetreatReplanTicks = 20;
+                }
+                if (dawnRetreatPathIndex < dawnRetreatPath.size()) {
+                    BlockPos step = dawnRetreatPath.get(dawnRetreatPathIndex);
+                    if (!canStandAt(step)) {
+                        dawnRetreatPath = Collections.emptyList();
+                        dawnRetreatReplanTicks = 0;
+                        this.setDeltaMovement(0.0D, this.getDeltaMovement().y, 0.0D);
+                    } else {
+                        double tx = step.getX() + 0.5D;
+                        double tz = step.getZ() + 0.5D;
+                        double dx = tx - this.getX();
+                        double dz = tz - this.getZ();
+                        if (dx * dx + dz * dz < 0.12D) dawnRetreatPathIndex++;
+                        else moveTowards(tx, step.getY(), tz, 1.35D);
+                    }
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+    private void spawnGroundParticles() {
+        if (!(this.level() instanceof ServerLevel server) || this.tickCount % 2 != 0) return;
+        server.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK,
+                        this.level().getBlockState(this.blockPosition().below())),
+                this.getX(), this.getY() + 0.15D, this.getZ(),
+                8, 0.55D, 0.12D, 0.55D, 0.08D);
     }
     @Override
     public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty, MobSpawnType reason, @Nullable SpawnGroupData spawnData, @Nullable CompoundTag dataTag) {
@@ -502,7 +700,13 @@ public class GriverEntity extends Animal implements GeoEntity {
 
         // Строим waypoint chain через граф patrol points
         PatrolManager m = PatrolManager.get(this.level());
-        if (m != null) {
+        if (naturalNightSpawn) {
+            // Natural routes are already checked segment by segment. Passing them
+            // through the legacy patrol graph could insert an unreachable waypoint
+            // and leave every freshly spawned griver idle until a riding reset.
+            waypointChain = new ArrayList<>();
+            waypointChain.add(target);
+        } else if (m != null) {
             waypointChain = m.findWaypointChain(this.blockPosition(), target);
             if (waypointChain != null && !waypointChain.isEmpty()) {
                 if (!waypointChain.get(waypointChain.size() - 1).equals(target)) {
@@ -563,45 +767,52 @@ public class GriverEntity extends Animal implements GeoEntity {
     private static final int MICRO_PATH_INTERVAL = 5; // Раз в 5 тиков
 
     private List<BlockPos> buildMicroPath(BlockPos start, BlockPos end) {
-        // ОГРАНИЧИВАЕМ ЧАСТОТУ ВЫЗОВОВ
-        if (microPathTimer > 0) {
-            microPathTimer--;
-            return lastMicroPath; // Возвращаем последний путь
-        }
+        refreshCreateObstacleCells();
+        BlockPos goal = canStandAt(end) ? end.immutable() : snapToWalkable(end);
+        if (goal == null) return Collections.emptyList();
 
-        microPathTimer = MICRO_PATH_INTERVAL;
+        // Real orthogonal A*. The old implementation greedily stepped toward the
+        // target and picked the first free neighbour at a wall, so it could oscillate
+        // forever instead of going around that wall.
+        PriorityQueue<MicroNode> open = new PriorityQueue<>(Comparator.comparingDouble(n -> n.f));
+        Map<Long, Double> best = new HashMap<>();
+        BlockPos origin = start.immutable();
+        open.add(new MicroNode(origin, null, 0.0D, heuristic(origin, goal)));
+        best.put(origin.asLong(), 0.0D);
 
-        List<BlockPos> path = new ArrayList<>();
-        mutablePos.set(start);
-
-        int maxIterations = 100; // ОГРАНИЧЕНИЕ ДЛЯ ИЗБЕЖАНИЯ БЕСКОНЕЧНЫХ ЦИКЛОВ
+        int minX = Math.min(origin.getX(), goal.getX()) - 14;
+        int maxX = Math.max(origin.getX(), goal.getX()) + 14;
+        int minZ = Math.min(origin.getZ(), goal.getZ()) - 14;
+        int maxZ = Math.max(origin.getZ(), goal.getZ()) + 14;
         int iterations = 0;
 
-        while (!mutablePos.equals(end) && iterations < maxIterations) {
-            iterations++;
+        while (!open.isEmpty() && iterations++ < 6000) {
+            MicroNode current = open.poll();
+            if (current.g > best.getOrDefault(current.pos.asLong(), Double.MAX_VALUE)) continue;
+            if (current.pos.equals(goal)) {
+                List<BlockPos> result = reconstructMicro(current);
+                if (!result.isEmpty()) result.remove(0); // current cell is not a movement step
+                lastMicroPath = result;
+                return result;
+            }
 
-            int dx = Integer.compare(end.getX(), mutablePos.getX());
-            int dy = Integer.compare(end.getY(), mutablePos.getY());
-            int dz = Integer.compare(end.getZ(), mutablePos.getZ());
+            for (Direction direction : Direction.Plane.HORIZONTAL) {
+                BlockPos next = current.pos.relative(direction);
+                if (next.getX() < minX || next.getX() > maxX
+                        || next.getZ() < minZ || next.getZ() > maxZ) continue;
+                if (!canStandAt(next)) continue;
 
-            mutablePos.move(dx, dy, dz); // ИСПОЛЬЗУЕМ MutableBlockPos!
-
-            if (isPassable(mutablePos)) {
-                path.add(new BlockPos(mutablePos)); // СОЗДАЁМ КОПИЮ
-            } else {
-                mutablePos.move(-dx, -dy, -dz); // ОТКАТ
-                BlockPos alternative = findAlternative(mutablePos, end);
-                if (alternative != null) {
-                    path.add(alternative);
-                    mutablePos.set(alternative);
-                } else {
-                    break;
-                }
+                double nextG = current.g + 1.0D + getWallPenalty(next) * 0.15D;
+                long key = next.asLong();
+                if (nextG >= best.getOrDefault(key, Double.MAX_VALUE)) continue;
+                best.put(key, nextG);
+                open.add(new MicroNode(next.immutable(), current, nextG,
+                        nextG + heuristic(next, goal)));
             }
         }
 
-        lastMicroPath = path;
-        return path;
+        lastMicroPath = Collections.emptyList();
+        return lastMicroPath;
     }
 
 // ========== НОВЫЕ МЕТОДЫ ДЛЯ ПРОВЕРКИ СТЕН ==========
@@ -712,17 +923,75 @@ public class GriverEntity extends Animal implements GeoEntity {
      * buildMicroPath отвалится. Близость к стене учитывается как ШТРАФ в A*, не как блок.
      */
     private boolean canStandAt(BlockPos pos) {
+        refreshCreateObstacleCells();
+        if (isCreateObstacle(pos) || isCreateObstacle(pos.above()) || isCreateObstacle(pos.above(2))) {
+            return false;
+        }
         var below = this.level().getBlockState(pos.below());
         if (below.isAir() || !below.isSolid()) return false;
-        if (!this.level().getBlockState(pos).isAir()) return false;
-        if (!this.level().getBlockState(pos.above()).isAir()) return false;
-        return this.level().getBlockState(pos.above(2)).isAir();
+        if (!isPassable(pos)) return false;
+        if (!isPassable(pos.above())) return false;
+        return isPassable(pos.above(2));
     }
 
     private boolean isPassable(BlockPos pos) {
+        refreshCreateObstacleCells();
+        if (isCreateObstacle(pos)) return false;
         var state = this.level().getBlockState(pos);
         if (state.isAir()) return true;
+        if (state.is(BlockTags.LEAVES)
+                || state.is(Blocks.POWDER_SNOW)
+                || state.is(BlockTags.FENCES)
+                || state.is(BlockTags.WALLS)) {
+            return false;
+        }
         return state.getCollisionShape(this.level(), pos).isEmpty();
+    }
+
+    private boolean isCreateObstacle(BlockPos pos) {
+        return createObstacleCells.contains(pos.asLong());
+    }
+
+    private void refreshCreateObstacleCells() {
+        if (this.level().isClientSide) return;
+        if (createObstacleCacheTick != Integer.MIN_VALUE
+                && this.tickCount - createObstacleCacheTick < 3) return;
+        // Contraptions are marked with a generous body margin, so three ticks of
+        // caching remain safe while avoiding thousands of transforms every tick.
+        createObstacleCacheTick = this.tickCount;
+        createObstacleCells.clear();
+        AABB search = this.getBoundingBox().inflate(96.0D, 24.0D, 96.0D);
+        List<AbstractContraptionEntity> contraptions = this.level().getEntitiesOfClass(
+                AbstractContraptionEntity.class, search,
+                e -> e.isAlive() && e.collisionEnabled() && e.getContraption() != null);
+
+        for (AbstractContraptionEntity contraptionEntity : contraptions) {
+            for (var entry : contraptionEntity.getContraption().getBlocks().entrySet()) {
+                var info = entry.getValue();
+                if (info.state().isAir()
+                        || info.state().getCollisionShape(this.level(), BlockPos.ZERO).isEmpty()) continue;
+                Vec3 center = contraptionEntity.toGlobalVector(Vec3.atCenterOf(entry.getKey()), 1.0F);
+
+                // Mark only cells actually overlapped by the moving block. Expanding
+                // this to neighbouring cells closes one-block and three-block maze
+                // corridors completely, leaving the griver with no first step.
+                // A fractional moving block is naturally present in two cells while
+                // crossing their boundary.
+                int minX = (int) Math.floor(center.x - 0.499D);
+                int maxX = (int) Math.floor(center.x + 0.499D);
+                int minY = (int) Math.floor(center.y - 0.499D);
+                int maxY = (int) Math.floor(center.y + 0.499D);
+                int minZ = (int) Math.floor(center.z - 0.499D);
+                int maxZ = (int) Math.floor(center.z + 0.499D);
+                for (int x = minX; x <= maxX; x++) {
+                    for (int y = minY; y <= maxY; y++) {
+                        for (int z = minZ; z <= maxZ; z++) {
+                            createObstacleCells.add(BlockPos.asLong(x, y, z));
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -820,6 +1089,80 @@ public class GriverEntity extends Animal implements GeoEntity {
         BlockPos head = plannedTargets.get(0);
         m.setGriverTarget(this.getUUID(), head);
         assignNewTarget(head);
+    }
+
+    private void pickNewNaturalNightTarget(PatrolManager manager) {
+        if (plannedTargets.isEmpty()) {
+            plannedTargets.addAll(createNextNaturalNightRoute());
+        }
+        if (plannedTargets.isEmpty()) {
+            currentGlobalTarget = null;
+            refillRetryCooldown = 20;
+            return;
+        }
+        manager.setPlannedTargets(this.getUUID(), plannedTargets);
+        BlockPos next = plannedTargets.get(0);
+        manager.setGriverTarget(this.getUUID(), next);
+        assignNewTarget(next);
+    }
+
+    private void regenerateNaturalNightRoute(PatrolManager manager, String reason) {
+        manager.clearGriverTarget(this.getUUID());
+        plannedTargets.clear();
+        currentGlobalTarget = null;
+        waypointChain = null;
+        waypointIdx = 0;
+        microPath = null;
+        microIdx = 0;
+        microReplanCooldown = 0;
+        stuckTicks = 0;
+        recoveryAttempts = 0;
+        successfulMoveTicks = 0;
+        naturalPatrolStationaryTicks = 0;
+        this.setDeltaMovement(0.0D, this.getDeltaMovement().y, 0.0D);
+        ModLogger.patrol("natural-route-regenerate", "griver="
+                + this.getUUID().toString().substring(0, 8) + " reason=" + reason);
+        pickNewNaturalNightTarget(manager);
+    }
+
+    private List<BlockPos> createNextNaturalNightRoute() {
+        if (!(this.level() instanceof ServerLevel server)) return Collections.emptyList();
+        int wanted = 4 + this.random.nextInt(4);
+        List<BlockPos> route = new ArrayList<>(wanted);
+        BlockPos center = this.blockPosition();
+        int failures = 0;
+        while (route.size() < wanted && failures < 80) {
+            BlockPos point = LabyrinthChunkGenerator.findRandomMainMazeCorridor(
+                    this.random, center, 25, 1);
+            if (point == null || !server.hasChunkAt(point) || !canStandAt(point)
+                    || point.distSqr(center) < 36.0D || route.contains(point)) {
+                failures++;
+                continue;
+            }
+            List<BlockPos> candidatePath = buildMicroPath(center, point);
+            if (candidatePath == null || candidatePath.isEmpty()) {
+                failures++;
+                continue;
+            }
+            route.add(point);
+            center = point;
+        }
+        ModLogger.patrol("natural-route-refresh", "griver="
+                + this.getUUID().toString().substring(0, 8) + " size=" + route.size());
+        return route;
+    }
+
+    private List<BlockPos> filterReachableNaturalRoute(List<BlockPos> route) {
+        List<BlockPos> reachable = new ArrayList<>();
+        BlockPos from = this.blockPosition();
+        for (BlockPos point : route) {
+            if (point == null || !canStandAt(point)) continue;
+            List<BlockPos> path = buildMicroPath(from, point);
+            if (path == null || path.isEmpty()) continue;
+            reachable.add(point.immutable());
+            from = point;
+        }
+        return reachable;
     }
 
     /**
@@ -938,6 +1281,11 @@ public class GriverEntity extends Animal implements GeoEntity {
         if (currentGlobalTarget != null) {
             m.recordVisit(this.getUUID(), currentGlobalTarget);
         }
+        if (naturalNightSpawn && dawnRetreatTarget == null) {
+            if (!plannedTargets.isEmpty()) plannedTargets.remove(0);
+            pickNewNaturalNightTarget(m);
+            return;
+        }
         if (inDispersalPhase) {
             m.clearDispersalTarget(this.getUUID());
             inDispersalPhase = false;
@@ -997,6 +1345,10 @@ public class GriverEntity extends Animal implements GeoEntity {
 
         // ========== СЕРВЕРНАЯ ЛОГИКА ==========
         animationController.tick();
+
+        if (naturalNightSpawn && tickNaturalNightLifecycle()) {
+            return;
+        }
 
         // ========== SAFETY: МОНИТОР СКОРОСТИ ==========
         // updateReturningLogic временно поднимает MOVEMENT_SPEED до 0.25*3=0.75 для
@@ -1086,12 +1438,11 @@ public class GriverEntity extends Animal implements GeoEntity {
         }
 
         // Если нет активной цели, но есть обидчик — начинаем атаку
-        if (lastHurtByMob != null && lastHurtByMob.isAlive() && distanceTo(lastHurtByMob) < 30.0) {
-            if (!isOperatorOrImposter(lastHurtByMob)) {
-                startAttackingTarget(lastHurtByMob);
-                continueAttackingTarget();
-                return;
-            }
+        if (lastHurtByMob != null && lastHurtByMob.isAlive()
+                && !isProtectedFromGriver(lastHurtByMob) && distanceTo(lastHurtByMob) < 30.0) {
+            startAttackingTarget(lastHurtByMob);
+            continueAttackingTarget();
+            return;
         }
 
         // Ищем новую цель
@@ -1127,7 +1478,14 @@ public class GriverEntity extends Animal implements GeoEntity {
         if (m != null && m.isGlobalPatrolActive() && !isVehicle() && !isReturningHome && !returning && forcedAttackTarget == null && !isAttacking && attackAnimationTimer == 0) {
             if (!isPatrolling()) {
                 this.entityData.set(IS_PATROLLING, true);
-                joinGlobalPatrol();
+                // A naturally spawned griver already owns a fixed all-night route.
+                // Rejoining the legacy global patrol after every chase used to clear
+                // that route and could leave it with no target after a single step.
+                if (naturalNightSpawn) {
+                    if (currentGlobalTarget == null) pickNewNaturalNightTarget(m);
+                } else {
+                    joinGlobalPatrol();
+                }
             }
             updatePatrolLogic();
         } else if (!isVehicle() && !isReturningHome && !returning && forcedAttackTarget == null && !isAttacking && attackAnimationTimer == 0) {
@@ -1152,13 +1510,11 @@ public class GriverEntity extends Animal implements GeoEntity {
         return !isVehicle() && !isReturningHome && !returning && forcedAttackTarget == null;
     }
 
-    private boolean isOperatorOrImposter(LivingEntity entity) {
+    private boolean isProtectedFromGriver(Entity entity) {
         if (!(entity instanceof Player player)) return false;
         return player.getCapability(FractionProvider.FRACTION)
-                .map(data -> {
-                    FractionType fraction = data.getFraction();
-                    return fraction == FractionType.OPERATOR || fraction == FractionType.IMPOSTER;
-                })
+                .map(data -> data.getFraction() == FractionType.OPERATOR
+                        || data.getFraction() == FractionType.IMPOSTER)
                 .orElse(false);
     }
 
@@ -1244,12 +1600,17 @@ public class GriverEntity extends Animal implements GeoEntity {
         }
 
         if (currentGlobalTarget == null) {
-            pickNewRegularTarget(m);
+            if (naturalNightSpawn) {
+                if (refillRetryCooldown > 0) refillRetryCooldown--;
+                else pickNewNaturalNightTarget(m);
+            } else {
+                pickNewRegularTarget(m);
+            }
             return;
         }
 
         if (refillRetryCooldown > 0) refillRetryCooldown--;
-        if (plannedTargets.size() < PatrolManager.PLAN_LENGTH && refillRetryCooldown <= 0) {
+        if (!naturalNightSpawn && plannedTargets.size() < PatrolManager.PLAN_LENGTH && refillRetryCooldown <= 0) {
             refillRetryCooldown = 60;
             refillPlannedTargets(m);
         }
@@ -1288,49 +1649,14 @@ public class GriverEntity extends Animal implements GeoEntity {
             double stepX = step.getX() + 0.5;
             double stepZ = step.getZ() + 0.5;
 
-            if (step.getX() == this.blockPosition().getX() && step.getZ() == this.blockPosition().getZ()) {
-                microIdx++;
-                if (microIdx >= microPath.size()) {
-                    if (isFinalWaypoint) {
-                        onReachedTarget(m);
-                    } else {
-                        waypointIdx++;
-                        microPath = null;
-                    }
-                    return;
-                }
-                step = microPath.get(microIdx);
-                stepX = step.getX() + 0.5;
-                stepZ = step.getZ() + 0.5;
-            }
-
-            double curCenterX = Math.floor(this.getX()) + 0.5;
-            double curCenterZ = Math.floor(this.getZ()) + 0.5;
-            double offFromCenterX = this.getX() - curCenterX;
-            double offFromCenterZ = this.getZ() - curCenterZ;
-            double offSq = offFromCenterX * offFromCenterX + offFromCenterZ * offFromCenterZ;
-
-            int dxStep = step.getX() - (int) Math.floor(this.getX());
-            int dzStep = step.getZ() - (int) Math.floor(this.getZ());
-            boolean aligned = (dxStep != 0 && Math.abs(offFromCenterX) < 0.2)
-                    || (dzStep != 0 && Math.abs(offFromCenterZ) < 0.2)
-                    || (dxStep != 0 && Math.signum(offFromCenterX) == Math.signum(dxStep))
-                    || (dzStep != 0 && Math.signum(offFromCenterZ) == Math.signum(dzStep));
-
-            double tx, tz;
-            if (offSq > 0.15 && !aligned) {
-                tx = curCenterX;
-                tz = curCenterZ;
-            } else {
-                tx = stepX;
-                tz = stepZ;
-            }
+            double tx = stepX;
+            double tz = stepZ;
 
             double dx = stepX - this.getX();
             double dz = stepZ - this.getZ();
             double horDistSq = dx * dx + dz * dz;
 
-            if (horDistSq < 0.5) {
+            if (horDistSq < 0.12D) {
                 microIdx++;
                 stuckTicks = 0;
                 recoveryAttempts = 0;
@@ -1340,10 +1666,20 @@ public class GriverEntity extends Animal implements GeoEntity {
                     } else {
                         waypointIdx++;
                         microPath = null;
+                        microReplanCooldown = 0;
                     }
                     return;
                 }
             } else {
+                // A Create contraption may have moved onto a previously valid path.
+                // Stop before contact and rebuild against its current transform.
+                refreshCreateObstacleCells();
+                if (!canStandAt(step)) {
+                    this.setDeltaMovement(0.0D, this.getDeltaMovement().y, 0.0D);
+                    microPath = null;
+                    microReplanCooldown = 0;
+                    return;
+                }
                 moveTowards(tx, step.getY(), tz);
             }
         }
@@ -1355,16 +1691,23 @@ public class GriverEntity extends Animal implements GeoEntity {
                     || Math.abs(cur.getX() - stuckCheckLastPos.getX()) >= 1
                     || Math.abs(cur.getZ() - stuckCheckLastPos.getZ()) >= 1;
             if (moved) {
+                naturalPatrolStationaryTicks = 0;
                 successfulMoveTicks += 10;
                 if (successfulMoveTicks >= 40) {
                     stuckTicks = 0;
                     recoveryAttempts = 0;
                 }
             } else {
+                if (naturalNightSpawn) naturalPatrolStationaryTicks += 10;
                 successfulMoveTicks = 0;
                 stuckTicks += 10;
             }
             stuckCheckLastPos = cur;
+
+            if (naturalNightSpawn && naturalPatrolStationaryTicks >= 100) {
+                regenerateNaturalNightRoute(m, "stationary-5s target=" + currentGlobalTarget);
+                return;
+            }
 
             if (stuckTicks >= 30 && recoveryAttempts == 0) {
                 recoveryAttempts = 1;
@@ -1423,46 +1766,27 @@ public class GriverEntity extends Animal implements GeoEntity {
      * Это исключает диагональное прижимание к стенам на поворотах.
      */
     private void moveTowards(double tx, double ty, double tz) {
-        BlockPos myCell = this.blockPosition();
-        int targetCellX = (int) Math.floor(tx);
-        int targetCellZ = (int) Math.floor(tz);
+        moveTowards(tx, ty, tz, 1.25D);
+    }
 
-        int axisDx = targetCellX - myCell.getX();
-        int axisDz = targetCellZ - myCell.getZ();
-
-        double speed = (double) this.getAttributeValue(Attributes.MOVEMENT_SPEED);
-        double mx, mz;
-
-        double curCenterX = myCell.getX() + 0.5;
-        double curCenterZ = myCell.getZ() + 0.5;
-
-        if (axisDx != 0 && axisDz == 0) {
-            // Движение по X, выравниваем Z
-            mx = Math.signum(axisDx) * speed;
-            double zOff = curCenterZ - this.getZ();
-            mz = Math.max(-speed, Math.min(speed, zOff * 0.8));
-        } else if (axisDz != 0 && axisDx == 0) {
-            // Движение по Z, выравниваем X
-            mz = Math.signum(axisDz) * speed;
-            double xOff = curCenterX - this.getX();
-            mx = Math.max(-speed, Math.min(speed, xOff * 0.8));
-        } else if (axisDx == 0 && axisDz == 0) {
-            // Цель в той же клетке — подтягиваемся к её центру
-            double dx = tx - this.getX();
-            double dz = tz - this.getZ();
-            mx = Math.max(-speed, Math.min(speed, dx));
-            mz = Math.max(-speed, Math.min(speed, dz));
-        } else {
-            // Diagonal target (не должно быть для ортогонального A*, fallback)
-            double dx = tx - this.getX();
-            double dz = tz - this.getZ();
-            double len = Math.sqrt(dx * dx + dz * dz);
-            mx = (dx / len) * speed;
-            mz = (dz / len) * speed;
-        }
+    private void moveTowards(double tx, double ty, double tz, double speedMultiplier) {
+        double dx = tx - this.getX();
+        double dz = tz - this.getZ();
+        double distance = Math.sqrt(dx * dx + dz * dz);
+        if (distance < 0.001D) return;
+        double maxSpeed = this.getAttributeValue(Attributes.MOVEMENT_SPEED) * speedMultiplier;
+        // Micro-path cells are steering markers, not destinations. Braking at every
+        // cell made a running griver slower than a walking player.
+        double desiredSpeed = maxSpeed;
+        double mx = dx / distance * desiredSpeed;
+        double mz = dz / distance * desiredSpeed;
 
         Vec3 dv = this.getDeltaMovement();
-        this.setDeltaMovement(mx, dv.y, mz);
+        // Ease into the next cell instead of replacing horizontal velocity every
+        // tick. This removes the visible jerk at route nodes and 90 degree turns.
+        double smoothedX = dv.x * 0.45D + mx * 0.55D;
+        double smoothedZ = dv.z * 0.45D + mz * 0.55D;
+        this.setDeltaMovement(smoothedX, dv.y, smoothedZ);
 
         // Если впереди ступенька вверх — прыжок
         if (ty > this.getY() + 0.5 && this.onGround()) {
@@ -1477,7 +1801,7 @@ public class GriverEntity extends Animal implements GeoEntity {
         float delta = targetYaw - currentYaw;
         while (delta < -180) delta += 360;
         while (delta > 180) delta -= 360;
-        float step = Math.signum(delta) * Math.min(15f, Math.abs(delta));
+        float step = Math.signum(delta) * Math.min(8f, Math.abs(delta));
         float newYaw = currentYaw + step;
         this.setYRot(newYaw);
         this.yBodyRot = newYaw;
@@ -1504,6 +1828,7 @@ public class GriverEntity extends Animal implements GeoEntity {
 
     @Override
     public boolean doHurtTarget(Entity target) {
+        if (isProtectedFromGriver(target)) return false;
         // Если зашли сюда из performAttack (путь райдера) — он уже взвёл
         // attackAnimationTimer и забродкастил event, дублировать нельзя
         // (тройной звук удара). Если timer == 0 — это AI-атака, ванильный
@@ -1542,18 +1867,7 @@ public class GriverEntity extends Animal implements GeoEntity {
         Vec3 lookVec = this.getLookAngle();
         for (var target : entities) {
             if (target instanceof LivingEntity living && living != this) {
-                // Проверяем, не является ли цель оператором или предателем
-                if (target instanceof Player player) {
-                    boolean isOperator = player.getCapability(FractionProvider.FRACTION)
-                            .map(data -> data.getFraction() == FractionType.OPERATOR)
-                            .orElse(false);
-                    boolean isImposter = player.getCapability(FractionProvider.FRACTION)
-                            .map(data -> data.getFraction() == FractionType.IMPOSTER)
-                            .orElse(false);
-
-                    if (isOperator || isImposter) continue;
-                }
-
+                if (isProtectedFromGriver(target)) continue;
                 Vec3 toTarget = target.position().subtract(this.position()).normalize();
                 double dot = lookVec.dot(toTarget);
                 if (dot > 0.6 && this.distanceTo(target) <= range) {
@@ -1626,6 +1940,7 @@ public class GriverEntity extends Animal implements GeoEntity {
         tag.putBoolean("IsPatrolling", isPatrolling());
         tag.putBoolean("ReturningHome", returningHome);        // НОВОЕ
         tag.putBoolean("ForceChunkLoading", forceChunkLoading); // НОВОЕ
+        tag.putBoolean("NaturalNightSpawn", naturalNightSpawn);
         tag.putInt("ChunkLoadRadius", chunkLoadRadius);        // НОВОЕ
         if (possessingPlayerUUID != null) tag.putUUID("PossessingPlayer", possessingPlayerUUID);
         if (currentGlobalTarget != null) {
@@ -1675,6 +1990,7 @@ public class GriverEntity extends Animal implements GeoEntity {
         if (tag.contains("SpawnerX")) {
             spawnerBlockPos = new BlockPos(tag.getInt("SpawnerX"), tag.getInt("SpawnerY"), tag.getInt("SpawnerZ"));
         }
+        naturalNightSpawn = tag.getBoolean("NaturalNightSpawn");
     }
 
 
@@ -1794,10 +2110,8 @@ public class GriverEntity extends Animal implements GeoEntity {
             if (isReturningHome) return false;
 
             if (lastHurtByMob != null && lastHurtByMob.isAlive() && distanceTo(lastHurtByMob) < MAX_DISTANCE) {
-                if (!isOperatorOrImposter(lastHurtByMob)) {
-                    target = lastHurtByMob;
-                    return true;
-                }
+                target = lastHurtByMob;
+                return true;
             }
 
             LivingEntity closest = findClosestVisibleTarget();
@@ -1878,16 +2192,12 @@ public class GriverEntity extends Animal implements GeoEntity {
             LivingEntity closest = null;
 
             if (lastHurtByMob != null && lastHurtByMob.isAlive() && distanceTo(lastHurtByMob) < MAX_DISTANCE + 10) {
-                if (!isOperatorOrImposter(lastHurtByMob)) {
-                    return lastHurtByMob;
-                }
+                return lastHurtByMob;
             }
 
             for (Player player : level().players()) {
                 if (player.isCreative() || player.isSpectator() || player.isInvisible()) continue;
                 if (player == getControllingPassenger()) continue;
-                if (isOperatorOrImposter(player)) continue;
-
                 double distance = distanceTo(player);
                 if (distance < closestDistance && hasLineOfSight(player)) {
                     closestDistance = distance;
@@ -1913,16 +2223,6 @@ public class GriverEntity extends Animal implements GeoEntity {
             return closest;
         }
 
-        private boolean isOperatorOrImposter(LivingEntity entity) {
-            if (!(entity instanceof Player player)) return false;
-            return player.getCapability(FractionProvider.FRACTION)
-                    .map(data -> {
-                        FractionType fraction = data.getFraction();
-                        return fraction == FractionType.OPERATOR || fraction == FractionType.IMPOSTER;
-                    })
-                    .orElse(false);
-        }
-
         private boolean hasLineOfSight(LivingEntity target) {
             return GriverEntity.this.getSensing().hasLineOfSight(target);
         }
@@ -1936,38 +2236,10 @@ public class GriverEntity extends Animal implements GeoEntity {
     @Override
     public boolean hurt(DamageSource source, float amount) {
         // Запоминаем, кто атаковал гривера
-        if (source.getEntity() instanceof LivingEntity attacker) {
-            boolean isOperator = false;
-            boolean isImposter = false;
-
-            if (attacker instanceof Player player) {
-                isOperator = player.getCapability(FractionProvider.FRACTION)
-                        .map(data -> data.getFraction() == FractionType.OPERATOR)
-                        .orElse(false);
-                isImposter = player.getCapability(FractionProvider.FRACTION)
-                        .map(data -> data.getFraction() == FractionType.IMPOSTER)
-                        .orElse(false);
-            }
-
-            // Если атакует не оператор и не предатель - запоминаем для ответной атаки
-            if (!isOperator && !isImposter && !isVehicle()) {
+        if (source.getEntity() instanceof Player attacker && !isProtectedFromGriver(attacker)) {
+            if (!isVehicle()) {
                 lastHurtByMob = attacker;
                 hurtCooldown = 100;
-            }
-        }
-
-        // Только операторы и предатели могут наносить урон гриверу
-        if (source.getEntity() instanceof Player player) {
-            boolean isOperator = player.getCapability(FractionProvider.FRACTION)
-                    .map(data -> data.getFraction() == FractionType.OPERATOR)
-                    .orElse(false);
-            boolean isImposter = player.getCapability(FractionProvider.FRACTION)
-                    .map(data -> data.getFraction() == FractionType.IMPOSTER)
-                    .orElse(false);
-
-            // Предатели и операторы могут убивать гриверов
-            if (!isOperator && !isImposter && !isVehicle()) {
-                return false;
             }
         }
 
@@ -2073,7 +2345,8 @@ public class GriverEntity extends Animal implements GeoEntity {
             this.inDispersalPhase = false;
 
             this.entityData.set(IS_PATROLLING, true);
-            joinGlobalPatrol();
+            if (naturalNightSpawn) pickNewNaturalNightTarget(m);
+            else joinGlobalPatrol();
             ModLogger.patrol("riding", "griver=" + getUUID().toString().substring(0, 8) + " AI enabled, returning to patrol");
         }
     }
@@ -2139,18 +2412,7 @@ public class GriverEntity extends Animal implements GeoEntity {
 
     public void setForcedAttackTarget(LivingEntity target, int durationTicks) {
         if (target == null) return;
-
-        // Проверяем, не является ли цель оператором или предателем
-        if (target instanceof Player player) {
-            boolean isOperator = player.getCapability(FractionProvider.FRACTION)
-                    .map(data -> data.getFraction() == FractionType.OPERATOR)
-                    .orElse(false);
-            boolean isImposter = player.getCapability(FractionProvider.FRACTION)
-                    .map(data -> data.getFraction() == FractionType.IMPOSTER)
-                    .orElse(false);
-
-            if (isOperator || isImposter) return;
-        }
+        if (isProtectedFromGriver(target)) return;
 
         this.forcedAttackTarget = target;
         this.forcedAttackTimeout = durationTicks;
@@ -2651,9 +2913,8 @@ public class GriverEntity extends Animal implements GeoEntity {
     private boolean hasLivingTarget() {
         if (currentTarget != null && currentTarget.isAlive()) return true;
         if (forcedAttackTarget != null && forcedAttackTarget.isAlive()) return true;
-        if (lastHurtByMob != null && lastHurtByMob.isAlive()) {
-            if (!isOperatorOrImposter(lastHurtByMob)) return true;
-        }
+        if (lastHurtByMob != null && lastHurtByMob.isAlive()
+                && !isProtectedFromGriver(lastHurtByMob)) return true;
         return false;
     }
 
@@ -2663,7 +2924,8 @@ public class GriverEntity extends Animal implements GeoEntity {
     private LivingEntity getCurrentAttackTarget() {
         if (currentTarget != null && currentTarget.isAlive()) return currentTarget;
         if (forcedAttackTarget != null && forcedAttackTarget.isAlive()) return forcedAttackTarget;
-        if (lastHurtByMob != null && lastHurtByMob.isAlive() && !isOperatorOrImposter(lastHurtByMob)) {
+        if (lastHurtByMob != null && lastHurtByMob.isAlive()
+                && !isProtectedFromGriver(lastHurtByMob)) {
             return lastHurtByMob;
         }
         return null;
@@ -2681,7 +2943,8 @@ public class GriverEntity extends Animal implements GeoEntity {
         if (targetCacheTimer > 0) {
             targetCacheTimer--;
 
-            if (cachedTarget != null && cachedTarget.isAlive() && !cachedTarget.isRemoved()) {
+            if (cachedTarget != null && cachedTarget.isAlive() && !cachedTarget.isRemoved()
+                    && !isProtectedFromGriver(cachedTarget)) {
                 double distance = this.distanceToSqr(cachedTarget);
                 if (distance <= 900.0) { // 30^2
                     return cachedTarget;
@@ -2699,25 +2962,32 @@ public class GriverEntity extends Animal implements GeoEntity {
 
     private LivingEntity findNewTargetInternal() {
         double range = 30.0;
-        List<LivingEntity> entities = level().getEntitiesOfClass(
-                LivingEntity.class,
-                this.getBoundingBox().inflate(range)
-        );
-
-        LivingEntity bestTarget = null;
+        Player bestTarget = null;
         double bestDistance = Double.MAX_VALUE;
 
-        for (LivingEntity entity : entities) {
-            if (entity == this) continue;
-            if (!entity.isAlive()) continue;
-            if (entity instanceof GriverEntity) continue;
+        for (Player player : level().players()) {
+            if (!player.isAlive() || player == this.getControllingPassenger()) continue;
+            if (player.isCreative() || player.isSpectator()
+                    || player.isInvisible() || isProtectedFromGriver(player)) {
+                continue;
+            }
 
-            double distance = this.distanceToSqr(entity);
-            if (distance < bestDistance) {
-                if (canSeeEntity(entity)) {
-                    bestDistance = distance;
-                    bestTarget = entity;
+            if (player.isCrouching()) {
+                Vec3 toPlayer = player.position().subtract(this.position());
+                double distance = toPlayer.length();
+                Vec3 look = this.getLookAngle();
+                double facing = distance > 0.001D ? look.dot(toPlayer.scale(1.0D / distance)) : 1.0D;
+                // A crouching player is ignored unless they are very close and directly
+                // in front of the griver.
+                if (distance > 5.0D || facing < 0.72D) {
+                    continue;
                 }
+            }
+
+            double distance = this.distanceToSqr(player);
+            if (distance <= range * range && distance < bestDistance && canSeeEntity(player)) {
+                bestDistance = distance;
+                bestTarget = player;
             }
         }
 
@@ -2745,6 +3015,9 @@ public class GriverEntity extends Animal implements GeoEntity {
 
         currentTarget = target;
         isChasingPlayer = true;
+        chaseMicroPath = Collections.emptyList();
+        chaseMicroIndex = 0;
+        chaseReplanTicks = 0;
         setTarget(target);
         chaseTimeout = 300; // 15 секунд на преследование
 
@@ -2768,7 +3041,8 @@ public class GriverEntity extends Animal implements GeoEntity {
         // Игрок переключился в creative/spectator/невидимость — бросаем сразу.
         // Без этого griver продолжал гнаться даже после /gamemode creative.
         if (currentTarget instanceof Player p
-                && (p.isCreative() || p.isSpectator() || p.isInvisible())) {
+                && (p.isCreative() || p.isSpectator() || p.isInvisible()
+                || isProtectedFromGriver(p))) {
             currentTarget = null;
             isChasingPlayer = false;
             chaseTimeout = 0;
@@ -2813,8 +3087,26 @@ public class GriverEntity extends Animal implements GeoEntity {
                 attackDelayCounter--;
             }
         } else if (distance <= 30.0) {
-            if (getNavigation().isDone()) {
-                getNavigation().moveTo(currentTarget, WALK_SPEED);
+            getNavigation().stop();
+            if (chaseReplanTicks-- <= 0 || chaseMicroIndex >= chaseMicroPath.size()) {
+                chaseMicroPath = buildMicroPath(this.blockPosition(), currentTarget.blockPosition());
+                chaseMicroIndex = 0;
+                chaseReplanTicks = 10;
+            }
+            if (chaseMicroIndex < chaseMicroPath.size()) {
+                BlockPos step = chaseMicroPath.get(chaseMicroIndex);
+                if (!canStandAt(step)) {
+                    chaseMicroPath = Collections.emptyList();
+                    chaseReplanTicks = 0;
+                    this.setDeltaMovement(0.0D, this.getDeltaMovement().y, 0.0D);
+                    return;
+                }
+                double tx = step.getX() + 0.5D;
+                double tz = step.getZ() + 0.5D;
+                double dx = tx - this.getX();
+                double dz = tz - this.getZ();
+                if (dx * dx + dz * dz < 0.5D) chaseMicroIndex++;
+                else moveTowards(tx, step.getY(), tz);
             }
         }
     }

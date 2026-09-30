@@ -42,6 +42,16 @@ public class LabyrinthAssembler {
             }
         }
 
+        // checkBlock/propagateLightSources are queued by the threaded light engine.
+        // Flush the queue before notifying clients; otherwise the block update can
+        // arrive with the old dark light section and remain visible while the wall
+        // is moving.
+        var lightEngine = level.getChunkSource().getLightEngine();
+        int safetyPasses = 0;
+        while (lightEngine.hasLightWork() && safetyPasses++ < 8) {
+            lightEngine.runLightUpdates();
+        }
+
         // 3. Отправляем обновления блоков клиентам.
         // Теперь, когда свет на сервере уже гарантированно пересчитан,
         // клиенты получат корректные данные об освещении.
@@ -210,6 +220,20 @@ public class LabyrinthAssembler {
         double targetZ = oce.getZ() + dz;
         double stepX = dx / (double) MOVE_DURATION_TICKS;
         double stepZ = dz / (double) MOVE_DURATION_TICKS;
+
+        // Relight the complete swept volume before movement begins. A Create
+        // contraption samples the world's light at its current rendered position;
+        // refreshing only the source and final positions left intermediate sections
+        // with the shadow that existed while the wall was still a world structure.
+        BlockPos sweptMin = new BlockPos(
+                Math.min(srcMin.getX(), targetMin.getX()),
+                Math.min(srcMin.getY(), targetMin.getY()),
+                Math.min(srcMin.getZ(), targetMin.getZ()));
+        BlockPos sweptMax = new BlockPos(
+                Math.max(zone.maxPos.getX(), targetMax.getX()),
+                Math.max(zone.maxPos.getY(), targetMax.getY()),
+                Math.max(zone.maxPos.getZ(), targetMax.getZ()));
+        refreshLighting(level, sweptMin, sweptMax);
 
         activeMoves.put(zone.id, new ActiveMove(zone, oce, stepX, stepZ,
                 targetX, targetZ, targetMin, targetMax, MOVE_DURATION_TICKS));

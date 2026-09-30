@@ -15,6 +15,7 @@ import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -39,6 +40,7 @@ public class GriverCommand {
                         .then(Commands.argument("pos", BlockPosArgument.blockPos())
                                 .executes(ctx -> spawnGriverAt(ctx, BlockPosArgument.getBlockPos(ctx, "pos")))))
                 .then(Commands.literal("list").executes(GriverCommand::listAllGrivers))
+                .then(Commands.literal("tpnearest").executes(GriverCommand::teleportToNearestGriver))
                 .then(Commands.literal("killall").executes(GriverCommand::killAll))
                 .then(Commands.literal("admin").executes(GriverCommand::openAdmin))
                 .then(Commands.literal("attack")
@@ -213,6 +215,52 @@ public class GriverCommand {
                             + (g.isPatrolling() ? " §a[patrol]" : "")), false);
         }
         return 1;
+    }
+
+    private static int teleportToNearestGriver(CommandContext<CommandSourceStack> ctx) {
+        ServerPlayer player = ctx.getSource().getPlayer();
+        if (player == null) {
+            ctx.getSource().sendFailure(Component.literal("§cКоманду должен выполнить игрок"));
+            return 0;
+        }
+        ServerLevel level = player.serverLevel();
+        GriverEntity nearest = null;
+        double nearestDistance = Double.MAX_VALUE;
+        for (var entity : level.getAllEntities()) {
+            if (entity instanceof GriverEntity griver && griver.isAlive()) {
+                double distance = player.distanceToSqr(griver);
+                if (distance < nearestDistance) {
+                    nearestDistance = distance;
+                    nearest = griver;
+                }
+            }
+        }
+        if (nearest == null) {
+            ctx.getSource().sendFailure(Component.literal("§cВ этом измерении нет загруженных гриверов"));
+            return 0;
+        }
+
+        BlockPos destination = findSafeTeleportNear(level, nearest.blockPosition());
+        player.teleportTo(destination.getX() + 0.5D, destination.getY(), destination.getZ() + 0.5D);
+        GriverEntity target = nearest;
+        int distance = (int) Math.sqrt(nearestDistance);
+        ctx.getSource().sendSuccess(() -> Component.literal("§aТелепорт к ближайшему гриверу §7(ID: "
+                + target.getId() + ", расстояние: " + distance + ")"), false);
+        return 1;
+    }
+
+    private static BlockPos findSafeTeleportNear(ServerLevel level, BlockPos center) {
+        for (int radius = 2; radius <= 4; radius++) {
+            for (Direction direction : Direction.Plane.HORIZONTAL) {
+                BlockPos candidate = center.relative(direction, radius);
+                if (level.getBlockState(candidate.below()).isSolid()
+                        && level.getBlockState(candidate).getCollisionShape(level, candidate).isEmpty()
+                        && level.getBlockState(candidate.above()).getCollisionShape(level, candidate.above()).isEmpty()) {
+                    return candidate;
+                }
+            }
+        }
+        return center.above(2);
     }
 
     private static int killAll(CommandContext<CommandSourceStack> ctx) {
