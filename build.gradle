@@ -24,6 +24,9 @@ minecraft {
 
             // ★ ДОБАВЛЕНО: Выделяем 4 ГБ оперативной памяти для Клиента ★
             jvmArg '-Xmx6G'
+            // На используемой системе G1 падает нативно в GCTaskThread (jvm.dll).
+            // SerialGC не создаёт проблемный набор параллельных GC-потоков.
+            jvmArg '-XX:+UseSerialGC'
 
             // Настройки для корректной работы Mixin
             property 'mixin.env.remapRefMap', 'true'
@@ -44,6 +47,7 @@ minecraft {
 
             // ★ ДОБАВЛЕНО: Выделяем 4 ГБ оперативной памяти для Сервера ★
             jvmArg '-Xmx4G'
+            jvmArg '-XX:+UseSerialGC'
 
             mods {
                 "${mod_id}" {

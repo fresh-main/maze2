@@ -138,6 +138,7 @@ public class StructureGenerator {
     // ★ СПИСОК ЗАЩИЩЁННЫХ ЗОН (заполняется при размещении структур)
     private static final List<ProtectedRegion> protectedRegions = new ArrayList<>();
     private static boolean initialized = false;
+    private static volatile boolean protectionRegionsLoaded = false;
 
     public static void init() {
         if (initialized) return;
@@ -187,39 +188,19 @@ public class StructureGenerator {
             if (data.intersectsChunk(chunkX, chunkZ)) {
                 data.placement.place(level, null);
 
-                if (!data.breakable && data.size != null && data.size.getX() > 0) {
-                    boolean alreadyRegistered = protectedRegions.stream()
-                            .anyMatch(r -> r.structureName.equals(data.placement.getName()));
-
-                    if (!alreadyRegistered) {
-                        int[] bounds = data.getWorldBounds();
-
-                        int height = data.size.getY() > 0 ? data.size.getY() : 80;
-
-                        BlockPos min = new BlockPos(bounds[0], data.origin.getY(), bounds[2]);
-                        Vec3i regionSize = new Vec3i(
-                                Math.max(1, bounds[1] - bounds[0] + 1),
-                                Math.max(1, height),
-                                Math.max(1, bounds[3] - bounds[2] + 1)
-                        );
-
-                        protectedRegions.add(
-                                new ProtectedRegion(data.placement.getName(), min, regionSize)
-                        );
-
-                        System.out.println("[StructureGenerator] Protected region registered: "
-                                + data.placement.getName()
-                                + " (Rot: " + data.placement.getRotation() + ")"
-                                + " bounds=[" + bounds[0] + ", " + bounds[1] + "] "
-                                + "[" + bounds[2] + ", " + bounds[3] + "]");
-                    }
-                }
+                registerOrUpdateProtectedRegion(data);
             }
         }
     }
 
     // ★ ПУБЛИЧНЫЙ МЕТОД: проверяет, защищён ли блок от разрушения
     public static boolean isBlockProtected(BlockPos pos) {
+        init();
+        // В старом мире структуры уже стоят и placeStructuresInChunk больше не
+        // вызывается для их чанков. В таком случае восстанавливаем зоны из NBT.
+        if (!protectionRegionsLoaded) {
+            preloadGladeSizes();
+        }
         for (ProtectedRegion region : protectedRegions) {
             if (region.contains(pos)) {
                 return true;
@@ -313,7 +294,7 @@ public class StructureGenerator {
         structures.removeIf(data -> name.equals(data.placement.getName()));
 
         structures.add(new StructureData(
-                new StructurePlacement(name, "labyrinthmod", name, pos, false, rotation),
+                new StructurePlacement(name, "labyrinthmod", name, pos, true, rotation),
                 pos
         ));
 
@@ -328,8 +309,6 @@ public class StructureGenerator {
         }
 
         gladeStructureInfos.add(info);
-
-        registerOrUpdateProtectedRegion(info);
 
         System.out.println("[StructureGenerator] Glade structure '" + name + "' added at " + pos
                 + " Rot: " + rotation
@@ -558,6 +537,20 @@ public class StructureGenerator {
                 }
             }
 
+            // Защита должна восстанавливаться и для уже сгенерированного мира.
+            // Постройки Глейда являются игровыми объектами и остаются ломаемыми.
+            protectedRegions.removeIf(r -> isGladeStructure(r.structureName));
+            for (StructureData data : structures) {
+                registerOrUpdateProtectedRegion(data);
+            }
+            protectionRegionsLoaded = structures.stream()
+                    .filter(data -> "lift_1".equals(data.placement.getName())
+                            || "lift_2".equals(data.placement.getName()))
+                    .allMatch(data -> data.size != null
+                            && data.size.getX() > 0
+                            && data.size.getY() > 0
+                            && data.size.getZ() > 0);
+
         } catch (Throwable ignored) {
             // Если сервер/менеджер ещё недоступен — остаёмся на fallback.
         }
@@ -617,7 +610,6 @@ public class StructureGenerator {
 
             if (size != null && !info.sizeLoaded) {
                 info.setSize(size, getPivotOffset(info.name, size));
-                registerOrUpdateProtectedRegion(info);
             }
         }
 
@@ -728,27 +720,24 @@ public class StructureGenerator {
         return new int[]{worldMinX, worldMaxX, worldMinZ, worldMaxZ};
     }
 
-    private static void registerOrUpdateProtectedRegion(GladeStructureInfo info) {
-        protectedRegions.removeIf(r -> r.structureName.equals(info.name));
+    private static synchronized void registerOrUpdateProtectedRegion(StructureData data) {
+        String name = data.placement.getName();
+        protectedRegions.removeIf(r -> r.structureName.equals(name));
 
-        int margin = 2;
+        if (data.breakable || isGladeStructure(name)
+                || data.size == null || data.size.getX() <= 0 || data.size.getZ() <= 0) {
+            return;
+        }
 
-        int[] aabb = getFootprintAabb(
-                info.name,
-                info.origin,
-                info.rotation,
-                info.fallbackRadius,
-                margin
+        int[] bounds = data.getWorldBounds();
+        int height = data.size.getY() > 0 ? data.size.getY() : 80;
+        BlockPos min = new BlockPos(bounds[0], data.origin.getY(), bounds[2]);
+        Vec3i regionSize = new Vec3i(
+                Math.max(1, bounds[1] - bounds[0] + 1),
+                Math.max(1, height),
+                Math.max(1, bounds[3] - bounds[2] + 1)
         );
-
-        BlockPos min = new BlockPos(aabb[0], info.origin.getY(), aabb[2]);
-        Vec3i size = new Vec3i(
-                aabb[1] - aabb[0] + 1,
-                80,
-                aabb[3] - aabb[2] + 1
-        );
-
-        protectedRegions.add(new ProtectedRegion(info.name, min, size));
+        protectedRegions.add(new ProtectedRegion(name, min, regionSize));
     }
     private static boolean isGladeStructure(String name) {
         return "ferma".equals(name)
