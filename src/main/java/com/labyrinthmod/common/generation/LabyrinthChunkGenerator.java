@@ -1308,24 +1308,18 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         int chunkX = chunk.getPos().x;
         int chunkZ = chunk.getPos().z;
 
-        for (int secY = chunk.getMinSection(); secY < chunk.getMaxSection(); secY++) {
-            LevelChunkSection section = chunk.getSection(chunk.getSectionIndexFromSectionY(secY));
-            int baseY = secY << 4;
-
-            for (int localX = 0; localX < 16; localX++) {
-                int worldX = (chunkX << 4) + localX;
-
-                for (int localZ = 0; localZ < 16; localZ++) {
-                    int worldZ = (chunkZ << 4) + localZ;
-                    fillColumnFast(section, baseY, localX, localZ, worldX, worldZ);
-                }
+        for (int localX = 0; localX < 16; localX++) {
+            int worldX = (chunkX << 4) + localX;
+            for (int localZ = 0; localZ < 16; localZ++) {
+                int worldZ = (chunkZ << 4) + localZ;
+                fillColumnFast(chunk, localX, localZ, worldX, worldZ);
             }
         }
 
         return CompletableFuture.completedFuture(chunk);
     }
 
-    private void fillColumnFast(LevelChunkSection section, int baseY, int localX, int localZ, int worldX, int worldZ) {
+    private void fillColumnFast(ChunkAccess chunk, int localX, int localZ, int worldX, int worldZ) {
         int dist = Math.max(Math.abs(worldX), Math.abs(worldZ));
         long hash = hash(worldX, worldZ);
         int topY = getTopY(worldX, worldZ);
@@ -1339,25 +1333,38 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
 
         boolean nearGladeWall = dist <= GLADE_RADIUS && dist >= GLADE_RADIUS - 4;
         boolean nearOuterWall = dist > OUTER_WALL_END && dist <= OUTER_WALL_END + 4;
+        // Границы сглаживания зависят только от X/Z. Считаем их один раз
+        // на колонку, а не повторно для каждого из 16 блоков секции по Y.
+        double passageBlend = dist <= GLADE_RADIUS
+                ? getPassageBlendFactor(worldX, worldZ)
+                : 0.0;
+        StructureBlendResult structureBlend = dist <= GLADE_RADIUS
+                ? getStructureBlendResult(worldX, worldZ)
+                : StructureBlendResult.NONE;
 
-        for (int localY = 0; localY < 16; localY++) {
-            int worldY = baseY + localY;
-            BlockState state;
-            if (isNatural) {
-                state = generateNaturalTerrain(worldX, worldY, worldZ, dist, riverDist);
-                if ((nearGladeWall || nearOuterWall) && (state == null || state.isAir())) {
-                    BlockState vines = tryGenerateWallVines(worldX, worldY, worldZ);
-                    if (vines != null) state = vines;
-                }
-            } else {
-                if (worldY < FLOOR_Y) {
-                    state = getWallBlock(worldX, worldY, worldZ);
+        for (int secY = chunk.getMinSection(); secY < chunk.getMaxSection(); secY++) {
+            LevelChunkSection section = chunk.getSection(chunk.getSectionIndexFromSectionY(secY));
+            int baseY = secY << 4;
+            for (int localY = 0; localY < 16; localY++) {
+                int worldY = baseY + localY;
+                BlockState state;
+                if (isNatural) {
+                    state = generateNaturalTerrain(worldX, worldY, worldZ, dist, riverDist,
+                            passageBlend, structureBlend);
+                    if ((nearGladeWall || nearOuterWall) && (state == null || state.isAir())) {
+                        BlockState vines = tryGenerateWallVines(worldX, worldY, worldZ);
+                        if (vines != null) state = vines;
+                    }
                 } else {
-                    state = generateLabyrinthFast(worldX, worldY, worldZ, dist, hash, topY);
+                    if (worldY < FLOOR_Y) {
+                        state = getWallBlock(worldX, worldY, worldZ);
+                    } else {
+                        state = generateLabyrinthFast(worldX, worldY, worldZ, dist, hash, topY);
+                    }
                 }
+                if (state == null) state = Blocks.AIR.defaultBlockState();
+                section.setBlockState(localX, localY, localZ, state, false);
             }
-            if (state == null) state = Blocks.AIR.defaultBlockState();
-            section.setBlockState(localX, localY, localZ, state, false);
         }
     }
 
@@ -2219,25 +2226,17 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             return Blocks.OAK_LEAVES.defaultBlockState();
         }
     }
-    private BlockState generateNaturalTerrain(int x, int y, int z, int dist, double riverDist) {
+    private BlockState generateNaturalTerrain(int x, int y, int z, int dist, double riverDist,
+                                              double passageBlend, StructureBlendResult structureBlend) {
         if (dist <= GLADE_RADIUS) {
             double noise = terrainNoise.noise(x * 0.04, 0, z * 0.04);
             int terrainHeight = FLOOR_Y + (int)(noise * 5);
-            double passageBlend = getPassageBlendFactor(x, z);
             if (passageBlend > 0.0) {
                 // Плавная интерполяция: чем ближе к проходу, тем ближе к FLOOR_Y + 1
                 double smoothBlend = passageBlend * passageBlend * (3.0 - 2.0 * passageBlend);
                 int targetHeight = FLOOR_Y;
                 terrainHeight = (int)(terrainHeight * (1.0 - smoothBlend) + targetHeight * smoothBlend);
             }
-
-            if (passageBlend > 0.0) {
-                double smoothBlend = passageBlend * passageBlend * (3.0 - 2.0 * passageBlend);
-                int targetHeight = FLOOR_Y;
-                terrainHeight = (int)(terrainHeight * (1.0 - smoothBlend) + targetHeight * smoothBlend);
-            }
-
-            StructureBlendResult structureBlend = getStructureBlendResult(x, z);
 
             if (structureBlend.factor > 0.0) {
                 double smoothBlend = structureBlend.factor * structureBlend.factor * (3.0 - 2.0 * structureBlend.factor);
@@ -4077,6 +4076,8 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         return StructureGenerator.isInsideGladeStructureZone(x, z, 2);
     }
     private static class StructureBlendResult {
+        // При factor=0 targetY не используется, поэтому подходит нейтральное значение.
+        static final StructureBlendResult NONE = new StructureBlendResult(0.0, 0, false);
         final double factor;
         final int targetY;
         final boolean core;

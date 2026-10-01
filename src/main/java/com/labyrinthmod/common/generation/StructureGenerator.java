@@ -67,6 +67,8 @@ public class StructureGenerator {
         public final BlockPos origin;
         public Vec3i size;
         public final boolean breakable;
+        private Vec3i cachedBoundsSize;
+        private int[] cachedWorldBounds;
 
         public StructureData(StructurePlacement placement, BlockPos origin) {
             this.placement = placement;
@@ -93,18 +95,27 @@ public class StructureGenerator {
          * {minX, maxX, minZ, maxZ}
          */
         public int[] getWorldBounds() {
+            // Структура не перемещается после регистрации, а размер загружается
+            // один раз. Повторное преобразование границ для каждой попытки
+            // генерации не нужно.
+            if (cachedWorldBounds != null && Objects.equals(cachedBoundsSize, size)) {
+                return cachedWorldBounds;
+            }
+
             if (size == null || size.getX() <= 0 || size.getZ() <= 0) {
                 // Если размер ещё не загружен, берём запасную зону.
                 // Для глайд-структур лучше переключить больше чанков,
                 // чем потерять часть постройки.
                 int pad = isGladeStructure(placement.getName()) ? 64 : 16;
 
-                return new int[]{
+                cachedBoundsSize = size;
+                cachedWorldBounds = new int[]{
                         origin.getX() - pad,
                         origin.getX() + pad,
                         origin.getZ() - pad,
                         origin.getZ() + pad
                 };
+                return cachedWorldBounds;
             }
 
             int minXLocal = 0;
@@ -123,7 +134,8 @@ public class StructureGenerator {
                 maxZLocal = size.getZ() - 1 - pivot.getZ();
             }
 
-            return transformLocalBounds(
+            cachedBoundsSize = size;
+            cachedWorldBounds = transformLocalBounds(
                     origin,
                     placement.getRotation(),
                     minXLocal,
@@ -131,6 +143,7 @@ public class StructureGenerator {
                     minZLocal,
                     maxZLocal
             );
+            return cachedWorldBounds;
         }
     }
 
@@ -647,22 +660,6 @@ public class StructureGenerator {
                             newBounds[3] >= oldBounds[2];
 
             if (overlapX && overlapZ) {
-                System.out.println(
-                        "[StructureGenerator] Placement blocked: "
-                                + name
-                                + " intersects "
-                                + existing.placement.getName()
-                                + " new=["
-                                + newBounds[0] + ", " + newBounds[1]
-                                + "] ["
-                                + newBounds[2] + ", " + newBounds[3]
-                                + "] old=["
-                                + oldBounds[0] + ", " + oldBounds[1]
-                                + "] ["
-                                + oldBounds[2] + ", " + oldBounds[3]
-                                + "]"
-                );
-
                 return true;
             }
         }
