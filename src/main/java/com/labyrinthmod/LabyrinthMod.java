@@ -123,6 +123,7 @@ public class LabyrinthMod {
 
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
         MinecraftForge.EVENT_BUS.register(new DailyQuestSpawner());
+        com.labyrinthmod.common.block.MazeMonitorRegistry.register(modEventBus);
 
 
         modEventBus.addListener(this::registerChunkGenerator);

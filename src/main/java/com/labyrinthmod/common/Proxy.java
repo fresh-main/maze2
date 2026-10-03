@@ -32,6 +32,15 @@ public class Proxy {
         // На сервере ничего не делаем
     }
 
+    // ДОБАВИТЬ ЭТИ СИГНАТУРЫ МЕТОДОВ:
+    public void handleMazeMonitorMap(com.labyrinthmod.common.network.packet.MazeMonitorMapPacket p) {
+
+    }
+
+    public void handleMazeMonitorSync(com.labyrinthmod.common.network.packet.MazeMonitorSyncPacket p) {
+
+    }
+
     /** Зарегистрировать клиентские обработчики (только на клиенте) */
     public void registerClientListeners() {
         // На сервере ничего не делаем
@@ -46,4 +55,5 @@ public class Proxy {
     public boolean isDedicatedServer() {
         return true;
     }
+
 }

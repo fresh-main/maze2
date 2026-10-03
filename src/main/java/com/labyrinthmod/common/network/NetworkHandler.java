@@ -243,6 +243,10 @@ public class NetworkHandler {
                 .decoder(OpenQuestAdminPacket::decode)
                 .consumerMainThread(OpenQuestAdminPacket::handle)
                 .add();
+        CHANNEL.registerMessage(id++, MazeMonitorMapPacket.class,
+                MazeMonitorMapPacket::encode, MazeMonitorMapPacket::decode, MazeMonitorMapPacket::handle);
+        CHANNEL.registerMessage(id++, MazeMonitorSyncPacket.class,
+                MazeMonitorSyncPacket::encode, MazeMonitorSyncPacket::decode, MazeMonitorSyncPacket::handle);
 
     }
     public static void sendToPlayer(ServerPlayer player, S2CLiftLockPacket packet) {

@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "": { "model": "labyrinthmod:block/maze_monitor" }
+  }
+}

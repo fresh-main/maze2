@@ -1,5 +1,6 @@
 package com.labyrinthmod.common.event;
 
+import com.labyrinthmod.common.generation.LabyrinthConfig;
 import com.mojang.brigadier.ParseResults;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
@@ -27,38 +28,67 @@ import java.util.Random;
 
 @Mod.EventBusSubscriber(modid = "labyrinthmod")
 public class DoorScheduleHandler {
+
     private static final Logger LOGGER = LogManager.getLogger();
 
-    // Состояние для отслеживания, какие команды уже были выполнены сегодня
     private static long lastMorningDay = -1;
     private static long lastEveningDay = -1;
-
-    // Кэш выбранной двери на текущий день
     private static int currentDayDoor = -1;
     private static long currentDayForDoor = -1;
 
-    // ★ СЧЁТЧИК ТИКОВ С МОМЕНТА ЗАГРУЗКИ МИРА ★
     public static long worldTickCount = 0;
-    private static final long ACTIVATION_DELAY_TICKS = 300; // Задержка 300 тиков (15 секунд)
+    private static final long ACTIVATION_DELAY_TICKS = 300;
 
-    // ★ ТАЙМЕР ДЛЯ ПЕРЕЗАГРУЗКИ ЭНТИТИ ДВЕРЕЙ ЧЕРЕЗ 20 СЕКУНД (400 ТИКОВ) ★
     private static int eveningReloadTimer = -1;
     private static final int RELOAD_DELAY_TICKS = 400;
 
-    // TODO: Укажите реальные координаты ваших дверей (X, Y, Z)
-    private static final BlockPos DOOR_1_POS = new BlockPos(0, 0, 0);
-    private static final BlockPos DOOR_2_POS = new BlockPos(0, 0, 0);
-    private static final BlockPos DOOR_3_POS = new BlockPos(0, 0, 0);
-    private static final BlockPos DOOR_4_POS = new BlockPos(0, 0, 0);
+    // ═══════════════════════════════════════════════════════════
+    // ★ ИСПРАВЛЕНО: координаты дверей вычисляются динамически
+    //   на основе GLADE_RADIUS из конфига, точно так же, как в
+    //   StructureGenerator.updateDverPosition().
+    //
+    //   Формулы из StructureGenerator:
+    //     dverX = -24
+    //     dverY = 31
+    //     dverZ = -(gladeRadius + 8)
+    //
+    //     dver_1 → (dverX, dverY, -dverZ - 9)  = (-24, 31, gladeRadius - 1)
+    //     dver_2 → (dverX, dverY,  dverZ)       = (-24, 31, -(gladeRadius + 8))
+    //     dver_3 → (-dverZ - 9, dverY, dverX)   = (gladeRadius - 1, 31, -24)
+    //     dver_4 → (dverZ, dverY, dverX)         = (-(gladeRadius + 8), 31, -24)
+    // ═══════════════════════════════════════════════════════════
+
+    private static int getGladeRadius() {
+        LabyrinthConfig cfg = LabyrinthConfig.getInstance();
+        return cfg != null ? cfg.gleydRadius : 70;
+    }
+
+    private static BlockPos getDoor1Pos() {
+        int r = getGladeRadius();
+        return new BlockPos(-24, 31, r - 1);
+    }
+
+    private static BlockPos getDoor2Pos() {
+        int r = getGladeRadius();
+        return new BlockPos(-24, 31, -(r + 8));
+    }
+
+    private static BlockPos getDoor3Pos() {
+        int r = getGladeRadius();
+        return new BlockPos(r - 1, 31, -24);
+    }
+
+    private static BlockPos getDoor4Pos() {
+        int r = getGladeRadius();
+        return new BlockPos(-(r + 8), 31, -24);
+    }
 
     @SubscribeEvent
     public static void onServerTick(TickEvent.ServerTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
 
-        // ★ УВЕЛИЧИВАЕМ СЧЁТЧИК КАЖДЫЙ ТИК ★
         worldTickCount++;
 
-        // ★ НЕ АКТИВИРУЕМ ДВЕРИ, ПОКА НЕ ПРОШЛО 300 ТИКОВ ★
         if (worldTickCount < ACTIVATION_DELAY_TICKS) {
             return;
         }
@@ -67,7 +97,6 @@ public class DoorScheduleHandler {
         ServerLevel overworld = server.overworld();
         if (overworld == null) return;
 
-        // ★ ОБРАБОТКА ТАЙМЕРА ПЕРЕЗАГРУЗКИ ЭНТИТИ ★
         if (eveningReloadTimer > 0) {
             eveningReloadTimer--;
             if (eveningReloadTimer == 0) {
@@ -80,9 +109,6 @@ public class DoorScheduleHandler {
         long day = dayTime / 24000L;
         long timeOfDay = dayTime % 24000L;
 
-        // ==========================================
-        // 1. ВЫБИРАЕМ ДВЕРЬ НА СЕГОДНЯ
-        // ==========================================
         if (currentDayForDoor != day) {
             long mixedSeed = overworld.getSeed() ^ (day * 0x9E3779B97F4A7C15L);
             Random random = new Random(mixedSeed);
@@ -92,9 +118,6 @@ public class DoorScheduleHandler {
 
         String command = "activate dver_" + currentDayDoor;
 
-        // ==========================================
-        // 2. ПРОВЕРКА УТРА (с 100 до 11999 тиков)
-        // ==========================================
         boolean isMorning = timeOfDay >= 100 && timeOfDay < 12000;
         if (isMorning && lastMorningDay < day) {
             executeCommand(server, command);
@@ -102,16 +125,11 @@ public class DoorScheduleHandler {
             LOGGER.info("[DoorSchedule] Утро! Активирована команда: {}", command);
         }
 
-        // ==========================================
-        // 3. ПРОВЕРКА ВЕЧЕРА (с 12100 до 23999 тиков)
-        // ==========================================
         boolean isEvening = timeOfDay >= 12100 && timeOfDay < 23000;
         if (isEvening && lastEveningDay < day) {
             executeCommand(server, command);
             lastEveningDay = day;
             LOGGER.info("[DoorSchedule] Вечер! Активирована команда: {}", command);
-
-            // Запускаем таймер на перезагрузку энтити через 20 секунд (400 тиков)
             eveningReloadTimer = RELOAD_DELAY_TICKS;
         }
     }
@@ -127,19 +145,20 @@ public class DoorScheduleHandler {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // ★ ПЕРЕЗАГРУЗКА ЭНТИТИ И СТРУКТУР ДВЕРЕЙ (КАК В ЛИФТЕ) ★
-    // ═══════════════════════════════════════════════════════════
     private static void reloadAllDoors(MinecraftServer server) {
         ServerLevel level = server.overworld();
         if (level == null) return;
 
-        reloadDoorStructure(level, "dver_1", DOOR_1_POS);
-        reloadDoorStructure(level, "dver_2", DOOR_2_POS);
-        reloadDoorStructure(level, "dver_3", DOOR_3_POS);
-        reloadDoorStructure(level, "dver_4", DOOR_4_POS);
+        // ★ ИСПРАВЛЕНО: используем динамические координаты вместо (0,0,0)
+        reloadDoorStructure(level, "dver_1", getDoor1Pos());
+        reloadDoorStructure(level, "dver_2", getDoor2Pos());
+        reloadDoorStructure(level, "dver_3", getDoor3Pos());
+        reloadDoorStructure(level, "dver_4", getDoor4Pos());
 
-        LOGGER.info("[DoorSchedule] Перезагрузка энтити дверей завершена.");
+        LOGGER.info("[DoorSchedule] Перезагрузка энтити дверей завершена. "
+                        + "GLADE_RADIUS={}, dver_1={}, dver_2={}, dver_3={}, dver_4={}",
+                getGladeRadius(),
+                getDoor1Pos(), getDoor2Pos(), getDoor3Pos(), getDoor4Pos());
     }
 
     private static void reloadDoorStructure(ServerLevel level, String structureName, BlockPos structurePos) {
@@ -147,18 +166,15 @@ public class DoorScheduleHandler {
         StructureTemplateManager templateManager = level.getStructureManager();
         Optional<StructureTemplate> optTemplate = templateManager.get(loc);
         if (optTemplate.isEmpty()) return;
-
         StructureTemplate template = optTemplate.get();
         Vec3i size = template.getSize();
         if (size.getX() == 0 && size.getY() == 0 && size.getZ() == 0) return;
 
-        // Зона для очистки энтити (с небольшим запасом по 1 блоку с каждой стороны)
         AABB area = new AABB(
                 structurePos.getX() - 1, structurePos.getY() - 1, structurePos.getZ() - 1,
                 structurePos.getX() + size.getX() + 1, structurePos.getY() + size.getY() + 1, structurePos.getZ() + size.getZ() + 1
         );
 
-        // Удаляем все энтити в зоне двери (кроме игроков)
         List<Entity> entities = level.getEntities((Entity) null, area, e -> true);
         for (Entity entity : entities) {
             if (!(entity instanceof net.minecraft.server.level.ServerPlayer)) {
@@ -166,12 +182,10 @@ public class DoorScheduleHandler {
             }
         }
 
-        // Пересоздаем структуру (аналогично логике лифта)
         StructurePlaceSettings settings = new StructurePlaceSettings()
                 .setMirror(Mirror.NONE)
                 .setRotation(Rotation.NONE)
                 .setIgnoreEntities(false);
-
         template.placeInWorld(level, structurePos, structurePos, settings, RandomSource.create(level.getSeed()), 3);
     }
 }
