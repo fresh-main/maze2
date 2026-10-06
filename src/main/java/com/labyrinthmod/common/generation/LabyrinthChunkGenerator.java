@@ -1767,17 +1767,16 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         return bars;
     }
 
-    // =====================================================================
-    // ★ ДНО ТРЕЩИНЫ (ОРИГИНАЛ v3 + УМНЫЕ ПРУТЬЯ) ★
-    // =====================================================================
     private BlockState crackBottomBlock(int x, int y, int z, int dH) {
         double r = hash01(x, y, z);
+
         if (dH == 0) {
             // Поверхность: отверстие + изредка арматура/кирпичи
             if (r > 0.80) return smartIronBars(x, y, z);        // умные прутья
-            if (r > 0.62) return Blocks.CRACKED_STONE_BRICKS.defaultBlockState();
+            if (r > 0.62) return crackedWallBlock();
             return Blocks.AIR.defaultBlockState();
         }
+
         // dH == 1: глубже - больше прутьев (рельеф)
         if (r > 0.55) return smartIronBars(x, y, z);
         return Blocks.AIR.defaultBlockState();
@@ -1785,38 +1784,35 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
 
     private BlockState filledCrackBlock(int x, int y, int z) {
         double r = hash01(x, y, z);
-        if (r < 0.6) return Blocks.CRACKED_STONE_BRICKS.defaultBlockState();
-        return Blocks.COBBLESTONE.defaultBlockState();
+
+        if (r < 0.6) return crackedWallBlock();
+        return cobbleLikeWallBlock();
     }
 
     private BlockState weatheredSurface(int x, int y, int z, double vein, double base) {
         double r = hash01(x, y, z);
+
         if (vein < base * 2.0 && r < 0.55) {
-            return Blocks.CRACKED_STONE_BRICKS.defaultBlockState();
+            return crackedWallBlock();
         }
-        if (r < 0.12) return Blocks.CRACKED_STONE_BRICKS.defaultBlockState();
-        if (r < 0.22) return Blocks.MOSSY_STONE_BRICKS.defaultBlockState();
-        if (r < 0.28) return Blocks.COBBLESTONE.defaultBlockState();
+
+        if (r < 0.12) return crackedWallBlock();
+        if (r < 0.22) return mossyWallBlock();
+        if (r < 0.28) return cobbleLikeWallBlock();
+
         return getWallBlock(x, y, z);
     }
 
-    // =====================================================================
-    // ★ ГЛАВНЫЙ МЕТОД (ОРИГИНАЛ v3 + УМНЫЕ ПРУТЬЯ) ★
-    // =====================================================================
     private BlockState getDecayedWallBlock(int x, int y, int z, int depthFromSurface) {
         // ★ ЛИСТВЕННАЯ ШАПКА НА КРОМКЕ (верх стены зарастает) ★
-        // Раньше здесь тоже был getTopY() — он завышал высоту для стен основного
-        // лабиринта, из-за чего условие "y примерно равен высоте стены" почти
-        // никогда не выполнялось и кустики просто не рождались. wallTopAt() даёт
-        // реальную высоту конкретной стены.
         BlockState cap = tryGenerateVineCap(x, y, z, wallTopAt(x, z));
         if (cap != null) return cap;
 
-        // ... остальной код без изменений
         // ★ АБСОЛЮТНАЯ ЗАЩИТА ФУНДАМЕНТА ★
         if (y < FLOOR_Y + 5) {
             return getWallBlock(x, y, z);
         }
+
         if (depthFromSurface > 2) {
             return getWallBlock(x, y, z);
         }
@@ -1826,6 +1822,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         int thickness = geo[1];
         int wallHeight = geo[2];
         int dV = (FLOOR_Y + wallHeight) - y;
+
         if (dV < 0) return getWallBlock(x, y, z);
 
         double zone = crackZone(x, y, z);
@@ -1847,11 +1844,12 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
                             ? crackBottomBlock(x, y, z, dH)
                             : filledCrackBlock(x, y, z);
                 }
+
                 if (dH == MAX_CARVE_DEPTH) {
                     // Трещина "продолжается" вглубь: умные прутья + cracked
                     double r = hash01(x, y, z);
                     if (r < 0.3) return smartIronBars(x, y, z);
-                    return Blocks.CRACKED_STONE_BRICKS.defaultBlockState();
+                    return crackedWallBlock();
                 }
             }
         }
@@ -1859,8 +1857,8 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         // Сколотые края вокруг трещины
         if (dH == 0 && vein < base * 2.0) {
             double r = hash01(x, y, z);
-            if (r < 0.45) return Blocks.CRACKED_STONE_BRICKS.defaultBlockState();
-            if (r < 0.60) return Blocks.COBBLESTONE.defaultBlockState();
+            if (r < 0.45) return crackedWallBlock();
+            if (r < 0.60) return cobbleLikeWallBlock();
         }
 
         return weatheredSurface(x, y, z, vein, base);
@@ -2884,18 +2882,25 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
 
         // Сначала регистрируем базовые структуры и загружаем их размеры.
         StructureGenerator.preloadGladeSizes();
-
         StructureGenerator.updateDverPosition(this.GLADE_RADIUS);
+        StructureGenerator.updateSectorDoorPositions(
+                this.GLADE_RADIUS,
+                this.MAIN_MAZE_WIDTH,
+                this.SEPARATOR_WALL_THICKNESS,
+                this.SECTOR_WIDTH
+        );
+
         initializeBridge();
 
         // После добавления dver/most снова загружаем размеры,
         // чтобы проверка пересечений видела уже ВСЕ структуры.
         StructureGenerator.preloadGladeSizes();
-
         initializeGladeStructures();
 
         synchronized (generationLock) {
             if (isGenerated) return;
+
+            initWallPalette();
 
             generateMaze();
             generateSectors();
@@ -2904,6 +2909,68 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
 
             isGenerated = true;
         }
+    }
+    private static void initWallPalette() {
+        synchronized (LabyrinthChunkGenerator.class) {
+            if (usingModWallPalette()) {
+                return;
+            }
+
+            boolean hasModPalette =
+                    hasBlockById("mcwpaths:mossy_stone_running_bond")
+                            && hasBlockById("somemoreblocks:stone_tiles")
+                            && hasBlockById("somemoreblocks:cracked_stone_tiles");
+
+            if (hasModPalette) {
+                WALL_BLOCKS[0] = blockStateById(
+                        "mcwpaths:mossy_stone_running_bond",
+                        Blocks.MOSSY_STONE_BRICKS.defaultBlockState()
+                );
+                WALL_BLOCKS[1] = blockStateById(
+                        "somemoreblocks:stone_tiles",
+                        Blocks.STONE_BRICKS.defaultBlockState()
+                );
+                WALL_BLOCKS[2] = blockStateById(
+                        "somemoreblocks:cracked_stone_tiles",
+                        Blocks.CRACKED_STONE_BRICKS.defaultBlockState()
+                );
+            }
+        }
+    }
+
+    private static boolean usingModWallPalette() {
+        return WALL_BLOCKS[0] != null && !WALL_BLOCKS[0].is(Blocks.COBBLESTONE);
+    }
+
+    private static boolean hasBlockById(String id) {
+        return net.minecraft.core.registries.BuiltInRegistries.BLOCK
+                .getOptional(net.minecraft.resources.ResourceLocation.parse(id))
+                .isPresent();
+    }
+
+    private static BlockState blockStateById(String id, BlockState fallback) {
+        return net.minecraft.core.registries.BuiltInRegistries.BLOCK
+                .getOptional(net.minecraft.resources.ResourceLocation.parse(id))
+                .map(net.minecraft.world.level.block.Block::defaultBlockState)
+                .orElse(fallback);
+    }
+
+    private static BlockState crackedWallBlock() {
+        return usingModWallPalette()
+                ? WALL_BLOCKS[2]
+                : Blocks.CRACKED_STONE_BRICKS.defaultBlockState();
+    }
+
+    private static BlockState mossyWallBlock() {
+        return usingModWallPalette()
+                ? WALL_BLOCKS[0]
+                : Blocks.MOSSY_STONE_BRICKS.defaultBlockState();
+    }
+
+    private static BlockState cobbleLikeWallBlock() {
+        return usingModWallPalette()
+                ? WALL_BLOCKS[1]
+                : Blocks.COBBLESTONE.defaultBlockState();
     }
     // ★ БАЗОВАЯ ПОЛУШИРИНА ВОДЫ (без учёта сужения у моста) ★
     private double computeBaseWaterHalfWidth(int x, int z) {

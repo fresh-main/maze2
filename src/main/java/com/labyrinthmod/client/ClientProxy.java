@@ -56,6 +56,15 @@ public class ClientProxy extends Proxy {
             event.setCanceled(true);
         }
     }
+    @Override
+    public void handleMazeMonitorMap(com.labyrinthmod.common.network.packet.MazeMonitorMapPacket p) {
+        com.labyrinthmod.client.video_source.MazeMonitorClientData.applyMap(p);
+    }
+
+    @Override
+    public void handleMazeMonitorSync(com.labyrinthmod.common.network.packet.MazeMonitorSyncPacket p) {
+        com.labyrinthmod.client.video_source.MazeMonitorClientData.applySync(p);
+    }
 
     public net.minecraft.client.player.LocalPlayer getClientPlayer() {
         return Minecraft.getInstance().player;

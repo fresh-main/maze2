@@ -273,8 +273,8 @@ public class StructureGenerator {
         // Добавляем новый мост (breakable = false, чтобы игроки не могли его сломать)
         structures.add(new StructureData(
                 new StructurePlacement("most", "labyrinthmod", "most",
-                        new BlockPos(x, y, z), false, rotation),
-                new BlockPos(x, y, z)
+                        new BlockPos(x, y-1, z), true, rotation),
+                new BlockPos(x, y-1, z)
         ));
 
         System.out.println("[StructureGenerator] Bridge 'most' dynamically positioned at "
@@ -792,6 +792,90 @@ public class StructureGenerator {
         }
 
         return new int[]{worldMinX, worldMaxX, worldMinZ, worldMaxZ};
+    }
+    // ═══════════════════════════════════════════════════════════
+// ★ 8 СЕКТОРНЫХ ДВЕРЕЙ: sector_1 ... sector_8 ★
+// ═══════════════════════════════════════════════════════════
+
+    private static final BlockPos[] SECTOR_DOOR_POSITIONS = new BlockPos[8];
+    private static final int SECTOR_DOOR_Y = 31;
+    private static boolean sectorDoorsRegistered = false;
+
+    public static synchronized void updateSectorDoorPositions(
+            int gladeRadius,
+            int mainMazeWidth,
+            int separatorWallThickness,
+            int sectorWidth
+    ) {
+        if (sectorDoorsRegistered) {
+            return;
+        }
+
+        int mainMazeEnd = gladeRadius + mainMazeWidth;
+
+        int separatorCenter = mainMazeEnd + Math.max(1, (separatorWallThickness + 1) / 2);
+
+        // Проходы в сектора генерируются со смещением sectorWidth / 2 от осей X/Z.
+        int offset = Math.max(1, sectorWidth / 2);
+
+        int y = SECTOR_DOOR_Y;
+
+        BlockPos[] positions = new BlockPos[] {
+                new BlockPos( separatorCenter-2, y, -offset-13), // sector_7
+                new BlockPos( separatorCenter-2, y,  offset-13),  // sector_8
+
+
+                // Южные проходы, +Z
+                new BlockPos(-offset-13, y,  separatorCenter-3), // sector_3
+                new BlockPos( offset-13, y,  separatorCenter-3), // sector_4
+
+                // Западные проходы, -X
+                new BlockPos(-separatorCenter-2, y+1, -offset-13), // sector_5
+                new BlockPos(-separatorCenter-2, y+1,  offset-13), // sector_6
+
+                new BlockPos(-offset-13, y, -separatorCenter-3), // sector_1
+                new BlockPos( offset-13, y, -separatorCenter-3), // sector_2
+
+        };
+
+        for (int i = 0; i < positions.length; i++) {
+            String name = "sector_" + (i + 1);
+            BlockPos pos = positions[i];
+
+            SECTOR_DOOR_POSITIONS[i] = pos;
+
+            structures.add(new StructureData(
+                    new StructurePlacement(
+                            name,
+                            "labyrinthmod",
+                            name,
+                            pos,
+                            false,
+                            Rotation.NONE
+                    ),
+                    pos
+            ));
+        }
+
+        sectorDoorsRegistered = true;
+
+        System.out.println("[StructureGenerator] Sector doors registered: "
+                + "sector_1=" + positions[0]
+                + ", sector_2=" + positions[1]
+                + ", sector_3=" + positions[2]
+                + ", sector_4=" + positions[3]
+                + ", sector_5=" + positions[4]
+                + ", sector_6=" + positions[5]
+                + ", sector_7=" + positions[6]
+                + ", sector_8=" + positions[7]);
+    }
+
+    public static synchronized BlockPos getSectorDoorPos(int index) {
+        if (index < 1 || index > 8) {
+            return null;
+        }
+
+        return SECTOR_DOOR_POSITIONS[index - 1];
     }
 
 
