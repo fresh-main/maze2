@@ -5,6 +5,7 @@ import com.mazemap.client.FragmentTextureCache;
 import com.mazemap.client.MazePathFinder;
 import com.mazemap.item.PersonalMapItem;
 import com.mazemap.storage.PlayerMapData;
+import com.otbor.client.widgets.PaperRender;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
@@ -18,9 +19,6 @@ import java.util.Map;
 
 @OnlyIn(Dist.CLIENT)
 public class PersonalMapScreen extends Screen {
-    private static final int PAPER_BG = 0xFFE8DCB0;
-    private static final int PAPER_TINT = 0xFFD9C892;
-    private static final int PAPER_EDGE = 0xFF8B7B5A;
     private static final int PENCIL_INK = 0xFF2B2418;
     private static final int PENCIL_BODY = 0xFFFFD23F;
     private static final int PENCIL_TIP = 0xFF1A1A1A;
@@ -77,7 +75,7 @@ public class PersonalMapScreen extends Screen {
 
     @Override
     public void render(GuiGraphics gfx, int mouseX, int mouseY, float partialTicks) {
-        gfx.fillGradient(0, 0, this.width, this.height, 0xC0101010, 0xD0101010);
+        PaperRender.drawBoardBackground(gfx, this.width, this.height);
         float p = openProgress();
         if (p < 0.01f) {
             super.render(gfx, mouseX, mouseY, partialTicks);
@@ -93,15 +91,14 @@ public class PersonalMapScreen extends Screen {
         gfx.pose().scale(1f, p, 1f);
         gfx.pose().translate(-cx, -cy, 0);
 
-        gfx.fill(px + 4, py + 4, px + pw + 4, py + ph + 4, SHADOW);
-        gfx.fill(px, py, px + pw, py + ph, PAPER_BG);
+        PaperRender.drawPaper(gfx, px, py, pw, ph, 1.0f);
         for (int i = 0; i < ph; i += 8) {
-            gfx.fill(px + 10, py + i, px + pw - 10, py + i + 1, PAPER_TINT);
+            gfx.fill(px + 10, py + i, px + pw - 10, py + i + 1,
+                    PaperRender.withAlpha(PaperRender.PAPER_DARK, 0.30f));
         }
-        gfx.fill(px, py, px + pw, py + 2, PAPER_EDGE);
-        gfx.fill(px, py + ph - 2, px + pw, py + ph, PAPER_EDGE);
-        gfx.fill(px, py, px + 2, py + ph, PAPER_EDGE);
-        gfx.fill(px + pw - 2, py, px + pw, py + ph, PAPER_EDGE);
+        PaperRender.drawPin(gfx, px + 10, py + 10, false);
+        PaperRender.drawPin(gfx, px + pw - 10, py + 10, true);
+        PaperRender.drawTape(gfx, px + pw / 2 - 25, py - 4, 50, 9, 190);
 
         renderRuler(gfx, px - 16, py, ph);
         renderPencil(gfx, px + pw + 6, py, ph);
@@ -114,16 +111,19 @@ public class PersonalMapScreen extends Screen {
         if (p > 0.95f) { gfx.disableScissor(); }
 
         gfx.pose().popPose();
-        gfx.drawCenteredString(this.font, "§7ЛКМ+Тянуть - двигать | Колесо - зум | ПКМ - метка | ESC - закрыть",
-                this.width / 2, py + ph + 12, 0xFFFFFF);
+        String hint = "ЛКМ+Тянуть · двигать  |  Колесо · зум  |  ПКМ · метка  |  ESC · закрыть";
+        PaperRender.drawInkText(gfx, this.font, hint,
+                this.width / 2 - this.font.width(hint) / 2, py + ph + 12, PaperRender.PAPER_LIGHT);
+        PaperRender.drawRectStamp(gfx, this.font, "КАРТА ЛАБИРИНТА",
+                px + pw - 64, py + ph - 17, PaperRender.INK_RED);
 
         super.render(gfx, mouseX, mouseY, partialTicks);
     }
 
     private void renderRuler(GuiGraphics gfx, int x, int y, int h) {
         gfx.fill(x, y, x + 12, y + h, RULER_BG);
-        gfx.fill(x, y, x + 1, y + h, PAPER_EDGE);
-        gfx.fill(x + 11, y, x + 12, y + h, PAPER_EDGE);
+        gfx.fill(x, y, x + 1, y + h, PaperRender.PAPER_EDGE);
+        gfx.fill(x + 11, y, x + 12, y + h, PaperRender.PAPER_EDGE);
         for (int i = 0; i < h; i += 8) {
             int len = (i % 32 == 0) ? 8 : 4;
             gfx.fill(x + 12 - len, y + i, x + 12, y + i + 1, RULER_TICK);
@@ -159,7 +159,7 @@ public class PersonalMapScreen extends Screen {
                 long key = ((long) cx << 32) | (cz & 0xFFFFFFFFL);
                 PlayerMapData.Fragment frag = fragments.get(key);
                 if (frag == null) continue;
-                drawFragment(gfx, frag.pixels, cx, cz, x, y, w, h, worldLeft, worldTop, pxPerBlock);
+                drawFragment(gfx, frag.pixels, frag.heights, cx, cz, x, y, w, h, worldLeft, worldTop, pxPerBlock);
             }
         }
 
@@ -191,7 +191,7 @@ public class PersonalMapScreen extends Screen {
         }
     }
 
-    private void drawFragment(GuiGraphics gfx, byte[] pixels, int cellX, int cellZ,
+    private void drawFragment(GuiGraphics gfx, byte[] pixels, byte[] heights, int cellX, int cellZ,
                               int x, int y, int w, int h,
                               double worldLeft, double worldTop, double pxPerBlock) {
         int fragSize = PlayerMapData.FRAGMENT_SIZE;
@@ -204,7 +204,7 @@ public class PersonalMapScreen extends Screen {
         double baseScreenX = (fragOriginX - worldLeft) * pxPerBlock + x;
         double baseScreenY = (fragOriginZ - worldTop) * pxPerBlock + y;
 
-        ResourceLocation tex = FragmentTextureCache.getOrCreate(key, pixels);
+        ResourceLocation tex = FragmentTextureCache.getOrCreate(key, pixels, heights);
         gfx.pose().pushPose();
         gfx.pose().translate((float) baseScreenX, (float) baseScreenY, 0f);
         gfx.pose().scale((float) pixelOnScreen, (float) pixelOnScreen, 1f);

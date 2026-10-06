@@ -47,11 +47,12 @@ public final class ClientMazeMapHandlers {
         long key = ((long) p.cellX << 32) | (p.cellZ & 0xFFFFFFFFL);
         PlayerMapData.Fragment frag = FRAGMENTS.get(key);
         if (frag == null) {
-            frag = new PlayerMapData.Fragment(p.pixels, p.walkable);
+            frag = new PlayerMapData.Fragment(p.pixels, p.walkable, p.heights);
             FRAGMENTS.put(key, frag);
         } else {
             System.arraycopy(p.pixels, 0, frag.pixels, 0, p.pixels.length);
             System.arraycopy(p.walkable, 0, frag.walkable, 0, p.walkable.length);
+            System.arraycopy(p.heights, 0, frag.heights, 0, p.heights.length);
         }
         FragmentTextureCache.invalidate(key);
         MapHandRenderer.forceMapTextureUpload();

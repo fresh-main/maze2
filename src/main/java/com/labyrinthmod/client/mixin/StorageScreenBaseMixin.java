@@ -1,13 +1,15 @@
 package com.labyrinthmod.client.mixin;
 
 import com.labyrinthmod.client.NoResultsLabelOwner;
+import com.otbor.client.widgets.PaperContainerRender;
+import com.otbor.client.widgets.PaperRender;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.inventory.Slot;
 import net.p3pp3rf1y.sophisticatedcore.client.gui.StorageScreenBase;
-import net.p3pp3rf1y.sophisticatedcore.client.gui.controls.TextBox;
 import net.p3pp3rf1y.sophisticatedcore.client.gui.controls.Label;
+import net.p3pp3rf1y.sophisticatedcore.client.gui.controls.TextBox;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -36,9 +38,43 @@ public abstract class StorageScreenBaseMixin implements NoResultsLabelOwner {
 
     @Inject(method = "drawInventoryBg", at = @At("HEAD"), cancellable = true)
     private void otbor$hideUnusedPlayerInventoryBackground(GuiGraphics gfx, int x, int y,
-                                                               ResourceLocation texture, CallbackInfo ci) {
-        // The original texture includes three player-inventory rows that are locked here.
-        // The compact paper panel is drawn by BackpackScreenOverlay.
+                                                            ResourceLocation texture, CallbackInfo ci) {
+        ci.cancel();
+    }
+
+    @Inject(method = "drawUpgradeBackground", at = @At("HEAD"), cancellable = true)
+    private void otbor$drawPaperUpgradeSlots(GuiGraphics gfx, CallbackInfo ci) {
+        StorageScreenBase<?> self = (StorageScreenBase<?>) (Object) this;
+        var upgradeSlots = self.getMenu().upgradeSlots;
+
+        int minX = Integer.MAX_VALUE;
+        int minY = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE;
+        int maxY = Integer.MIN_VALUE;
+        for (Slot slot : upgradeSlots) {
+            if (slot.x <= -2000 || slot.y <= -2000) continue;
+            minX = Math.min(minX, slot.x);
+            minY = Math.min(minY, slot.y);
+            maxX = Math.max(maxX, slot.x + 16);
+            maxY = Math.max(maxY, slot.y + 16);
+        }
+
+        if (minX != Integer.MAX_VALUE) {
+            int left = self.getGuiLeft();
+            int top = self.getGuiTop();
+            int padding = 5;
+            PaperRender.drawPaperCard(gfx,
+                    left + minX - padding, top + minY - padding,
+                    maxX - minX + padding * 2, maxY - minY + padding * 2,
+                    1.0f, PaperRender.PAPER_BASE);
+
+            for (Slot slot : upgradeSlots) {
+                if (slot.x <= -2000 || slot.y <= -2000) continue;
+                PaperContainerRender.sketchSlotBox(gfx, left + slot.x, top + slot.y, 1.0f);
+            }
+        }
+
+        // Contents are rendered afterwards; only the gray/dashed background is replaced.
         ci.cancel();
     }
 

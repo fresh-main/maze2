@@ -3,6 +3,7 @@ package com.labyrinthmod.client.mixin;
 import com.otbor.client.widgets.PaperRender;
 import com.simibubi.create.content.equipment.toolbox.ToolboxScreen;
 import com.simibubi.create.content.schematics.cannon.SchematicannonScreen;
+import com.simibubi.create.content.schematics.table.SchematicTableScreen;
 import com.simibubi.create.foundation.gui.AllGuiTextures;
 import com.simibubi.create.foundation.gui.widget.IconButton;
 import net.minecraft.client.Minecraft;
@@ -17,7 +18,8 @@ public abstract class CreateIconButtonMixin {
     @Inject(method = "drawBg", at = @At("HEAD"), cancellable = true)
     private void otbor$paperControls(GuiGraphics gfx, AllGuiTextures texture, CallbackInfo ci) {
         var screen = Minecraft.getInstance().screen;
-        if (!(screen instanceof SchematicannonScreen) && !(screen instanceof ToolboxScreen)) return;
+        if (!(screen instanceof SchematicannonScreen) && !(screen instanceof SchematicTableScreen)
+                && !(screen instanceof ToolboxScreen)) return;
         IconButton button = (IconButton) (Object) this;
         int x = button.getX();
         int y = button.getY();
@@ -26,7 +28,7 @@ public abstract class CreateIconButtonMixin {
         PaperRender.drawPaperCard(gfx, x, y, w, h, 1f,
                 button.isHoveredOrFocused() ? PaperRender.PAPER_LIGHT : PaperRender.PAPER_BASE);
         gfx.fill(x + 2, y + 2, x + w - 2, y + h - 2,
-                button.active ? PaperRender.INK_SOFT : PaperRender.INK_FADED);
+                button.active ? PaperRender.PAPER_DARK : PaperRender.withAlpha(PaperRender.PAPER_DARK, 0.55f));
         gfx.fill(x + 3, y + h - 3, x + w - 3, y + h - 2, PaperRender.INK_RED);
         ci.cancel();
     }

@@ -51,9 +51,12 @@
     "RecipeBookComponentMixin",
     "RecipeButtonMixin",
     "RecipeBookTabButtonMixin",
+    "RecipeFilterButtonMixin",
     "CreateIconButtonMixin",
     "CreateIndicatorMixin",
     "CreatePlayerInventoryBackgroundMixin",
+    "SchematicannonScreenMixin",
+    "SchematicTableScreenMixin",
     "CreativeModeInventoryScreenMixin",
     "create.ContraptionLimitMixin"
 

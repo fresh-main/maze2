@@ -2,6 +2,8 @@ package com.mazemap.event;
 
 import com.labyrinthmod.LabyrinthMod;
 import com.mazemap.item.PersonalMapItem;
+import com.mazemap.registry.ModItems;
+import com.mazemap.util.MapDurabilityHandler;
 import com.mazemap.network.MazeMapNetwork;
 import com.mazemap.network.packet.S2CClearMapPacket;
 import com.mojang.brigadier.context.CommandContext;
@@ -24,9 +26,25 @@ public final class MazeMapCommands {
     public static void onRegisterCommands(RegisterCommandsEvent event) {
         event.getDispatcher().register(
                 Commands.literal("mazemap")
+                        .then(Commands.literal("infinite")
+                                .requires(source -> source.hasPermission(2))
+                                .executes(MazeMapCommands::giveInfiniteMap))
                         .then(Commands.literal("reset")
                                 .executes(MazeMapCommands::resetMap))
         );
+    }
+
+    private static int giveInfiniteMap(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        ServerPlayer player = ctx.getSource().getPlayerOrException();
+        ItemStack mapStack = new ItemStack(ModItems.PERSONAL_MAP.get());
+        MapDurabilityHandler.setInfinite(mapStack, true);
+        mapStack.setHoverName(Component.literal("§6Бесконечная личная карта"));
+
+        if (!player.getInventory().add(mapStack)) {
+            player.drop(mapStack, false);
+        }
+        player.sendSystemMessage(Component.literal("§aВы получили бесконечную карту."));
+        return 1;
     }
 
     private static int resetMap(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {

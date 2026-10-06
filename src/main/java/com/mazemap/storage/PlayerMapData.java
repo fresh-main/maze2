@@ -13,23 +13,34 @@ public class PlayerMapData {
     // ИСПРАВЛЕНИЕ: Добавляем константы размеров массивов
     public static final int PIXEL_COUNT = FRAGMENT_SIZE * FRAGMENT_SIZE;
     public static final int WALKABLE_BYTES = PIXEL_COUNT; // 1 байт на пиксель проходимости
+    public static final int HEIGHT_BYTES = PIXEL_COUNT;
 
     public static final byte PIXEL_UNEXPLORED = 0;
     public static final byte PIXEL_PASSAGE = 1;
+    public static final byte PIXEL_TREE_CONIFER = (byte) 0xFA;
+    public static final byte PIXEL_TREE_BIRCH = (byte) 0xFB;
+    public static final byte PIXEL_TREE = (byte) 0xFC;
+    public static final byte PIXEL_STRUCTURE = (byte) 0xFD;
+    public static final byte PIXEL_WATER = (byte) 0xFE;
+    /** Зарезервированный цвет механизмов Create (в обычной палитре карт не используется). */
+    public static final byte PIXEL_CREATE = (byte) 0xFF;
 
     // ИСПРАВЛЕНИЕ: Внутренний класс для хранения и цветов, и проходимости
     public static class Fragment {
         public final byte[] pixels;
         public final byte[] walkable;
+        public final byte[] heights;
 
         public Fragment() {
             this.pixels = new byte[PIXEL_COUNT];
             this.walkable = new byte[WALKABLE_BYTES];
+            this.heights = new byte[HEIGHT_BYTES];
         }
 
-        public Fragment(byte[] pixels, byte[] walkable) {
+        public Fragment(byte[] pixels, byte[] walkable, byte[] heights) {
             this.pixels = pixels;
             this.walkable = walkable;
+            this.heights = heights.length == HEIGHT_BYTES ? heights : new byte[HEIGHT_BYTES];
         }
     }
 
@@ -80,6 +91,7 @@ public class PlayerMapData {
             tag.putInt("z", unpackCellZ(e.getKey()));
             tag.putByteArray("p", e.getValue().pixels);
             tag.putByteArray("w", e.getValue().walkable); // Сохраняем проходимость
+            tag.putByteArray("h", e.getValue().heights);
             list.add(tag);
         }
         root.put("fragments", list);
@@ -95,9 +107,10 @@ public class PlayerMapData {
             int z = t.getInt("z");
             byte[] pixels = t.getByteArray("p");
             byte[] walkable = t.getByteArray("w");
+            byte[] heights = t.getByteArray("h");
             if (pixels.length == PIXEL_COUNT) {
                 if (walkable.length != WALKABLE_BYTES) walkable = new byte[WALKABLE_BYTES];
-                data.fragments.put(key(x, z), new Fragment(pixels, walkable));
+                data.fragments.put(key(x, z), new Fragment(pixels, walkable, heights));
             }
         }
         return data;

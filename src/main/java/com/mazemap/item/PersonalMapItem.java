@@ -51,7 +51,7 @@ public class PersonalMapItem extends Item {
                 PlayerMapData.Fragment frag = e.getValue();
                 MazeMapNetwork.CHANNEL.send(
                         PacketDistributor.PLAYER.with(() -> sp),
-                        new S2CFragmentSyncPacket(cellX, cellZ, frag.pixels, frag.walkable));
+                        new S2CFragmentSyncPacket(cellX, cellZ, frag.pixels, frag.walkable, frag.heights));
             }
         }
         return InteractionResultHolder.success(stack);

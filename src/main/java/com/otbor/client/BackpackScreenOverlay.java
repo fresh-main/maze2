@@ -15,6 +15,7 @@ import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.gui.screens.inventory.HopperScreen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.gui.screens.inventory.ShulkerBoxScreen;
+import net.minecraft.world.inventory.AbstractFurnaceMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.entity.player.Inventory;
 import net.p3pp3rf1y.sophisticatedcore.client.gui.StorageScreenBase;
@@ -167,6 +168,7 @@ public final class BackpackScreenOverlay {
             float local = PaperContainerRender.phase(t, st, st + 0.12f);
             PaperContainerRender.sketchSlotBox(gfx, leftPos + s.x, topPos + s.y, local);
         }
+
         if (screen instanceof StorageScreenBase<?> storageScreen) {
             int hotbarY = 18 + storageScreen.getMenu().getNumberOfRows() * 18 + 4;
             for (int i = 0; i < 9; i++) {
@@ -246,6 +248,10 @@ public final class BackpackScreenOverlay {
             PaperContainerRender.sketchSlotBox(gfx, leftPos + s.x, topPos + s.y, local);
         }
 
+        if (screen instanceof AbstractFurnaceScreen<?> furnaceScreen) {
+            drawVanillaFurnaceProgress(gfx, furnaceScreen, leftPos, topPos);
+        }
+
         // Штамп с overshoot
         float stampProg = PaperContainerRender.phase(t, 0.78f, 0.92f);
         if (stampProg > 0f) {
@@ -282,6 +288,61 @@ public final class BackpackScreenOverlay {
             gfx.fill(4, hotbarY + 18, iw - 4, panelBottom - 3, PaperRender.PAPER_LIGHT);
         }
     }
+
+    /** Стандартные ванильные индикаторы с реальным прогрессом горения и готовки. */
+    private static void drawVanillaFurnaceProgress(GuiGraphics gfx,
+                                                    AbstractFurnaceScreen<?> screen,
+                                                    int leftPos, int topPos) {
+        AbstractFurnaceMenu menu = screen.getMenu();
+        int flameX = leftPos + 56;
+        int flameY = topPos + 36;
+        int arrowX = leftPos + 79;
+        int arrowY = topPos + 34;
+
+        drawFlameIcon(gfx, flameX, flameY, PaperRender.INK_FADED, 14);
+        drawArrowIcon(gfx, arrowX, arrowY, PaperRender.INK_FADED, 24);
+
+        if (menu.isLit()) {
+            drawFlameIcon(gfx, flameX, flameY, PaperRender.INK_RED,
+                    Math.min(14, menu.getLitProgress() + 1));
+        }
+        int burn = menu.getBurnProgress();
+        if (burn > 0) {
+            drawArrowIcon(gfx, arrowX, arrowY, PaperRender.INK_RED,
+                    Math.min(24, burn + 1));
+        }
+    }
+
+    private static void drawFlameIcon(GuiGraphics gfx, int x, int y, int color, int fillHeight) {
+        int clipTop = y + 14 - Math.max(0, Math.min(14, fillHeight));
+        drawClipped(gfx, x + 1, y + 5, x + 4, y + 14, clipTop, x + 14, color);
+        drawClipped(gfx, x + 2, y + 2, x + 4, y + 7, clipTop, x + 14, color);
+        drawClipped(gfx, x + 5, y + 3, x + 9, y + 14, clipTop, x + 14, color);
+        drawClipped(gfx, x + 7, y, x + 9, y + 5, clipTop, x + 14, color);
+        drawClipped(gfx, x + 10, y + 5, x + 13, y + 14, clipTop, x + 14, color);
+        drawClipped(gfx, x + 11, y + 2, x + 13, y + 7, clipTop, x + 14, color);
+    }
+
+    private static void drawArrowIcon(GuiGraphics gfx, int x, int y, int color, int fillWidth) {
+        int clipRight = x + Math.max(0, Math.min(24, fillWidth));
+        // Узкое древко и построчно сужающийся треугольный наконечник.
+        drawClipped(gfx, x, y + 6, x + 16, y + 10, y, clipRight, color);
+        for (int row = 1; row <= 14; row++) {
+            int tipRight = x + 24 - Math.abs(7 - row);
+            drawClipped(gfx, x + 14, y + row, tipRight, y + row + 1,
+                    y, clipRight, color);
+        }
+    }
+
+    private static void drawClipped(GuiGraphics gfx, int x1, int y1, int x2, int y2,
+                                    int clipTop, int clipRight, int color) {
+        int left = x1;
+        int top = Math.max(y1, clipTop);
+        int right = Math.min(x2, clipRight);
+        if (right > left && y2 > top) {
+            gfx.fill(left, top, right, y2, color);
+        }
+    }
     /**
      * Универсальная отрисовка ВСЕХ табов (и левых апгрейдов, и правых настроек)
      * в бумажном стиле. Находим их через перебор children() экрана.
@@ -310,7 +371,12 @@ public final class BackpackScreenOverlay {
                 // 2. Рисуем бумажную карточку с рамкой и тенью
                 PaperRender.drawPaperCard(gfx, x, y, w, h, 1.0f, PaperRender.PAPER_LIGHT);
 
-                // 3. Пытаемся вернуть иконку таба, чтобы она не исчезла
+                // 3. Внутренняя ячейка вкладки выглядит как остальные слоты рюкзака.
+                int slotX = x + (w - 16) / 2;
+                int slotY = y + (h - 16) / 2;
+                PaperContainerRender.sketchSlotBox(gfx, slotX, slotY, 1.0f);
+
+                // 4. Возвращаем иконку поверх тёмной ячейки, чтобы она не исчезла.
                 drawTabIcon(gfx, child, x, y, w, h);
 
             } catch (Exception e) {
@@ -337,38 +403,48 @@ public final class BackpackScreenOverlay {
 
     /** Пытается извлечь иконку таба (ResourceLocation или ItemStack) и отрисовать её. */
     private static void drawTabIcon(GuiGraphics gfx, Object tab, int x, int y, int w, int h) {
-        // Попытка 1: Ищем поле 'icon' (обычно это ResourceLocation для UpgradeTab)
+        int iconX = x + (w - 16) / 2;
+        int iconY = y + (h - 16) / 2;
+        // Значок может храниться в базовом классе конкретной вкладки.
         try {
-            java.lang.reflect.Field iconField = tab.getClass().getDeclaredField("icon");
-            iconField.setAccessible(true);
-            Object icon = iconField.get(tab);
+            for (Class<?> type = tab.getClass(); type != null; type = type.getSuperclass()) {
+                try {
+                    java.lang.reflect.Field iconField = type.getDeclaredField("icon");
+                    iconField.setAccessible(true);
+                    Object icon = iconField.get(tab);
 
-            if (icon instanceof net.minecraft.resources.ResourceLocation rl) {
-                // Рисуем иконку 16x16 строго по центру таба
-                gfx.blit(rl, x + (w - 16) / 2, y + (h - 16) / 2, 0, 0, 16, 16, 16, 16);
-                return;
-            }
+                    if (icon instanceof net.minecraft.resources.ResourceLocation rl) {
+                        gfx.blit(rl, iconX, iconY, 0, 0, 16, 16, 16, 16);
+                        return;
+                    }
 
-            // Для некоторых табов иконка может быть ItemStack
-            if (icon instanceof net.minecraft.world.item.ItemStack stack) {
-                gfx.renderItem(stack, x + (w - 16) / 2, y + (h - 16) / 2);
-                return;
-            }
-        } catch (Exception e) {
-            // Поле 'icon' не найдено, идем дальше
-        }
-
-        // Попытка 2: Ищем метод отрисовки иконки (например, renderIcon или drawIcon)
-        try {
-            for (java.lang.reflect.Method method : tab.getClass().getDeclaredMethods()) {
-                if (method.getName().toLowerCase().contains("icon") && method.getParameterCount() == 1) {
-                    method.setAccessible(true);
-                    method.invoke(tab, gfx);
-                    return;
+                    if (icon instanceof net.minecraft.world.item.ItemStack stack) {
+                        gfx.renderItem(stack, iconX, iconY);
+                        return;
+                    }
+                } catch (NoSuchFieldException ignored) {
+                    // Проверяем базовый класс.
                 }
             }
         } catch (Exception e) {
-            // Метод не найден
+            // Если поле не подходит, попробуем метод отрисовки.
+        }
+
+        // Попытка 2: ищем метод иконки в иерархии классов вкладки.
+        for (Class<?> type = tab.getClass(); type != null; type = type.getSuperclass()) {
+            for (java.lang.reflect.Method method : type.getDeclaredMethods()) {
+                if (method.getName().toLowerCase(java.util.Locale.ROOT).contains("icon")
+                        && method.getParameterCount() == 1
+                        && method.getParameterTypes()[0].isInstance(gfx)) {
+                    try {
+                        method.setAccessible(true);
+                        method.invoke(tab, gfx);
+                        return;
+                    } catch (Exception ignored) {
+                        // Продолжаем поиск совместимого метода.
+                    }
+                }
+            }
         }
     }
 }

@@ -61,6 +61,7 @@ public abstract class AbstractContainerScreenMixin<T extends AbstractContainerMe
         if (BackpackScreenOverlay.isBackpackScreen(selfScreen)
                 || !PaperContainerRender.isExternalModScreen(selfScreen)
                 || selfScreen instanceof com.simibubi.create.content.schematics.cannon.SchematicannonScreen
+                || selfScreen instanceof com.simibubi.create.content.schematics.table.SchematicTableScreen
                 || selfScreen instanceof com.simibubi.create.content.equipment.toolbox.ToolboxScreen
                 || selfScreen instanceof vectorwing.farmersdelight.client.gui.CookingPotScreen) {
             this.titleLabelY = -9999;
@@ -89,6 +90,7 @@ public abstract class AbstractContainerScreenMixin<T extends AbstractContainerMe
             ((SlotAccessor) s).setY(s.y - shift);
         }
         if (selfScreen instanceof com.simibubi.create.content.schematics.cannon.SchematicannonScreen
+                || selfScreen instanceof com.simibubi.create.content.schematics.table.SchematicTableScreen
                 || selfScreen instanceof com.simibubi.create.content.equipment.toolbox.ToolboxScreen) {
             // Create positions its controls during init. Keep its window geometry intact.
             otbor$createHotbarOnly = true;

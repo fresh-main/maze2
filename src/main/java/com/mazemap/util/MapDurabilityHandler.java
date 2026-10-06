@@ -8,6 +8,7 @@ import java.util.List;
 
 public final class MapDurabilityHandler {
     private static final String TAG_DURABILITY = "MapDurability";
+    private static final String TAG_INFINITE = "InfiniteMap";
     public static final int MAX_DURABILITY = 1000;
 
     private MapDurabilityHandler() {}
@@ -17,6 +18,15 @@ public final class MapDurabilityHandler {
         if (stack.isEmpty()) return 0;
         CompoundTag tag = stack.getTag();
         return tag != null && tag.contains(TAG_DURABILITY) ? tag.getInt(TAG_DURABILITY) : MAX_DURABILITY;
+    }
+
+    public static boolean isInfinite(ItemStack stack) {
+        return !stack.isEmpty() && stack.getOrCreateTag().getBoolean(TAG_INFINITE);
+    }
+
+    public static void setInfinite(ItemStack stack, boolean infinite) {
+        if (stack.isEmpty()) return;
+        stack.getOrCreateTag().putBoolean(TAG_INFINITE, infinite);
     }
 
     /** Установить прочность */
@@ -29,6 +39,7 @@ public final class MapDurabilityHandler {
     /** Потратить 1 единицу прочности. Возвращает true, если прочность успешно списана. */
     public static boolean consumeDurability(ItemStack stack) {
         if (stack.isEmpty()) return false;
+        if (isInfinite(stack)) return true;
         int current = getDurability(stack);
         if (current <= 0) return false;
         setDurability(stack, current - 1);
@@ -37,11 +48,16 @@ public final class MapDurabilityHandler {
 
     /** Проверка: карта сломана? */
     public static boolean isBroken(ItemStack stack) {
-        return getDurability(stack) <= 0;
+        return !isInfinite(stack) && getDurability(stack) <= 0;
     }
 
     /** Вспомогательный метод для тултипа */
     public static void appendTooltip(ItemStack stack, List<Component> tooltip, TooltipFlag flag) {
+        if (isInfinite(stack)) {
+            tooltip.add(Component.literal("§6Бесконечная карта"));
+            tooltip.add(Component.literal("§7Чернила не расходуются"));
+            return;
+        }
         int dur = getDurability(stack);
         if (dur < MAX_DURABILITY) {
             String color = dur <= 0 ? "§4" : (dur <= 25 ? "§c" : (dur <= 50 ? "§e" : "§a"));
