@@ -19,6 +19,7 @@ import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Mth;
 import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -82,6 +83,7 @@ public class GriverEntity extends Animal implements GeoEntity {
     private UUID possessingPlayerUUID = null;
     private boolean isReturningHome = false;
     private int attackDelayCounter = 0;
+    public final GriverFootSolver footSolver = new GriverFootSolver();
 
     // Добавьте с другими полями
 
@@ -98,6 +100,10 @@ public class GriverEntity extends Animal implements GeoEntity {
 
     private int attackAnimationTimer = 0;
     private boolean shouldRestartAttackAnim = false;
+
+    private float moveSpeedFactor = 0f;
+    private float turnVelocity = 0f;
+    private int lastMoveTick = -10;
 
     // Добавьте с другими полями (в начале класса)
     private int soundCooldown = 0;
@@ -146,6 +152,9 @@ public class GriverEntity extends Animal implements GeoEntity {
     private static final int NO_PROGRESS_LIMIT = 60;       // 3 сек без продвижения = replan
     private static final int REPLAN_INTERVAL = 40;         // обновлять путь раз в 2 сек
     private static final int MAX_REPLAN_FAILS = 3;         // недостижимых попыток → новая цель
+
+    private static final double MIN_GROUND_SPEED = 0.1D;
+    private static final double RUN_ANIM_GROUND_SPEED = 0.45D;
 
     private int replanFails = 0;
     private int proximityCheckCooldown = 0;
@@ -210,6 +219,7 @@ public class GriverEntity extends Animal implements GeoEntity {
     private static final RawAnimation RUN_ANIM    = RawAnimation.begin().thenLoop("griver_run");
     private static final RawAnimation ATTACK_ANIM = RawAnimation.begin().thenPlay("griver_attack");
     private static final RawAnimation JUMP_ANIM   = RawAnimation.begin().thenPlay("griver_jump");
+    private static final RawAnimation IDLE_ANIM   = RawAnimation.begin().thenLoop("griver_idle");
 
     /** Контроллер анимаций - определяет когда какую анимацию включить */
     private final GriverAnimationController animationController;
@@ -1774,34 +1784,43 @@ public class GriverEntity extends Animal implements GeoEntity {
         double dz = tz - this.getZ();
         double distance = Math.sqrt(dx * dx + dz * dz);
         if (distance < 0.001D) return;
-        double maxSpeed = this.getAttributeValue(Attributes.MOVEMENT_SPEED) * speedMultiplier;
-        // Micro-path cells are steering markers, not destinations. Braking at every
-        // cell made a running griver slower than a walking player.
-        double desiredSpeed = maxSpeed;
-        double mx = dx / distance * desiredSpeed;
-        double mz = dz / distance * desiredSpeed;
+
+        if (this.tickCount - lastMoveTick > 2) {
+            moveSpeedFactor = 0.3F;
+            turnVelocity = 0F;
+        }
+        lastMoveTick = this.tickCount;
+
+        float currentYaw = this.getYRot();
+        float targetYaw = (float) (Math.atan2(dz, dx) * 180.0 / Math.PI) - 90.0F;
+        float delta = Mth.wrapDegrees(targetYaw - currentYaw);
+        float absDelta = Math.abs(delta);
+
+        float alignFactor = absDelta <= 25F ? 1F : Mth.clamp(1F - (absDelta - 25F) / 130F, 0.5F, 1F);
+        moveSpeedFactor += (alignFactor - moveSpeedFactor) * (alignFactor < moveSpeedFactor ? 0.3F : 0.12F);
+
+        double maxSpeed = this.getAttributeValue(Attributes.MOVEMENT_SPEED) * speedMultiplier * moveSpeedFactor;
+        double mx = dx / distance * maxSpeed;
+        double mz = dz / distance * maxSpeed;
 
         Vec3 dv = this.getDeltaMovement();
-        // Ease into the next cell instead of replacing horizontal velocity every
-        // tick. This removes the visible jerk at route nodes and 90 degree turns.
         double smoothedX = dv.x * 0.45D + mx * 0.55D;
         double smoothedZ = dv.z * 0.45D + mz * 0.55D;
+        double horizontal = Math.sqrt(smoothedX * smoothedX + smoothedZ * smoothedZ);
+        if (horizontal > 1.0E-4D && horizontal < MIN_GROUND_SPEED) {
+            double boost = MIN_GROUND_SPEED / horizontal;
+            smoothedX *= boost;
+            smoothedZ *= boost;
+        }
         this.setDeltaMovement(smoothedX, dv.y, smoothedZ);
 
-        // Если впереди ступенька вверх — прыжок
         if (ty > this.getY() + 0.5 && this.onGround()) {
             this.getJumpControl().jump();
         }
 
-        // Плавный поворот в направлении движения
-        double yawDx = tx - this.getX();
-        double yawDz = tz - this.getZ();
-        float targetYaw = (float) (Math.atan2(yawDz, yawDx) * 180.0 / Math.PI) - 90.0F;
-        float currentYaw = this.getYRot();
-        float delta = targetYaw - currentYaw;
-        while (delta < -180) delta += 360;
-        while (delta > 180) delta -= 360;
-        float step = Math.signum(delta) * Math.min(8f, Math.abs(delta));
+        float desiredTurn = Mth.clamp(delta * 0.3F, -9F, 9F);
+        turnVelocity += (desiredTurn - turnVelocity) * 0.35F;
+        float step = Math.abs(turnVelocity) >= absDelta ? delta : turnVelocity;
         float newYaw = currentYaw + step;
         this.setYRot(newYaw);
         this.yBodyRot = newYaw;
@@ -2045,8 +2064,6 @@ public class GriverEntity extends Animal implements GeoEntity {
         boolean isMoving = limbSwing > 0.05f || horizontalSpeed > 0.02;
         boolean isMovingBackward = false;
 
-        // Если есть наездник с явным «назад» — приоритет инпута. Иначе —
-        // dot-product между deltaMovement и направлением взгляда.
         if (this.isVehicle() && this.getControllingPassenger() instanceof Player rider
                 && rider.zza < 0) {
             isMovingBackward = true;
@@ -2059,18 +2076,32 @@ public class GriverEntity extends Animal implements GeoEntity {
         }
 
         if (isMoving) {
+            double target;
             if (isMovingBackward) {
-                ctrl.setAnimationSpeed(-1.5);
-            } else if (horizontalSpeed > 0.2 || limbSwing > 0.6f) {
-                ctrl.setAnimationSpeed(6.0);
+                target = -1.5;
             } else {
-                ctrl.setAnimationSpeed(2.0);
+                double blocksPerSecond = Math.hypot(this.getX() - this.xo, this.getZ() - this.zo) * 20.0D;
+                target = Mth.clamp(blocksPerSecond / RUN_ANIM_GROUND_SPEED, 1.0D, 6.0D);
             }
+            smoothAnimSpeed(ctrl, target);
             return state.setAndContinue(RUN_ANIM);
         }
 
-        // 4) Idle — никакой анимации, GeckoLib оставит модель в дефолтной позе.
-        return PlayState.STOP;
+        float turnRate = Math.max(
+                Math.abs(Mth.wrapDegrees(this.yBodyRot - this.yBodyRotO)),
+                Math.max(Math.abs(Mth.wrapDegrees(this.getYRot() - this.yRotO)),
+                        Math.abs(Mth.wrapDegrees(this.yHeadRot - this.yHeadRotO))));
+        if (turnRate > 1.0f) {
+            smoothAnimSpeed(ctrl, Mth.clamp(turnRate * 0.35, 1.0, 3.0));
+            return state.setAndContinue(RUN_ANIM);
+        }
+
+        ctrl.setAnimationSpeed(0.6);
+        return state.setAndContinue(IDLE_ANIM);
+    }
+    private void smoothAnimSpeed(AnimationController<GriverEntity> ctrl, double target) {
+        double current = ctrl.getAnimationSpeed();
+        ctrl.setAnimationSpeed(current + (target - current) * 0.12D);
     }
 
     // ========== GOALS ==========

@@ -13,16 +13,17 @@ import net.mehvahdjukaar.vista.client.video_source.IVideoSource;
 import net.mehvahdjukaar.vista.common.cassette.IBroadcastProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraftforge.network.PacketDistributor;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class MazeMonitorBlockEntity extends BlockEntity implements IBroadcastProvider {
 
@@ -33,7 +34,9 @@ public class MazeMonitorBlockEntity extends BlockEntity implements IBroadcastPro
     private UUID myUUID;
     private boolean linked = false;
     private int syncCooldown = 0;
-    private boolean mapSent = false;
+    private static final int MAP_RETRY_TICKS = 200;
+    private final Set<UUID> mapSentTo = new HashSet<>();
+    private long mapRetryAt = 0L;
 
     public MazeMonitorBlockEntity(BlockPos pos, BlockState state) {
         super(MazeMonitorRegistry.MAZE_MONITOR_BE.get(), pos, state);
@@ -58,21 +61,25 @@ public class MazeMonitorBlockEntity extends BlockEntity implements IBroadcastPro
             be.linked = true;
         }
 
-        // Карта статична, шлём один раз при загрузке блока, а не каждый sync.
-        if (!be.mapSent) {
-            be.mapSent = true;
-            be.sendMapSnapshot(serverLevel);
-        }
-
         be.syncCooldown++;
         if (be.syncCooldown < SYNC_INTERVAL_TICKS) return;
         be.syncCooldown = 0;
+        be.sendMapSnapshot(serverLevel);
         be.sendSync(serverLevel);
     }
 
     private void sendMapSnapshot(ServerLevel level) {
+        List<ServerPlayer> online = level.players();
+        mapSentTo.retainAll(online.stream().map(ServerPlayer::getUUID).collect(Collectors.toSet()));
+        List<ServerPlayer> targets = online.stream().filter(p -> !mapSentTo.contains(p.getUUID())).toList();
+        if (targets.isEmpty()) return;
+
+        long now = level.getGameTime();
+        if (now < mapRetryAt) return;
+
         PatrolManager m = PatrolManager.get(level);
         if (m == null) {
+            mapRetryAt = now + MAP_RETRY_TICKS;
             LabyrinthMod.LOGGER.warn("[MazeMonitor] PatrolManager.get() returned null for level {}",
                     level.dimension().location());
             return;
@@ -80,6 +87,7 @@ public class MazeMonitorBlockEntity extends BlockEntity implements IBroadcastPro
         BlockPos bMin = m.getBoundsMin();
         BlockPos bMax = m.getBoundsMax();
         if (bMin == null || bMax == null) {
+            mapRetryAt = now + MAP_RETRY_TICKS;
             LabyrinthMod.LOGGER.warn("[MazeMonitor] bounds not set on PatrolManager for level {} (bMin={}, bMax={})",
                     level.dimension().location(), bMin, bMax);
             return;
@@ -87,16 +95,32 @@ public class MazeMonitorBlockEntity extends BlockEntity implements IBroadcastPro
 
         PatrolManager.MapCache cache = m.getOrBuildMapCache(level);
         if (cache == null) {
-            LabyrinthMod.LOGGER.warn("[MazeMonitor] getOrBuildMapCache() returned null for level {}",
+            mapRetryAt = now + MAP_RETRY_TICKS;
+            LabyrinthMod.LOGGER.warn("[MazeMonitor] map cache is empty or unavailable for level {}",
                     level.dimension().location());
             return;
         }
 
         MazeMonitorMapPacket packet = new MazeMonitorMapPacket(
                 getUUID(), bMin, bMax, cache.width, cache.height, cache.floorY, cache.data);
-        NetworkHandler.CHANNEL.send(PacketDistributor.ALL.noArg(), packet);
-        LabyrinthMod.LOGGER.info("[MazeMonitor] sent map snapshot {}x{} bMin={} bMax={} for monitor {}",
-                cache.width, cache.height, bMin, bMax, getUUID());
+        for (ServerPlayer p : targets) {
+            NetworkHandler.CHANNEL.send(PacketDistributor.PLAYER.with(() -> p), packet);
+            mapSentTo.add(p.getUUID());
+        }
+        LabyrinthMod.LOGGER.info("[MazeMonitor] sent map snapshot {}x{} to {} player(s) for monitor {}",
+                cache.width, cache.height, targets.size(), getUUID());
+    }
+
+    @Override
+    public CompoundTag getUpdateTag() {
+        CompoundTag tag = super.getUpdateTag();
+        tag.putUUID("MonitorUUID", getUUID());
+        return tag;
+    }
+
+    @Override
+    public ClientboundBlockEntityDataPacket getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
     }
 
     private void sendSync(ServerLevel level) {

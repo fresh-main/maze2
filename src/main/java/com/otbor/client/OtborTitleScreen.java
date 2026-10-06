@@ -3,6 +3,8 @@ import com.otbor.client.widgets.PaperRender;
 import com.otbor.client.widgets.PaperWidgets;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.AbstractButton;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
@@ -13,6 +15,10 @@ public class OtborTitleScreen extends Screen {
     private Screen pendingScreen = null;
     private long enterStart = 0L;
     private float scaleMultiplier = 1.0f;
+    private static final long COMING_SOON_MS = 1800L;
+    private long comingSoonStart = 0L;
+    private int noteX;
+    private int noteY;
 
     public OtborTitleScreen() {
         super(Component.literal("OTBOR "));
@@ -28,27 +34,28 @@ public class OtborTitleScreen extends Screen {
     protected void init() {
         super.init();
         this.enterStart = System.currentTimeMillis();
-
-        double guiScale = minecraft.getWindow().getGuiScale();
-        if (guiScale <= 0.0) guiScale = 2.0;
-        scaleMultiplier = (float) ((int) Math.round(guiScale)) / 2.0f;
+        scaleMultiplier = 1.0f;
 
         int cx = this.width / 2;
 
         int cardW = (int)(168 * scaleMultiplier);
         int cardH = (int)(220 * scaleMultiplier);
         int gap = (int)(20 * scaleMultiplier);
+        int sq = (int)(56 * scaleMultiplier);
+        int sqGap = (int)(12 * scaleMultiplier);
+        int extra = sq + gap;
 
         int count = 4;
-        int totalRowW = cardW * count + gap * (count - 1);
+        int totalRowW = cardW * count + gap * (count - 1) + extra;
         int cardsY = Math.max(this.height - cardH - (int)(100 * scaleMultiplier), (int)(200 * scaleMultiplier));
 
         if (totalRowW > this.width - (int)(40 * scaleMultiplier)) {
-            cardW = Math.max((int)(120 * scaleMultiplier), (this.width - (int)(40 * scaleMultiplier) - gap * (count - 1)) / count);
-            totalRowW = cardW * count + gap * (count - 1);
+            cardW = Math.max((int)(120 * scaleMultiplier), (this.width - (int)(40 * scaleMultiplier) - gap * (count - 1) - extra) / count);
+            totalRowW = cardW * count + gap * (count - 1) + extra;
         }
 
         int startX = cx - totalRowW / 2;
+        int step = cardW + gap;
 
         addRenderableWidget(PaperWidgets.noteCard(
                 startX, cardsY, cardW, cardH,
@@ -63,7 +70,7 @@ public class OtborTitleScreen extends Screen {
         ));
 
         addRenderableWidget(PaperWidgets.noteCard(
-                startX + (cardW + gap), cardsY, cardW, cardH,
+                startX + step, cardsY, cardW, cardH,
                 1,
                 Component.literal("ИГРАТЬ"),
                 "одиночное приключение",
@@ -74,8 +81,21 @@ public class OtborTitleScreen extends Screen {
                 b -> requestNavigate(new OtborWorldSelectionScreen(this))
         ));
 
+        int colX = startX + step * 2;
+        int colY = cardsY + (cardH - (sq * 2 + sqGap)) / 2;
+        noteX = colX + sq / 2;
+        noteY = colY - (int)(16 * scaleMultiplier);
+
+        addRenderableWidget(new IconButton(colX, colY, sq, true,
+                Component.literal("Выход из игры"),
+                () -> this.minecraft.stop()));
+
+        addRenderableWidget(new IconButton(colX, colY + sq + sqGap, sq, false,
+                Component.literal("Перевод"),
+                () -> comingSoonStart = System.currentTimeMillis()));
+
         addRenderableWidget(PaperWidgets.noteCard(
-                startX + (cardW + gap) * 2, cardsY, cardW, cardH,
+                startX + step * 2 + extra, cardsY, cardW, cardH,
                 2,
                 Component.literal("УЗНАТЬ"),
                 "кто создал этот ад?",
@@ -87,7 +107,7 @@ public class OtborTitleScreen extends Screen {
         ));
 
         addRenderableWidget(PaperWidgets.noteCard(
-                startX + (cardW + gap) * 3, cardsY, cardW, cardH,
+                startX + step * 3 + extra, cardsY, cardW, cardH,
                 3,
                 Component.literal("ИНСТРУКЦИЯ"),
                 "О.Т.Б.О.Р",
@@ -110,6 +130,7 @@ public class OtborTitleScreen extends Screen {
         super.render(gfx, mouseX, mouseY, partialTick);
 
         renderCornerStamps(gfx);
+        renderComingSoon(gfx);
 
         if (enterStart != 0L) {
             float p = Math.min(1f, (System.currentTimeMillis() - enterStart) / 220f);
@@ -245,6 +266,97 @@ public class OtborTitleScreen extends Screen {
         }
     }
 
+    private void renderComingSoon(GuiGraphics gfx) {
+        if (comingSoonStart == 0L) return;
+        if (System.currentTimeMillis() - comingSoonStart >= COMING_SOON_MS) {
+            comingSoonStart = 0L;
+            return;
+        }
+        String text = "СКОРО...";
+        int w = this.font.width(text) + 16;
+        int h = this.font.lineHeight + 10;
+        gfx.pose().pushPose();
+        gfx.pose().translate(noteX, noteY, 0);
+        gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-4f));
+        gfx.pose().translate(-w / 2f, -h / 2f, 0);
+        PaperRender.drawPaperCard(gfx, 0, 0, w, h, 1.0f, PaperRender.PAPER_LIGHT);
+        PaperRender.drawScribble(gfx, this.font, text, 8, 5, PaperRender.withAlpha(PaperRender.INK_RED, 0.9f));
+        gfx.pose().popPose();
+    }
+
+
     @Override
     public boolean shouldCloseOnEsc() { return false; }
+
+    private static class IconButton extends AbstractButton {
+        private static final String[] POWER = {
+                ".....##.....",
+                ".....##.....",
+                "..#..##..#..",
+                ".##..##..##.",
+                "##...##...##",
+                "##........##",
+                "##........##",
+                "##........##",
+                ".##......##.",
+                "..##....##..",
+                "...######..."
+        };
+        private static final String[] GLOBE = {
+                "...######...",
+                ".##.#..#.##.",
+                ".#..#..#..#.",
+                "#...#..#...#",
+                "############",
+                "#...#..#...#",
+                "#...#..#...#",
+                "############",
+                ".#..#..#..#.",
+                ".##.#..#.##.",
+                "...######..."
+        };
+
+        private final boolean exit;
+        private final Runnable action;
+
+        IconButton(int x, int y, int size, boolean exit, Component narration, Runnable action) {
+            super(x, y, size, size, narration);
+            this.exit = exit;
+            this.action = action;
+        }
+
+        @Override
+        public void onPress() {
+            action.run();
+        }
+
+        @Override
+        protected void renderWidget(@NotNull GuiGraphics gfx, int mouseX, int mouseY, float partialTick) {
+            PaperRender.drawPaperCard(gfx, getX(), getY(), width, height, 1.0f, PaperRender.PAPER_LIGHT);
+            boolean hot = isHoveredOrFocused();
+            if (hot) {
+                gfx.fill(getX(), getY(), getX() + width, getY() + height,
+                        PaperRender.withAlpha(PaperRender.INK_RED, 0.12f));
+            }
+            int color = hot ? PaperRender.INK_RED : PaperRender.INK;
+            String[] bmp = exit ? POWER : GLOBE;
+            int unit = Math.max(1, width / 24);
+            int ix = getX() + (width - bmp[0].length() * unit) / 2;
+            int iy = getY() + (height - bmp.length * unit) / 2;
+            for (int row = 0; row < bmp.length; row++) {
+                for (int col = 0; col < bmp[row].length(); col++) {
+                    if (bmp[row].charAt(col) == '#') {
+                        int px = ix + col * unit;
+                        int py = iy + row * unit;
+                        gfx.fill(px, py, px + unit, py + unit, color);
+                    }
+                }
+            }
+        }
+
+        @Override
+        protected void updateWidgetNarration(@NotNull NarrationElementOutput output) {
+            defaultButtonNarrationText(output);
+        }
+    }
 }

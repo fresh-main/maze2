@@ -20,7 +20,6 @@ public class LabyrinthCreateWorldScreen extends Screen {
     private int gladeRadius = 70;
     private int mainMazeWidth = 100;
     private int sectorWidth = 72;
-    private int mazeHeight = 50;
 
     // ★ СТАНДАРТНЫЕ  НАСТРОЙКИ МИРА ★
     private GameType gameMode = GameType.SURVIVAL;
@@ -51,10 +50,6 @@ public class LabyrinthCreateWorldScreen extends Screen {
     // ★ ОПТИМИЗАЦИЯ: Дебаунс для тяжёлых вычислений ★
     private long lastAdjustTime = 0;
     private boolean pendingRebuild = false;
-
-    // ★ ОПТИМИЗАЦИЯ: Кэш даты, чтобы не дёргать систему каждый кадр ★
-    private String cachedDate = java.time.LocalDate.now().toString();
-    private long lastDateUpdate = System.currentTimeMillis();
 
     public LabyrinthCreateWorldScreen(Screen parent) {
         super(Component.literal("СОЗДАНИЕ ЛАБИРИНТА"));
@@ -118,17 +113,9 @@ public class LabyrinthCreateWorldScreen extends Screen {
 
         PaperRender.drawPaper(gfx, paperX, paperY, paperW, paperH, 1.0f, PaperRender.PAPER_LIGHT);
 
-        // ФОНОВАЯ СЕТКА
         int gridColor = PaperRender.withAlpha(PaperRender.INK_FADED, 0.08f);
         for (int gx = paperX; gx < paperX + paperW; gx += 20) gfx.fill(gx, paperY, gx + 1, paperY + paperH, gridColor);
         for (int gy = paperY; gy < paperY + paperH; gy += 20) gfx.fill(paperX, gy, paperX + paperW, gy + 1, gridColor);
-
-        // ДЕКОР
-        gfx.fill(paperX + 20, paperY + paperH / 3, paperX + paperW - 20, paperY + paperH / 3 + 1, PaperRender.withAlpha(PaperRender.INK_FADED, 0.15f));
-        gfx.fill(paperX + paperW / 2, paperY + 20, paperX + paperW / 2 + 1, paperY + paperH - 20, PaperRender.withAlpha(PaperRender.INK_FADED, 0.1f));
-        drawInkBlot(gfx, paperX + 15, paperY + paperH - 60, 4);
-        drawInkBlot(gfx, paperX + paperW - 25, paperY + 80, 3);
-        drawCoffeeRing(gfx, paperX + paperW - 80, paperY + paperH - 120, 18);
 
         PaperRender.drawPin(gfx, paperX + 25, paperY + 15, false);
         PaperRender.drawPin(gfx, paperX + paperW - 25, paperY + 15, true);
@@ -136,19 +123,9 @@ public class LabyrinthCreateWorldScreen extends Screen {
         Font font = this.font;
         int cx = paperX + paperW / 2;
 
-        // ЗАГОЛОВОК
         String title = "ЧЕРТЁЖ №07 · КОНФИГУРАЦИЯ ОБЪЕКТА";
         gfx.drawString(font, title, cx - font.width(title) / 2, paperY + 25, PaperRender.INK_DARK, false);
         PaperRender.drawHandDivider(gfx, paperX + 40, paperY + 40, paperW - 80, PaperRender.INK_SOFT);
-
-        gfx.drawString(font, "СЕР. №: A-774-Ω", paperX + paperW - 100, paperY + 25, PaperRender.INK_FADED, false);
-
-        // ★ ОПТИМИЗАЦИЯ: Обновляем дату раз в минуту, а не каждый кадр ★
-        if (System.currentTimeMillis() - lastDateUpdate > 60000) {
-            cachedDate = java.time.LocalDate.now().toString();
-            lastDateUpdate = System.currentTimeMillis();
-        }
-        gfx.drawString(font, "ДАТА: " + cachedDate, paperX + paperW - 100, paperY + 35, PaperRender.INK_FADED, false);
 
         gfx.pose().pushPose();
         gfx.pose().translate(paperX + 60, paperY + 20, 0);
@@ -156,70 +133,38 @@ public class LabyrinthCreateWorldScreen extends Screen {
         PaperRender.drawRectStamp(gfx, font, "СЕКРЕТНО", 0, 0, PaperRender.withAlpha(PaperRender.INK_RED, 0.6f));
         gfx.pose().popPose();
 
-        // СХЕМА ЛАБИРИНТА
-        int previewCy = paperY + 190;
+        int previewCy = paperY + 150;
         drawMazePreviewFromCache(gfx, cx, previewCy);
         drawCompassRose(gfx, cx, previewCy, previewRadius + 15);
 
-        int compassOffset = previewRadius + 15;
+        int compassOffset = previewRadius + 17;
         gfx.drawString(font, "N", cx - 3, previewCy - compassOffset, PaperRender.INK_RED, false);
         gfx.drawString(font, "S", cx - 3, previewCy + compassOffset - 8, PaperRender.INK_RED, false);
         gfx.drawString(font, "W", cx - compassOffset - 5, previewCy - 4, PaperRender.INK_RED, false);
         gfx.drawString(font, "E", cx + compassOffset, previewCy - 4, PaperRender.INK_RED, false);
 
-        gfx.pose().pushPose();
-        gfx.pose().translate(cx + previewRadius + 25, previewCy - 30, 0);
-        gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-5f));
-        PaperRender.drawScribble(gfx, font, "СЕВЕРНЫЙ ВХОД", 0, 0, PaperRender.withAlpha(PaperRender.INK, 0.8f));
-        gfx.fill(-10, 10, 0, 11, PaperRender.INK);
-        gfx.fill(-10, 10, -9, 15, PaperRender.INK);
-        gfx.fill(-12, 12, -10, 13, PaperRender.INK);
-        gfx.pose().popPose();
+        drawLegend(gfx, font, cx - 70, previewCy + previewRadius + 28);
 
-        gfx.pose().pushPose();
-        gfx.pose().translate(cx - previewRadius - 60, previewCy + 20, 0);
-        gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(4f));
-        PaperRender.drawScribble(gfx, font, "Центральный", 0, 0, PaperRender.withAlpha(PaperRender.INK_FADED, 0.7f));
-        PaperRender.drawScribble(gfx, font, "Глейд", 0, 10, PaperRender.withAlpha(PaperRender.INK_FADED, 0.7f));
-        gfx.pose().popPose();
-
-        int scaleBarY = previewCy + previewRadius + 30;
-        gfx.fill(cx - 40, scaleBarY, cx + 40, scaleBarY + 2, PaperRender.INK);
-        for (int i = -40; i <= 40; i += 10) {
-            int tickH = (i % 20 == 0) ? 4 : 2;
-            gfx.fill(cx + i, scaleBarY - tickH, cx + i + 1, scaleBarY + 2 + tickH, PaperRender.INK);
-        }
-        gfx.drawString(font, "0", cx - 4, scaleBarY + 5, PaperRender.INK_FADED, false);
-        gfx.drawString(font, "100 бл.", cx + 25, scaleBarY + 5, PaperRender.INK_FADED, false);
-
-        // ЛЕВАЯ КОЛОНКА
         int leftColX = paperX + 50;
+        int rightColX = paperX + paperW - 210;
         int paramY = paperY + 65;
 
         drawAdjuster(gfx, font, leftColX, paramY, "РАДИУС ПОЛЯНЫ", gladeRadius, 50, 120, 10, mouseX, mouseY);
-        drawAdjuster(gfx, font, leftColX, paramY + 70, "ШИРИНА ЛАБИРИНТА", mainMazeWidth, 60, 150, 10, mouseX, mouseY);
-        drawLegend(gfx, font, leftColX, paramY + 120);
+        drawAdjuster(gfx, font, leftColX, paramY + 50, "ШИРИНА ЛАБИРИНТА", mainMazeWidth, 60, 150, 10, mouseX, mouseY);
+        drawAdjuster(gfx, font, leftColX, paramY + 100, "ШИРИНА СЕКТОРОВ", sectorWidth, 48, 120, 12, mouseX, mouseY);
 
-        // ПРАВАЯ КОЛОНКА
-        int rightColX = paperX + paperW - 210;
+        drawCycleOption(gfx, font, rightColX, paramY, "ФОРМАТ ВЫЖИВАНИЯ", getGameModeName(), mouseX, mouseY);
+        drawCycleOption(gfx, font, rightColX, paramY + 50, "СЛОЖНОСТЬ", getDifficultyName(), mouseX, mouseY);
+        drawCycleOption(gfx, font, rightColX, paramY + 100, "ДОПУСК КОМАНД", allowCheats ? "РАЗРЕШЕНО" : "ЗАПРЕЩЕНО", mouseX, mouseY);
 
-        drawAdjuster(gfx, font, rightColX, paramY, "ШИРИНА СЕКТОРОВ", sectorWidth, 48, 120, 12, mouseX, mouseY);
-        drawAdjuster(gfx, font, rightColX, paramY + 70, "ВЫСОТА СТЕН", mazeHeight, 30, 80, 5, mouseX, mouseY);
-
-        // ★ НАСТРОЙКИ МИРА ★
-        int optY = paramY + 120;
-        drawCycleOption(gfx, font, rightColX, optY, "ФОРМАТ ВЫЖИВАНИЯ", getGameModeName(), mouseX, mouseY);
-        drawCycleOption(gfx, font, rightColX, optY + 45, "КАТЕГОРИЯ УГРОЗЫ", getDifficultyName(), mouseX, mouseY);
-        drawCycleOption(gfx, font, rightColX, optY + 90, "ДОПУСК КОМАНД", allowCheats ? "РАЗРЕШЕНО" : "ЗАПРЕЩЕНО", mouseX, mouseY);
-
-        // НИЖНЯЯ ЧАСТЬ (Имя мира)
         int btnY = paperY + paperH - 45;
-        nameBoxX = cx - 120;
-        nameBoxY = btnY - 45;
-        nameBoxW = 240;
+        nameBoxW = Math.max(120, Math.min(240, paperW - 2 * (40 + 130 + 15)));
         nameBoxH = 22;
+        nameBoxX = cx - nameBoxW / 2;
+        nameBoxY = btnY + 3;
 
-        gfx.drawString(font, "КОДОВОЕ НАЗВАНИЕ ОБЪЕКТА:", nameBoxX, nameBoxY - 12, PaperRender.INK_FADED, false);
+        String nameLabel = "НАЗВАНИЕ ОБЪЕКТА:";
+        gfx.drawString(font, nameLabel, cx - font.width(nameLabel) / 2, nameBoxY - 12, PaperRender.INK_FADED, false);
 
         int borderColor = isNameFocused ? PaperRender.INK_RED : PaperRender.INK_SOFT;
         gfx.fill(nameBoxX, nameBoxY, nameBoxX + nameBoxW, nameBoxY + nameBoxH, PaperRender.PAPER_BASE);
@@ -233,22 +178,6 @@ public class LabyrinthCreateWorldScreen extends Screen {
             int cursorX = nameBoxX + 6 + font.width(worldName) + 2;
             gfx.fill(cursorX, nameBoxY + 4, cursorX + 1, nameBoxY + 18, PaperRender.INK_RED);
         }
-
-        int signY = paperY + paperH - 25;
-        gfx.fill(paperX + 40, signY, paperX + 180, signY + 1, PaperRender.INK_SOFT);
-        gfx.drawString(font, "ГЛАВНЫЙ АРХИТЕКТОР", paperX + 40, signY + 3, PaperRender.INK_FADED, false);
-
-        gfx.pose().pushPose();
-        gfx.pose().translate(paperX + 200, signY - 10, 0);
-        gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-5f));
-        PaperRender.drawRoundStamp(gfx, font, 0, 0, 20, "ОЗНАКОМЛЕН", "", PaperRender.withAlpha(PaperRender.INK_SOFT, 0.4f));
-        gfx.pose().popPose();
-
-        gfx.pose().pushPose();
-        gfx.pose().translate(paperX + paperW - 70, paperY + paperH - 80, 0);
-        gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(15f));
-        PaperRender.drawRoundStamp(gfx, font, 0, 0, 28, "УТВЕРЖДЕНО", "", PaperRender.withAlpha(PaperRender.INK_RED, 0.5f));
-        gfx.pose().popPose();
 
         super.render(gfx, mouseX, mouseY, partialTick);
     }
@@ -499,12 +428,11 @@ public class LabyrinthCreateWorldScreen extends Screen {
             if (dist > SECTORS_END && dist <= OUTER_WALL_END) pThickWalls.add(h);
         }
 
-        int[][] gladePassages = {{0, -GLADE_WALL_END / 2}, {0, GLADE_WALL_END / 2}, {-GLADE_WALL_END / 2, 0}, {GLADE_WALL_END / 2, 0}};
+        int[][] gladePassages = {{0, -(gR + 5), 0, 1}, {0, gR + 5, 0, -1}, {-(gR + 5), 0, 1, 0}, {gR + 5, 0, -1, 0}};
         for (int[] p : gladePassages) {
-            boolean isVert = (p[0] == 0);
-            for (int step = -10; step <= 10; step++) for (int w = -3; w <= 3; w++) {
-                int wx = isVert ? p[0] + step : p[0] + w;
-                int wz = isVert ? p[1] + w : p[1] + step;
+            for (int step = -10; step <= 25; step++) for (int w = -7; w <= 7; w++) {
+                int wx = (p[2] != 0) ? p[0] + p[2] * step : p[0] + w;
+                int wz = (p[3] != 0) ? p[1] + p[3] * step : p[1] + w;
                 pPassages.add(hash(wx, wz));
             }
         }
@@ -557,13 +485,17 @@ public class LabyrinthCreateWorldScreen extends Screen {
 
                 long h = hash(wx, wz);
                 int dist = Math.max(Math.abs(wx), Math.abs(wz));
+                boolean inRingWall = (dist > gR && dist <= GLADE_WALL_END) || (dist > MAIN_MAZE_END && dist <= SEPARATOR_WALL_END);
 
-                if (pPassages.contains(h)) pixelMap[px][py] = 4;
-                else if (dist <= gR) pixelMap[px][py] = 5;
-                else if (pMazeCorridors.contains(h) || pSectorCorridors.contains(h)) pixelMap[px][py] = 3;
-                else if (pMazeWalls.contains(h) || pSectorWalls.contains(h)) pixelMap[px][py] = 2;
-                else if (pThickWalls.contains(h)) pixelMap[px][py] = 1;
-                else pixelMap[px][py] = 0;
+                byte v;
+                if (inRingWall && pPassages.contains(h)) v = 4;
+                else if (dist <= gR) v = 5;
+                else if (pMazeCorridors.contains(h) || pSectorCorridors.contains(h)) v = 3;
+                else if (pMazeWalls.contains(h) || pSectorWalls.contains(h)) v = 2;
+                else if (pThickWalls.contains(h)) v = 1;
+                else v = 0;
+
+                if (pixelMap[px][py] != 4) pixelMap[px][py] = v;
             }
         }
     }
@@ -601,7 +533,7 @@ public class LabyrinthCreateWorldScreen extends Screen {
         gfx.fill(x + 5, y + 28, x + 15, y + 30, PaperRender.INK_FADED);
         gfx.drawString(font, "- Стена лабиринта", x + 20, y + 26, PaperRender.INK_SOFT, false);
         gfx.fill(x + 5, y + 40, x + 15, y + 42, PaperRender.INK_RED);
-        gfx.drawString(font, "- Архитектурный шлюз", x + 20, y + 38, PaperRender.INK_SOFT, false);
+        gfx.drawString(font, "- Проход", x + 20, y + 38, PaperRender.INK_SOFT, false);
     }
 
     private void drawCompassRose(GuiGraphics gfx, int cx, int cy, int radius) {
@@ -619,24 +551,6 @@ public class LabyrinthCreateWorldScreen extends Screen {
         gfx.fill(cx, cy + radius - 2, cx + 1, cy + radius + len, faded);
         gfx.fill(cx - radius - len, cy, cx - radius + 2, cy + 1, faded);
         gfx.fill(cx + radius - 2, cy, cx + radius + len, cy + 1, faded);
-    }
-
-    private void drawCoffeeRing(GuiGraphics gfx, int cx, int cy, int radius) {
-        int color = PaperRender.withAlpha(0x5C4033, 0.1f);
-        for (int angle = 0; angle < 360; angle += 3) {
-            double rad = Math.toRadians(angle);
-            int px = (int) (cx + radius * Math.cos(rad));
-            int py = (int) (cy + radius * Math.sin(rad));
-            gfx.fill(px, py, px + 1, py + 1, color);
-            if (angle % 6 == 0) gfx.fill(px + 1, py, px + 2, py + 1, color);
-        }
-    }
-
-    private void drawInkBlot(GuiGraphics gfx, int x, int y, int size) {
-        int color = PaperRender.withAlpha(PaperRender.INK, 0.15f);
-        gfx.fill(x, y, x + size, y + size, color);
-        gfx.fill(x - 1, y + 1, x + size + 1, y + size - 1, color);
-        gfx.fill(x + 1, y - 1, x + size - 1, y + size + 1, color);
     }
 
     private void drawAdjuster(GuiGraphics gfx, Font font, int x, int y, String label, int value, int min, int max, int step, int mouseX, int mouseY) {
@@ -688,15 +602,13 @@ public class LabyrinthCreateWorldScreen extends Screen {
 
         // ★ ОПТИМИЗАЦИЯ: Передаём текущее значение напрямую, чтобы не пересчитывать координаты ★
         handleAdjusterClick(mouseX, mouseY, leftColX, paramY, 50, 120, 10, gladeRadius, v -> { gladeRadius = v; triggerDelayedRebuild(); });
-        handleAdjusterClick(mouseX, mouseY, leftColX, paramY + 70, 60, 150, 10, mainMazeWidth, v -> { mainMazeWidth = v; triggerDelayedRebuild(); });
-        handleAdjusterClick(mouseX, mouseY, rightColX, paramY, 48, 120, 12, sectorWidth, v -> { sectorWidth = v; triggerDelayedRebuild(); });
-        handleAdjusterClick(mouseX, mouseY, rightColX, paramY + 70, 30, 80, 5, mazeHeight, v -> { mazeHeight = v; triggerDelayedRebuild(); });
+        handleAdjusterClick(mouseX, mouseY, leftColX, paramY + 50, 60, 150, 10, mainMazeWidth, v -> { mainMazeWidth = v; triggerDelayedRebuild(); });
+        handleAdjusterClick(mouseX, mouseY, leftColX, paramY + 100, 48, 120, 12, sectorWidth, v -> { sectorWidth = v; triggerDelayedRebuild(); });
 
         // Клик по настройкам мира
-        int optY = paramY + 120;
-        if (handleCycleClick(mouseX, mouseY, rightColX, optY)) { cycleGameMode(); return true; }
-        if (handleCycleClick(mouseX, mouseY, rightColX, optY + 45)) { cycleDifficulty(); return true; }
-        if (handleCycleClick(mouseX, mouseY, rightColX, optY + 90)) { allowCheats = !allowCheats; return true; }
+        if (handleCycleClick(mouseX, mouseY, rightColX, paramY)) { cycleGameMode(); return true; }
+        if (handleCycleClick(mouseX, mouseY, rightColX, paramY + 50)) { cycleDifficulty(); return true; }
+        if (handleCycleClick(mouseX, mouseY, rightColX, paramY + 100)) { allowCheats = !allowCheats; return true; }
 
         return super.mouseClicked(mouseX, mouseY, button);
     }
@@ -809,7 +721,6 @@ public class LabyrinthCreateWorldScreen extends Screen {
             cfg.gleydRadius = this.gladeRadius;
             cfg.mainMazeWidth = this.mainMazeWidth / 10;
             cfg.sectorWidth = this.sectorWidth / 12;
-            cfg.mainMazeHeight = this.mazeHeight;
             cfg.save();
 
             net.minecraft.world.level.WorldDataConfiguration dataConfig = net.minecraft.world.level.WorldDataConfiguration.DEFAULT;

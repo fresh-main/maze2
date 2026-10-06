@@ -139,11 +139,6 @@ public class PatrolManager extends SavedData {
         mapCache = null;
     }
 
-    /**
-     * Возвращает кэшированную карту или строит новую (heavy: до миллионов getBlockState).
-     * Кэш сбрасывается только при смене bounds — рельеф внутри границ обычно не
-     * меняется во время игры, и редкие изменения переживём 1 рестартом сервера.
-     */
     public MapCache getOrBuildMapCache(Level level) {
         if (boundsMin == null || boundsMax == null) return null;
         if (mapCache != null
@@ -164,6 +159,7 @@ public class PatrolManager extends SavedData {
         int mh = (maxZ - minZ + 1 + stepZ - 1) / stepZ;
 
         byte[] data = new byte[mw * mh];
+        boolean anyWalkable = false;
         for (int i = 0; i < mw; i++) {
             for (int j = 0; j < mh; j++) {
                 int x = minX + i * stepX;
@@ -178,11 +174,14 @@ public class PatrolManager extends SavedData {
                     walkable = true; break;
                 }
                 data[i * mh + j] = (byte) (walkable ? 1 : 0);
+                if (walkable) anyWalkable = true;
             }
         }
 
+        if (!anyWalkable) return null;
+
         mapCache = new MapCache(mw, mh, fy, data, boundsMin, boundsMax);
-        setDirty(); // персистим — после рестарта сервера первый заход в админку без лага
+        setDirty();
         return mapCache;
     }
 
@@ -1363,11 +1362,14 @@ public class PatrolManager extends SavedData {
             m.griverVisitHistory.put(id, hist);
         }
 
-        // Восстанавливаем кэш карты — уберёт лаг при первом открытии админки.
         if (tag.contains("mapCache")) {
             CompoundTag mc = tag.getCompound("mapCache");
             byte[] data = mc.getByteArray("data");
-            if (data.length > 0) {
+            boolean anyWalkable = false;
+            for (byte b : data) {
+                if (b != 0) { anyWalkable = true; break; }
+            }
+            if (anyWalkable) {
                 BlockPos bMin = new BlockPos(mc.getInt("bMinX"), mc.getInt("bMinY"), mc.getInt("bMinZ"));
                 BlockPos bMax = new BlockPos(mc.getInt("bMaxX"), mc.getInt("bMaxY"), mc.getInt("bMaxZ"));
                 m.mapCache = new MapCache(mc.getInt("w"), mc.getInt("h"), mc.getInt("fy"), data, bMin, bMax);
