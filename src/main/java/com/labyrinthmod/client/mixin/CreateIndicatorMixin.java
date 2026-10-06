@@ -3,6 +3,7 @@ package com.labyrinthmod.client.mixin;
 import com.otbor.client.widgets.PaperRender;
 import com.simibubi.create.content.equipment.toolbox.ToolboxScreen;
 import com.simibubi.create.content.schematics.cannon.SchematicannonScreen;
+import com.simibubi.create.content.schematics.table.SchematicTableScreen;
 import com.simibubi.create.foundation.gui.widget.Indicator;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -20,7 +21,8 @@ public abstract class CreateIndicatorMixin {
     private void otbor$paperIndicator(GuiGraphics gfx, int mouseX, int mouseY,
                                       float partialTick, CallbackInfo ci) {
         var screen = Minecraft.getInstance().screen;
-        if (!(screen instanceof SchematicannonScreen) && !(screen instanceof ToolboxScreen)) return;
+        if (!(screen instanceof SchematicannonScreen) && !(screen instanceof SchematicTableScreen)
+                && !(screen instanceof ToolboxScreen)) return;
         Indicator indicator = (Indicator) (Object) this;
         if (!indicator.visible) return;
         int x = indicator.getX();

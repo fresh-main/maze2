@@ -44,7 +44,7 @@ public final class C2SRequestMapPacket {
                 int cellZ = (int) key;
                 PlayerMapData.Fragment frag = e.getValue();
                 MazeMapNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> sender),
-                        new S2CFragmentSyncPacket(cellX, cellZ, frag.pixels, frag.walkable));
+                        new S2CFragmentSyncPacket(cellX, cellZ, frag.pixels, frag.walkable, frag.heights));
             }
         });
         ctx.setPacketHandled(true);

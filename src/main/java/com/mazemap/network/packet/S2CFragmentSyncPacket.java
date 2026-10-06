@@ -13,12 +13,14 @@ public class S2CFragmentSyncPacket {
     public final int cellZ;
     public final byte[] pixels;
     public final byte[] walkable;
+    public final byte[] heights;
 
-    public S2CFragmentSyncPacket(int cellX, int cellZ, byte[] pixels, byte[] walkable) {
+    public S2CFragmentSyncPacket(int cellX, int cellZ, byte[] pixels, byte[] walkable, byte[] heights) {
         this.cellX = cellX;
         this.cellZ = cellZ;
         this.pixels = pixels;
         this.walkable = walkable;
+        this.heights = heights;
     }
 
     public static void encode(S2CFragmentSyncPacket p, FriendlyByteBuf buf) {
@@ -26,6 +28,7 @@ public class S2CFragmentSyncPacket {
         buf.writeInt(p.cellZ);
         buf.writeByteArray(p.pixels);
         buf.writeByteArray(p.walkable);
+        buf.writeByteArray(p.heights);
     }
 
     public static S2CFragmentSyncPacket decode(FriendlyByteBuf buf) {
@@ -33,7 +36,8 @@ public class S2CFragmentSyncPacket {
                 buf.readInt(),
                 buf.readInt(),
                 buf.readByteArray(), // ИСПРАВЛЕНО: Убрали лимиты
-                buf.readByteArray()  // ИСПРАВЛЕНО: Убрали лимиты
+                buf.readByteArray(), // ИСПРАВЛЕНО: Убрали лимиты
+                buf.readByteArray()
         );
     }
 

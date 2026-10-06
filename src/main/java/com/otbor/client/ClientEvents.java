@@ -269,6 +269,7 @@ public class ClientEvents {
     public static void onRecipeBookButtonInit(ScreenEvent.Init.Post event) {
         Screen screen = event.getScreen();
         if (!(screen instanceof net.minecraft.client.gui.screens.inventory.CraftingScreen)
+                && !(screen instanceof net.minecraft.client.gui.screens.inventory.AbstractFurnaceScreen)
                 && !(screen instanceof vectorwing.farmersdelight.client.gui.CookingPotScreen)) return;
         for (GuiEventListener child : new ArrayList<>(screen.children())) {
             if (child instanceof net.minecraft.client.gui.components.ImageButton original) {
@@ -330,7 +331,8 @@ public class ClientEvents {
         invokeBackpackOverlay("drawRightSidePaperCover", event.getGuiGraphics(), screen);
         invokeBackpackOverlay("drawLockedCover", event.getGuiGraphics(), screen);
         if (screen instanceof net.p3pp3rf1y.sophisticatedcore.client.gui.StorageScreenBase) {
-            renderBackpackTabs(event.getGuiGraphics());
+            // Repaint the paper tabs after their vanilla texture and restore their icons.
+            invokeBackpackOverlay("drawPaperTabs", event.getGuiGraphics(), screen);
         }
     }
     private static final java.util.List<int[]> backpackTabData = new java.util.ArrayList<>();

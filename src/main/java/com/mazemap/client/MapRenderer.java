@@ -52,8 +52,7 @@ public final class MapRenderer {
                 long key = ((long) cx << 32) | (cz & 0xFFFFFFFFL);
                 PlayerMapData.Fragment frag = fragments.get(key);
                 if (frag == null) continue;
-                byte[] pixels = frag.pixels;
-                drawFragment(gfx, pixels, cx, cz, x, y, w, h, worldLeft, worldTop, pxPerBlock);
+                drawFragment(gfx, frag.pixels, frag.heights, cx, cz, x, y, w, h, worldLeft, worldTop, pxPerBlock);
             }
         }
 
@@ -118,7 +117,7 @@ public final class MapRenderer {
         gfx.pose().popPose();
     }
 
-    private static void drawFragment(GuiGraphics gfx, byte[] pixels, int cellX, int cellZ,
+    private static void drawFragment(GuiGraphics gfx, byte[] pixels, byte[] heights, int cellX, int cellZ,
                                      int x, int y, int w, int h,
                                      double worldLeft, double worldTop, double pxPerBlock) {
         int fragSize = PlayerMapData.FRAGMENT_SIZE;
@@ -132,7 +131,7 @@ public final class MapRenderer {
         double baseScreenX = (fragOriginX - worldLeft) * pxPerBlock + x;
         double baseScreenY = (fragOriginZ - worldTop) * pxPerBlock + y;
 
-        ResourceLocation tex = FragmentTextureCache.getOrCreate(key, pixels);
+        ResourceLocation tex = FragmentTextureCache.getOrCreate(key, pixels, heights);
         gfx.pose().pushPose();
         gfx.pose().translate((float) baseScreenX, (float) baseScreenY, 0f);
         gfx.pose().scale((float) pixelOnScreen, (float) pixelOnScreen, 1f);

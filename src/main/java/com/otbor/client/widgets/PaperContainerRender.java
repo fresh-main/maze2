@@ -69,6 +69,7 @@ public final class PaperContainerRender {
         Layout layout = Layout.detect(screen);
         boolean preserveModContent = isExternalModScreen(screen);
         boolean customModHeader = screen instanceof com.simibubi.create.content.schematics.cannon.SchematicannonScreen
+                || screen instanceof com.simibubi.create.content.schematics.table.SchematicTableScreen
                 || screen instanceof com.simibubi.create.content.equipment.toolbox.ToolboxScreen
                 || screen instanceof vectorwing.farmersdelight.client.gui.CookingPotScreen;
 
@@ -100,7 +101,9 @@ public final class PaperContainerRender {
         // === 4. Заголовок (typewriter) ===
         float headerProg = phase(t, 0.24f, 0.56f);
         if (headerProg > 0f && !layout.header.isEmpty() && (!preserveModContent || customModHeader)) {
-            int headerY = topPos + 6;
+            int headerY = screen instanceof com.simibubi.create.content.schematics.cannon.SchematicannonScreen
+                    || screen instanceof com.simibubi.create.content.schematics.table.SchematicTableScreen
+                    ? topPos - 10 : topPos + 6;
             String header = layout.header;
             int hw = font.width(header);
             int hx = leftPos + imageWidth / 2 - hw / 2;
@@ -141,8 +144,20 @@ public final class PaperContainerRender {
                     PaperRender.withAlpha(PaperRender.INK_RED, 0.5f * sp));
         }
 
-        // === 6. Скетч-рамки слотов, волна сверху-слева вниз-вправо ===
-        if (!preserveModContent) {
+        // === 6. Рамки слотов ===
+        // Контент модов рисуется их renderBg, поэтому рамки для этих экранов
+        // должны иметь прозрачный центр: так остаются видны встроенные иконки.
+        if (screen instanceof net.mehvahdjukaar.supplementaries.client.screens.VariableSizeContainerScreen) {
+            // Supplementaries draws its slot texture before AbstractContainerScreen.
+            // Reuse the established paper slot style here, after the paper sheet and before items.
+            renderSlotSketches(gfx, screen.getMenu(), leftPos, topPos, imageWidth, imageHeight, t);
+        } else if (preserveModContent) {
+            renderModSlotFrames(gfx, screen.getMenu(), leftPos, topPos,
+                    imageWidth, imageHeight,
+                    screen instanceof com.simibubi.create.content.schematics.cannon.SchematicannonScreen
+                            || screen instanceof com.simibubi.create.content.schematics.table.SchematicTableScreen
+                            || screen instanceof com.simibubi.create.content.equipment.toolbox.ToolboxScreen);
+        } else {
             renderSlotSketches(gfx, screen.getMenu(), leftPos, topPos, imageWidth, imageHeight, t);
         }
 
@@ -345,6 +360,31 @@ public final class PaperContainerRender {
         }
     }
 
+    /** Бумажная рамка без заливки, чтобы не закрывать встроенную графику модов. */
+    private static void renderModSlotFrames(GuiGraphics gfx, AbstractContainerMenu menu,
+                                            int leftPos, int topPos,
+                                            int imageWidth, int imageHeight,
+                                            boolean hotbarOnlyPlayerInventory) {
+        for (Slot slot : menu.slots) {
+            if (hotbarOnlyPlayerInventory && slot.container instanceof net.minecraft.world.entity.player.Inventory
+                    && slot.getContainerSlot() >= 9) {
+                continue;
+            }
+            if (!slot.isActive() || slot.x < 0 || slot.y < 0
+                    || slot.x > imageWidth + 200 || slot.y > imageHeight + 200) {
+                continue;
+            }
+
+            int x = leftPos + slot.x;
+            int y = topPos + slot.y;
+            gfx.fill(x - 1, y - 1, x + 17, y, PaperRender.INK);
+            gfx.fill(x - 1, y + 16, x + 17, y + 17, PaperRender.INK);
+            gfx.fill(x - 1, y, x, y + 16, PaperRender.INK);
+            gfx.fill(x + 16, y, x + 17, y + 16, PaperRender.INK);
+            gfx.fill(x, y, x + 16, y + 1, 0x50FFFFFF);
+        }
+    }
+
     /**
      * Рамка-«скетч» вокруг 16×16 слота. Перо обводит по периметру за 4 хода:
      * top → right → bottom → left, с лёгкими утолщениями в углах.
@@ -510,6 +550,7 @@ public final class PaperContainerRender {
                 case "CartographyTableScreen" -> cartographyLayout();
                 case "SmithingScreen" -> smithingLayout();
                 case "SchematicannonScreen" -> schematicannonLayout();
+                case "SchematicTableScreen" -> schematicTableLayout();
                 case "ToolboxScreen" -> toolboxLayout();
                 case "ShulkerBoxScreen", "ChestScreen", "DispenserScreen", "HopperScreen" ->
                         storageLayout(title);
@@ -703,6 +744,13 @@ public final class PaperContainerRender {
             Layout layout = new Layout();
             layout.header = "СТРОИТЕЛЬНАЯ ПУШКА";
             layout.kicker = "ЧЕРТЁЖ · ПЕЧАТЬ";
+            return layout;
+        }
+
+        private static Layout schematicTableLayout() {
+            Layout layout = new Layout();
+            layout.header = "СХЕМАТИЧНЫЙ СТОЛ";
+            layout.kicker = "ЧЕРТЁЖ · ПОДГОТОВКА";
             return layout;
         }
 

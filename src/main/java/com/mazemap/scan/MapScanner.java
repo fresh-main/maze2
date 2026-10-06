@@ -1,5 +1,6 @@
 package com.mazemap.scan;
 
+import com.simibubi.create.content.contraptions.AbstractContraptionEntity;
 import com.mazemap.item.PersonalMapItem;
 import com.mazemap.network.MazeMapNetwork;
 import com.mazemap.network.packet.S2CFragmentSyncPacket;
@@ -8,20 +9,31 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.material.MapColor;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.network.PacketDistributor;
 
 import java.util.HashSet;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 
 public final class MapScanner {
-    public static final int SCAN_RADIUS = 12;
-    public static final int SCAN_INTERVAL_TICKS = 4;
+    /** Захватывает крупную крону целиком, даже если игрок стоит около ствола. */
+    public static final int SCAN_RADIUS = 32;
+    /** Большой визуальный радиус сканируется раз в секунду, чтобы не нагружать сервер. */
+    public static final int SCAN_INTERVAL_TICKS = 20;
     public static final int MAX_SCAN_Y = 300;
     private MapScanner() {}
+
+    private record MovingSurface(int y, BlockState state) {}
 
     // ==========================================
     // ПРОВЕРКИ БЛОКОВ
@@ -33,17 +45,58 @@ public final class MapScanner {
      */
     private static boolean isRenderableBlock(BlockState state, ServerLevel level, BlockPos pos) {
         if (state.isAir()) return false;
+        if (state.getFluidState().is(FluidTags.WATER)) return true;
+        if (isTreeFoliage(state)) return true;
+        // Механизмы Create часто имеют MapColor.NONE и неполную форму коллизии,
+        // поэтому обычная проверка полной грани скрывала их с карты.
+        if (isCreateBlock(state)) return !state.getShape(level, pos).isEmpty();
         if (state.is(BlockTags.REPLACEABLE) ||
                 state.is(BlockTags.FLOWERS) || state.is(BlockTags.TALL_FLOWERS) ||
                 state.is(BlockTags.SMALL_FLOWERS) || state.is(BlockTags.SAPLINGS) ||
                 state.is(BlockTags.CROPS)) return false;
 
-        // Листва имеет MapColor.PLANT, но мы хотим её рисовать!
-        if (state.is(BlockTags.LEAVES)) return true;
-
         if (state.getMapColor(level, pos) == MapColor.PLANT || state.getMapColor(level, pos) == MapColor.NONE) return false;
 
         return state.isCollisionShapeFullBlock(level, pos);
+    }
+
+    private static boolean isCreateBlock(BlockState state) {
+        var id = ForgeRegistries.BLOCKS.getKey(state.getBlock());
+        return id != null && "create".equals(id.getNamespace());
+    }
+
+    private static boolean isTreeFoliage(BlockState state) {
+        if (state.is(BlockTags.LEAVES) || state.getBlock() instanceof LeavesBlock) return true;
+        var id = ForgeRegistries.BLOCKS.getKey(state.getBlock());
+        if (id == null) return false;
+        String path = id.getPath();
+        return path.contains("leaves") || path.endsWith("_leaf") || path.startsWith("leaf_");
+    }
+
+    private static byte treePixel(BlockState state) {
+        var id = ForgeRegistries.BLOCKS.getKey(state.getBlock());
+        String path = id == null ? "" : id.getPath();
+        if (path.contains("spruce") || path.contains("pine") || path.contains("fir")
+                || path.contains("cedar") || path.contains("redwood")) {
+            return PlayerMapData.PIXEL_TREE_CONIFER;
+        }
+        if (path.contains("birch") || path.contains("aspen")) {
+            return PlayerMapData.PIXEL_TREE_BIRCH;
+        }
+        return PlayerMapData.PIXEL_TREE;
+    }
+
+    private static boolean isStructureBlock(BlockState state) {
+        var id = ForgeRegistries.BLOCKS.getKey(state.getBlock());
+        if (id == null) return false;
+        String path = id.getPath();
+        return path.contains("brick") || path.contains("cobble") || path.contains("masonry")
+                || path.contains("plank") || path.contains("concrete")
+                || path.contains("terracotta") || path.contains("glass") || path.contains("tile")
+                || path.contains("wall") || path.contains("fence") || path.contains("door")
+                || path.contains("stairs") || path.contains("slab") || path.contains("pillar")
+                || path.contains("beam") || path.contains("metal") || path.contains("iron")
+                || path.contains("copper") || path.contains("foundation");
     }
 
     /**
@@ -76,6 +129,7 @@ public final class MapScanner {
         BlockPos center = player.blockPosition();
         Set<Long> changedFragments = new HashSet<>();
         int playerHeadY = (int) Math.floor(player.getEyeY());
+        Map<Long, MovingSurface> movingSurfaces = collectMovingSurfaces(level, center);
 
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
         int scale = PlayerMapData.FRAGMENT_SIZE / PlayerMapData.FRAGMENT_SIZE_BLOCKS;
@@ -86,7 +140,11 @@ public final class MapScanner {
                 int worldZ = center.getZ() + dz;
 
                 // 1. СЛОЙ ОТРИСОВКИ
-                int startYRender = Math.min(MAX_SCAN_Y, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, worldX, worldZ));
+                // Визуальный слой должен начинаться над кроной. Вариант NO_LEAVES
+                // начинал поиск под листвой, из-за чего дерево распадалось на землю,
+                // ствол и случайные куски кроны.
+                int startYRender = Math.min(MAX_SCAN_Y,
+                        level.getHeight(Heightmap.Types.MOTION_BLOCKING, worldX, worldZ));
                 int surfaceYRender = Integer.MIN_VALUE;
                 for (int y = startYRender; y >= level.getMinBuildHeight(); y--) {
                     cursor.set(worldX, y, worldZ);
@@ -96,12 +154,22 @@ public final class MapScanner {
                     }
                 }
 
+                MovingSurface movingSurface = movingSurfaces.get(columnKey(worldX, worldZ));
+                if (movingSurface != null && movingSurface.y() >= surfaceYRender) {
+                    surfaceYRender = movingSurface.y();
+                }
+
                 byte color = PlayerMapData.PIXEL_UNEXPLORED;
+                byte heightByte = 0;
                 if (surfaceYRender != Integer.MIN_VALUE) {
+                    heightByte = (byte) Math.max(0, Math.min(255, surfaceYRender));
                     cursor.set(worldX, surfaceYRender, worldZ);
-                    BlockState surfaceBlock = level.getBlockState(cursor);
+                    BlockState surfaceBlock = movingSurface != null && movingSurface.y() == surfaceYRender
+                            ? movingSurface.state() : level.getBlockState(cursor);
                     MapColor mapColor = surfaceBlock.getMapColor(level, cursor);
-                    if (mapColor == MapColor.NONE) mapColor = MapColor.STONE;
+                    if (mapColor == MapColor.NONE) {
+                        mapColor = isCreateBlock(surfaceBlock) ? MapColor.METAL : MapColor.STONE;
+                    }
 
                     int baseBrightness = 2;
                     cursor.set(worldX, surfaceYRender + 1, worldZ);
@@ -114,8 +182,18 @@ public final class MapScanner {
 
                     int heightFactor = (surfaceYRender - 64) / 16;
                     int finalBrightness = Math.max(0, Math.min(3, baseBrightness + heightFactor));
-                    int packed = (mapColor.id << 2) | finalBrightness;
-                    color = (byte) (2 + packed);
+                    if (isTreeFoliage(surfaceBlock)) {
+                        color = treePixel(surfaceBlock);
+                    } else if (surfaceBlock.getFluidState().is(FluidTags.WATER)) {
+                        color = PlayerMapData.PIXEL_WATER;
+                    } else if (isCreateBlock(surfaceBlock)) {
+                        color = PlayerMapData.PIXEL_CREATE;
+                    } else if (isStructureBlock(surfaceBlock)) {
+                        color = PlayerMapData.PIXEL_STRUCTURE;
+                    } else {
+                        int packed = (mapColor.id << 2) | finalBrightness;
+                        color = (byte) (2 + packed);
+                    }
                 }
 
                 // 2. СЛОЙ ПРОХОДИМОСТИ
@@ -136,6 +214,7 @@ public final class MapScanner {
                     boolean space2 = !isSolidForPathfinding(level.getBlockState(cursor), level, cursor);
                     isWalkable = space1 && space2;
                 }
+                if (movingSurface != null) isWalkable = false;
 
                 // 3. ЗАПИСЬ В FRAGMENT
                 int cellX = Math.floorDiv(worldX, PlayerMapData.FRAGMENT_SIZE_BLOCKS);
@@ -158,6 +237,10 @@ public final class MapScanner {
                         }
                         if (fragment.walkable[idx] != walkByte) {
                             fragment.walkable[idx] = walkByte;
+                            fragChanged = true;
+                        }
+                        if (fragment.heights[idx] != heightByte) {
+                            fragment.heights[idx] = heightByte;
                             fragChanged = true;
                         }
                     }
@@ -189,9 +272,50 @@ public final class MapScanner {
                 if (frag != null) {
                     MazeMapNetwork.CHANNEL.send(
                             PacketDistributor.PLAYER.with(() -> player),
-                            new S2CFragmentSyncPacket(cellX, cellZ, frag.pixels, frag.walkable));
+                            new S2CFragmentSyncPacket(cellX, cellZ, frag.pixels, frag.walkable, frag.heights));
                 }
             }
         }
+    }
+
+
+    private static Map<Long, MovingSurface> collectMovingSurfaces(ServerLevel level, BlockPos center) {
+        Map<Long, MovingSurface> result = new HashMap<>();
+        double radius = SCAN_RADIUS + 8.0D;
+        AABB search = new AABB(center).inflate(radius, MAX_SCAN_Y, radius);
+        var contraptions = level.getEntitiesOfClass(AbstractContraptionEntity.class, search,
+                entity -> entity.isAlive() && entity.getContraption() != null);
+
+        for (AbstractContraptionEntity entity : contraptions) {
+            for (var entry : entity.getContraption().getBlocks().entrySet()) {
+                BlockState state = entry.getValue().state();
+                if (state.isAir() || state.getShape(level, BlockPos.ZERO).isEmpty()) continue;
+
+                Vec3 worldCenter = entity.toGlobalVector(Vec3.atCenterOf(entry.getKey()), 1.0F);
+                int minX = (int) Math.floor(worldCenter.x - 0.499D);
+                int maxX = (int) Math.floor(worldCenter.x + 0.499D);
+                int minY = (int) Math.floor(worldCenter.y - 0.499D);
+                int maxY = (int) Math.floor(worldCenter.y + 0.499D);
+                int minZ = (int) Math.floor(worldCenter.z - 0.499D);
+                int maxZ = (int) Math.floor(worldCenter.z + 0.499D);
+
+                for (int x = minX; x <= maxX; x++) {
+                    if (Math.abs(x - center.getX()) > SCAN_RADIUS) continue;
+                    for (int z = minZ; z <= maxZ; z++) {
+                        if (Math.abs(z - center.getZ()) > SCAN_RADIUS) continue;
+                        long key = columnKey(x, z);
+                        MovingSurface previous = result.get(key);
+                        if (previous == null || maxY > previous.y()) {
+                            result.put(key, new MovingSurface(Math.max(minY, maxY), state));
+                        }
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    private static long columnKey(int x, int z) {
+        return ((long) x << 32) ^ (z & 0xFFFFFFFFL);
     }
 }

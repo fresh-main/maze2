@@ -49,6 +49,7 @@ public class C2STransferFragmentsPacket {
                 for (int i = 0; i < src.pixels.length; i++) {
                     if (src.pixels[i] != 0 && dst.pixels[i] == 0) {
                         dst.pixels[i] = src.pixels[i];
+                        dst.heights[i] = src.heights[i];
                         changed = true;
                     }
                 }
@@ -65,7 +66,7 @@ public class C2STransferFragmentsPacket {
                     dstData.markDirty();
                     MazeMapNetwork.CHANNEL.send(
                             PacketDistributor.PLAYER.with(() -> recipient),
-                            new S2CFragmentSyncPacket(cellX, cellZ, dst.pixels, dst.walkable));
+                            new S2CFragmentSyncPacket(cellX, cellZ, dst.pixels, dst.walkable, dst.heights));
                 }
             }
 

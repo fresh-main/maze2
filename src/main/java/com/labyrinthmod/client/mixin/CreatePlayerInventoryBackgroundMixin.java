@@ -2,6 +2,7 @@ package com.labyrinthmod.client.mixin;
 
 import com.simibubi.create.content.equipment.toolbox.ToolboxScreen;
 import com.simibubi.create.content.schematics.cannon.SchematicannonScreen;
+import com.simibubi.create.content.schematics.table.SchematicTableScreen;
 import com.simibubi.create.foundation.gui.menu.AbstractSimiContainerScreen;
 import net.minecraft.client.gui.GuiGraphics;
 import org.spongepowered.asm.mixin.Mixin;
@@ -13,7 +14,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class CreatePlayerInventoryBackgroundMixin {
     @Inject(method = "renderPlayerInventory", at = @At("HEAD"), cancellable = true)
     private void otbor$hotbarOnly(GuiGraphics gfx, int x, int y, CallbackInfo ci) {
-        if ((Object) this instanceof ToolboxScreen || (Object) this instanceof SchematicannonScreen) {
+        if ((Object) this instanceof ToolboxScreen || (Object) this instanceof SchematicannonScreen
+                || (Object) this instanceof SchematicTableScreen) {
             ci.cancel();
         }
     }
