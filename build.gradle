@@ -147,7 +147,10 @@ dependencies {
     implementation fg.deobf("local:moonlight-1.20:2.16.35-forge")
     implementation fg.deobf("local:supplementaries-1.20:3.1.43-forge")
     implementation fg.deobf("curse.maven:scorched-guns-802940:7232063")
-    implementation fg.deobf("curse.maven:vista-1368607:8001242")
+    // Vista 3.1.3 ships without a refmap. Its BlockStateBase mixin therefore keeps
+    // an SRG method name and crashes only in ForgeGradle's named runClient environment.
+    // This local jar changes that single mixin target to hasBlockEntity()Z.
+    implementation fg.deobf("local:vista-1.20:3.1.3-forge-devfix3")
     implementation fg.deobf("curse.maven:framework-549225:7573740")
     implementation fg.deobf("org.embeddedt:embeddium-1.20.1:0.3.31-beta.53+mc1.20.1")
     implementation fg.deobf("curse.maven:oculus-581495:6020952")
