@@ -24,6 +24,9 @@ import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.*;
@@ -116,6 +119,7 @@ public class GriverEntity extends Animal implements GeoEntity {
     // Звуковые таймеры
     private int walkSoundCooldown = 0;
     private int runSoundCooldown = 0;
+    private int alertSoundCooldown = 0;
     private static final int WALK_SOUND_DELAY = 25;  // Медленные шаги (каждые 25 тиков = 1.25 секунды)
     private static final int RUN_SOUND_DELAY = 20;    // Звук бега длится 1 секунду (20 тиков) — кладём кулдаун ровно по длине, чтобы не было перекрытий
 
@@ -1324,6 +1328,7 @@ public class GriverEntity extends Animal implements GeoEntity {
             if (runSoundCooldown > 0) runSoundCooldown--;
             if (backwardSoundCooldown > 0) backwardSoundCooldown--;
             if (ridingSoundCooldown > 0) ridingSoundCooldown--;
+            if (alertSoundCooldown > 0) alertSoundCooldown--;
         }
 
         // ========== ОБНОВЛЕНИЕ ТАЙМЕРА АТАКИ ==========
@@ -2177,6 +2182,7 @@ public class GriverEntity extends Animal implements GeoEntity {
             pathUpdateCooldown = 0;
             lostTargetTimer = 0;
             setTarget(target);
+            playDetectionSound();
 
             ModLogger.patrol("attack-start", "griver=" + getUUID().toString().substring(0, 8)
                     + " target=" + (target != null ? target.getName().getString() : "null"));
@@ -2883,6 +2889,47 @@ public class GriverEntity extends Animal implements GeoEntity {
                 net.minecraft.sounds.SoundSource.HOSTILE,
                 1.8F,  // Громкий звук атаки. Дальность задана в ModSounds (24 блока)
                 0.8F + (this.random.nextFloat() * 0.4F));
+    }
+
+    private void playDetectionSound() {
+        if (this.level().isClientSide || alertSoundCooldown > 0) return;
+        this.level().playSound(null, this.blockPosition(), SoundEvents.RAVAGER_ROAR,
+                SoundSource.HOSTILE, 1.35F, 0.55F + this.random.nextFloat() * 0.12F);
+        // Тихий металлический слой делает рёв менее похожим на обычного моба.
+        this.level().playSound(null, this.blockPosition(), SoundEvents.IRON_GOLEM_DAMAGE,
+                SoundSource.HOSTILE, 0.65F, 0.55F + this.random.nextFloat() * 0.10F);
+        alertSoundCooldown = 140;
+    }
+
+    @Nullable
+    @Override
+    protected SoundEvent getAmbientSound() {
+        return this.getTarget() != null ? SoundEvents.WARDEN_ANGRY : SoundEvents.WARDEN_AMBIENT;
+    }
+
+    @Override
+    public int getAmbientSoundInterval() {
+        return 110;
+    }
+
+    @Override
+    protected SoundEvent getHurtSound(DamageSource source) {
+        return SoundEvents.RAVAGER_HURT;
+    }
+
+    @Override
+    protected SoundEvent getDeathSound() {
+        return SoundEvents.RAVAGER_DEATH;
+    }
+
+    @Override
+    protected float getSoundVolume() {
+        return 1.2F;
+    }
+
+    @Override
+    public float getVoicePitch() {
+        return 0.62F + this.random.nextFloat() * 0.12F;
     }
     // GeckoLib stubs — выбор run/walk/walk-back и его speed multiplier теперь
     // делается в animPredicate() (см. registerControllers).
