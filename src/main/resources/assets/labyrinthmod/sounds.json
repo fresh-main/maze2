@@ -27,6 +27,38 @@
       }
     ]
   },
+  "lift_up": {
+    "category": "block",
+    "sounds": [{ "name": "labyrinthmod:mechanisms/lift_up", "stream": true }]
+  },
+  "lift_down": {
+    "category": "block",
+    "sounds": [{ "name": "labyrinthmod:mechanisms/lift_down", "stream": true }]
+  },
+  "door_open": {
+    "category": "block",
+    "sounds": [{ "name": "labyrinthmod:mechanisms/door_open", "stream": false }]
+  },
+  "door_close": {
+    "category": "block",
+    "sounds": [{ "name": "labyrinthmod:mechanisms/door_close", "stream": false }]
+  },
+  "menu_ambience_1": {
+    "category": "music",
+    "sounds": [{ "name": "labyrinthmod:music/menu_ambience_1", "stream": true }]
+  },
+  "menu_ambience_2": {
+    "category": "music",
+    "sounds": [{ "name": "labyrinthmod:music/menu_ambience_2", "stream": true }]
+  },
+  "menu_ambience_3": {
+    "category": "music",
+    "sounds": [{ "name": "labyrinthmod:music/menu_ambience_3", "stream": true }]
+  },
+  "menu_epic": {
+    "category": "music",
+    "sounds": [{ "name": "labyrinthmod:music/menu_epic", "stream": true }]
+  },
   "page_flip": {
     "category": "ambient",
     "subtitle": "otbor.subtitle.page_flip",

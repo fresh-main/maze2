@@ -2846,7 +2846,7 @@ public class GriverEntity extends Animal implements GeoEntity {
             this.level().playSound(null, this.blockPosition(),
                     ModSounds.GRIVER_RUN.get(),
                     net.minecraft.sounds.SoundSource.HOSTILE,
-                    1.5F,
+                    1.15F,
                     0.7F + (this.random.nextFloat() * 0.3F));
             runSoundCooldown = RUN_SOUND_DELAY;
             // Сбрасываем кулдаун ходьбы, чтобы звуки не накладывались
@@ -2871,9 +2871,9 @@ public class GriverEntity extends Animal implements GeoEntity {
                 return;
             }
             this.level().playSound(null, this.blockPosition(),
-                    ModSounds.GRIVER_RUN.get(),
+                    ModSounds.GRIVER_WALK.get(),
                     net.minecraft.sounds.SoundSource.HOSTILE,
-                    1.2F,
+                    0.9F,
                     0.9F + (this.random.nextFloat() * 0.2F));
             walkSoundCooldown = WALK_SOUND_DELAY;
         }
@@ -2887,17 +2887,17 @@ public class GriverEntity extends Animal implements GeoEntity {
         this.level().playSound(null, this.blockPosition(),
                 ModSounds.GRIVER_ATTACK.get(),
                 net.minecraft.sounds.SoundSource.HOSTILE,
-                1.8F,  // Громкий звук атаки. Дальность задана в ModSounds (24 блока)
+                1.35F,
                 0.8F + (this.random.nextFloat() * 0.4F));
     }
 
     private void playDetectionSound() {
         if (this.level().isClientSide || alertSoundCooldown > 0) return;
         this.level().playSound(null, this.blockPosition(), SoundEvents.RAVAGER_ROAR,
-                SoundSource.HOSTILE, 1.35F, 0.55F + this.random.nextFloat() * 0.12F);
+                SoundSource.HOSTILE, 1.0F, 0.55F + this.random.nextFloat() * 0.12F);
         // Тихий металлический слой делает рёв менее похожим на обычного моба.
         this.level().playSound(null, this.blockPosition(), SoundEvents.IRON_GOLEM_DAMAGE,
-                SoundSource.HOSTILE, 0.65F, 0.55F + this.random.nextFloat() * 0.10F);
+                SoundSource.HOSTILE, 0.45F, 0.55F + this.random.nextFloat() * 0.10F);
         alertSoundCooldown = 140;
     }
 
@@ -2924,7 +2924,7 @@ public class GriverEntity extends Animal implements GeoEntity {
 
     @Override
     protected float getSoundVolume() {
-        return 1.2F;
+        return 0.95F;
     }
 
     @Override
