@@ -41,6 +41,7 @@ public class OtborTitleScreen extends Screen {
     @Override
     protected void init() {
         super.init();
+        this.minecraft.getMusicManager().stopPlaying();
         startNextMenuTrack();
         this.enterStart = System.currentTimeMillis();
         scaleMultiplier = 1.0f;
