@@ -32,6 +32,26 @@ public class ModSounds {
     public static final RegistryObject<SoundEvent> FRACTION_PECHAT = SOUNDS.register("fraction_pechat",
             () -> SoundEvent.createVariableRangeEvent(ResourceLocation.fromNamespaceAndPath(LabyrinthMod.MOD_ID, "fraction_pechat")));
 
+    public static final RegistryObject<SoundEvent> LIFT_UP = fixed("lift_up", 96f);
+    public static final RegistryObject<SoundEvent> LIFT_DOWN = fixed("lift_down", 96f);
+    public static final RegistryObject<SoundEvent> DOOR_OPEN = fixed("door_open", 72f);
+    public static final RegistryObject<SoundEvent> DOOR_CLOSE = fixed("door_close", 72f);
+
+    public static final RegistryObject<SoundEvent> MENU_AMBIENCE_1 = variable("menu_ambience_1");
+    public static final RegistryObject<SoundEvent> MENU_AMBIENCE_2 = variable("menu_ambience_2");
+    public static final RegistryObject<SoundEvent> MENU_AMBIENCE_3 = variable("menu_ambience_3");
+    public static final RegistryObject<SoundEvent> MENU_EPIC = variable("menu_epic");
+
+    private static RegistryObject<SoundEvent> fixed(String name, float range) {
+        return SOUNDS.register(name, () -> SoundEvent.createFixedRangeEvent(
+                ResourceLocation.fromNamespaceAndPath(LabyrinthMod.MOD_ID, name), range));
+    }
+
+    private static RegistryObject<SoundEvent> variable(String name) {
+        return SOUNDS.register(name, () -> SoundEvent.createVariableRangeEvent(
+                ResourceLocation.fromNamespaceAndPath(LabyrinthMod.MOD_ID, name)));
+    }
+
     public static void register(IEventBus eventBus) {
         SOUNDS.register(eventBus);
     }

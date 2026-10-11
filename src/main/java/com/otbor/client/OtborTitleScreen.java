@@ -1,14 +1,23 @@
 package com.otbor.client;
+import com.labyrinthmod.common.init.ModSounds;
 import com.otbor.client.widgets.PaperRender;
 import com.otbor.client.widgets.PaperWidgets;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
+import net.minecraft.client.resources.sounds.AbstractSoundInstance;
+import net.minecraft.client.resources.sounds.SoundInstance;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import org.jetbrains.annotations.NotNull;
+
 public class OtborTitleScreen extends Screen {
     private static final long EXIT_TRANSITION_MS = 240L;
     private long exitStart = 0L;
@@ -19,6 +28,7 @@ public class OtborTitleScreen extends Screen {
     private long comingSoonStart = 0L;
     private int noteX;
     private int noteY;
+    private MenuMusicInstance menuMusic;
 
     public OtborTitleScreen() {
         super(Component.literal("OTBOR "));
@@ -46,6 +56,8 @@ public class OtborTitleScreen extends Screen {
     @Override
     protected void init() {
         super.init();
+        this.minecraft.getMusicManager().stopPlaying();
+        startNextMenuTrack();
         this.enterStart = System.currentTimeMillis();
         scaleMultiplier = 1.0f;
 
@@ -128,6 +140,45 @@ public class OtborTitleScreen extends Screen {
                 false, -1.5f, 180L,
                 b -> requestNavigate(new OtborInstructionScreen(this))
         ));
+    }
+
+    @Override
+    public void tick() {
+        super.tick();
+        if (menuMusic == null || !Minecraft.getInstance().getSoundManager().isActive(menuMusic)) {
+            startNextMenuTrack();
+        }
+    }
+
+    @Override
+    public void removed() {
+        if (menuMusic != null) {
+            menuMusic.stopMe();
+            menuMusic = null;
+        }
+        super.removed();
+    }
+
+    private void startNextMenuTrack() {
+        if (this.minecraft == null || menuMusic != null && this.minecraft.getSoundManager().isActive(menuMusic)) return;
+        menuMusic = new MenuMusicInstance(ModSounds.MENU_EPIC.get());
+        this.minecraft.getSoundManager().play(menuMusic);
+    }
+
+    private static class MenuMusicInstance extends AbstractSoundInstance {
+        MenuMusicInstance(SoundEvent event) {
+            super(event, SoundSource.MUSIC, SoundInstance.createUnseededRandom());
+            this.looping = true;
+            this.delay = 0;
+            this.volume = 0.24f;
+            this.pitch = 1.0f;
+            this.relative = true;
+            this.attenuation = Attenuation.NONE;
+        }
+
+        void stopMe() {
+            Minecraft.getInstance().getSoundManager().stop(this);
+        }
     }
 
     @Override
@@ -299,4 +350,75 @@ public class OtborTitleScreen extends Screen {
 
     @Override
     public boolean shouldCloseOnEsc() { return false; }
+    private static class IconButton extends AbstractButton {
+        private static final String[] POWER = {
+                ".....##.....",
+                ".....##.....",
+                "..#..##..#..",
+                ".##..##..##.",
+                "##...##...##",
+                "##........##",
+                "##........##",
+                "##........##",
+                ".##......##.",
+                "..##....##..",
+                "...######..."
+        };
+        private static final String[] GLOBE = {
+                "...######...",
+                ".##.#..#.##.",
+                ".#..#..#..#.",
+                "#...#..#...#",
+                "############",
+                "#...#..#...#",
+                "#...#..#...#",
+                "############",
+                ".#..#..#..#.",
+                ".##.#..#.##.",
+                "...######..."
+        };
+
+        private final boolean exit;
+        private final Runnable action;
+
+        IconButton(int x, int y, int size, boolean exit, Component narration, Runnable action) {
+            super(x, y, size, size, narration);
+            this.exit = exit;
+            this.action = action;
+        }
+
+        @Override
+        public void onPress() {
+            action.run();
+        }
+
+        @Override
+        protected void renderWidget(@NotNull GuiGraphics gfx, int mouseX, int mouseY, float partialTick) {
+            PaperRender.drawPaperCard(gfx, getX(), getY(), width, height, 1.0f, PaperRender.PAPER_LIGHT);
+            boolean hot = isHoveredOrFocused();
+            if (hot) {
+                gfx.fill(getX(), getY(), getX() + width, getY() + height,
+                        PaperRender.withAlpha(PaperRender.INK_RED, 0.12f));
+            }
+            int color = hot ? PaperRender.INK_RED : PaperRender.INK;
+            String[] bmp = exit ? POWER : GLOBE;
+            int unit = Math.max(1, width / 24);
+            int ix = getX() + (width - bmp[0].length() * unit) / 2;
+            int iy = getY() + (height - bmp.length * unit) / 2;
+            for (int row = 0; row < bmp.length; row++) {
+                for (int col = 0; col < bmp[row].length(); col++) {
+                    if (bmp[row].charAt(col) == '#') {
+                        int px = ix + col * unit;
+                        int py = iy + row * unit;
+                        gfx.fill(px, py, px + unit, py + unit, color);
+                    }
+                }
+            }
+        }
+
+        @Override
+        protected void updateWidgetNarration(@NotNull NarrationElementOutput output) {
+            defaultButtonNarrationText(output);
+        }
+    }
 }
