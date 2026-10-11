@@ -2229,16 +2229,28 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         if (dist <= GLADE_RADIUS) {
             double noise = terrainNoise.noise(x * 0.04, 0, z * 0.04);
             int terrainHeight = FLOOR_Y + (int)(noise * 5);
+            // Холмы должны участвовать в сглаживании вокруг построек.
+            // Раньше они появлялись только сразу за границей зоны сглаживания,
+            // создавая там резкий квадратный обрыв.
+            if (dist >= 30 && dist <= 55) {
+                double hillNoise1 = featureNoise.noise(x * 0.04, 0, z * 0.04);
+                double hillNoise2 = terrainNoise.noise(x * 0.08, 0, z * 0.08);
+                double combinedNoise = (hillNoise1 + hillNoise2) * 0.5;
+                if (combinedNoise > 0.4) {
+                    terrainHeight += Math.max(0, Math.min((int) ((combinedNoise - 0.4) * 10.0), 6));
+                }
+            }
             if (passageBlend > 0.0) {
                 // Плавная интерполяция: чем ближе к проходу, тем ближе к FLOOR_Y + 1
                 double smoothBlend = passageBlend * passageBlend * (3.0 - 2.0 * passageBlend);
                 int targetHeight = FLOOR_Y;
                 terrainHeight = (int)(terrainHeight * (1.0 - smoothBlend) + targetHeight * smoothBlend);
             }
+            int riverBankTerrainHeight = terrainHeight;
 
             if (structureBlend.factor > 0.0) {
-                double smoothBlend = structureBlend.factor * structureBlend.factor * (3.0 - 2.0 * structureBlend.factor);
-                terrainHeight = (int)(terrainHeight * (1.0 - smoothBlend) + structureBlend.targetY * smoothBlend);
+                terrainHeight = (int) Math.round(terrainHeight * (1.0 - structureBlend.factor)
+                        + structureBlend.targetY * structureBlend.factor);
             }
 
             if (structureBlend.core) {
@@ -2258,7 +2270,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             }
 
             // ★ РЕКА через расстояние до кривой Безье ★
-            if (riverDist >= 0 && structureBlend.factor < 0.35) {
+            if (riverDist >= 0 && !structureBlend.core) {
                 double waterHalfWidth = getTerrainWaterHalfWidth(x, z);
 
                 double bankHalfWidth = 3.0;
@@ -2336,7 +2348,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
                         double bankNoise2 = terrainNoise.noise(x * 0.10, 0, z * 0.10) * 1.0 * noiseFactor;
                         double bankNoise3 = featureNoise.noise(x * 0.18, 0, z * 0.18) * 0.5 * noiseFactor;
 
-                        int bankHeight = waterLevel + (int)(bankSmoothT * (terrainHeight - waterLevel)
+                        int bankHeight = waterLevel + (int)(bankSmoothT * (riverBankTerrainHeight - waterLevel)
                                 + bankNoise + bankNoise2 + bankNoise3);
 
                         if (bankHeight < waterLevel) {
@@ -2409,25 +2421,6 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
                         }
                         return generateUnderground(x, y, z);
                     }
-                }
-            }
-            if (structureBlend.factor <= 0.0 && dist >= 30 && dist <= 55) {
-                // Используем два слоя шума для создания плавных, органичных возвышенностей
-                double hillNoise1 = featureNoise.noise(x * 0.04, 0, z * 0.04);
-                double hillNoise2 = terrainNoise.noise(x * 0.08, 0, z * 0.08);
-
-                // Комбинируем шумы
-                double combinedNoise = (hillNoise1 + hillNoise2) * 0.5;
-
-                // Если значение шума достаточно высокое, формируем холм
-                if (combinedNoise > 0.4) {
-                    // Масштабируем высоту: от 0 до 6 блоков
-                    double heightFactor = (combinedNoise - 0.4) / 0.6; // нормализуем значение от 0 до 1
-                    int addedHeight = (int)(heightFactor * 6.0);
-
-                    // ★ ЖЕСТКИЙ ЛИМИТ: холм не может быть выше 6 блоков и не может уходить в минус ★
-                    addedHeight = Math.max(0, Math.min(addedHeight, 6));
-                    terrainHeight += addedHeight;
                 }
             }
             if (y > terrainHeight) {
@@ -3861,48 +3854,15 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         }
     }
     private StructureBlendResult getStructureBlendResult(int x, int z) {
-        double maxBlend = 0.0;
-        int targetY = FLOOR_Y;
-        boolean core = false;
-
-        for (StructureGenerator.GladeStructureInfo info : StructureGenerator.getGladeStructureInfos()) {
-            double dist = info.distanceToFootprint(x, z);
-
-            // Внутри самого пятна застройки + маленький запас — жёсткая зона без воды.
-            if (dist <= 1.0) {
-                core = true;
-            }
-
-            if (dist < info.blendRadius) {
-                double d = Math.max(0.0, dist);
-                double blend = 1.0 - (d / info.blendRadius);
-                blend = blend * blend * (3.0 - 2.0 * blend);
-
-                if (blend > maxBlend) {
-                    maxBlend = blend;
-                    targetY = info.origin.getY();
-                }
-            }
-        }
-
-        // Радиус сглаживания лифта.
-        // Применяется только если рядом нет структуры глейда.
-        if (maxBlend <= 0.0) {
-            double dist0 = Math.sqrt((double) x * x + (double) z * z);
-            int liftBlendRadius = 30; // ★ РАДИУС СГЛАЖИВАНИЯ ЛИФТА
-
-            if (dist0 < liftBlendRadius) {
-                double blend0 = 1.0 - (dist0 / liftBlendRadius);
-                blend0 = blend0 * blend0 * (3.0 - 2.0 * blend0);
-
-                if (blend0 > maxBlend) {
-                    maxBlend = blend0;
-                    targetY = FLOOR_Y;
-                }
-            }
-        }
-
-        return new StructureBlendResult(maxBlend, targetY, core);
+        // Постройки поляны больше не выравнивают прямоугольный участок земли.
+        // Сглаживание остаётся только у центрального лифта.
+        double dist0 = Math.sqrt((double) x * x + (double) z * z);
+        int liftBlendRadius = 30;
+        if (dist0 >= liftBlendRadius) return StructureBlendResult.NONE;
+        double blend = 1.0 - dist0 / liftBlendRadius;
+        blend = blend * blend * (3.0 - 2.0 * blend);
+        boolean liftCore = x >= -18 && x <= 17 && z >= -14 && z <= 12;
+        return new StructureBlendResult(blend, FLOOR_Y, liftCore);
     }
 
     private double getStructureBlendFactor(int x, int z) {
@@ -4201,12 +4161,11 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             pos = findEmergencyGladePosition(name, rotation, fallbackRadius, margin);
         }
 
-        // Попытка 5: жёсткий фоллбэк по квадранту
         if (pos == null) {
-            pos = getForcedFallbackPosition(quadrant);
-            System.out.println("[LabyrinthChunkGenerator] FORCED fallback for '"
-                    + name + "' at " + pos);
+            System.out.println("[LabyrinthChunkGenerator] No dry placement for '" + name + "'; skipping structure");
+            return;
         }
+        pos = new BlockPos(pos.getX(), getFootprintMedianHeight(name, pos, rotation, fallbackRadius), pos.getZ());
 
         StructureGenerator.addGladeStructure(
                 name, pos, rotation, fallbackRadius, fallbackBlendRadius
@@ -4246,11 +4205,11 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             pos = findEmergencyGladePosition("tower", rotation, fallbackRadius, margin);
         }
 
-        // Попытка 5: форс
         if (pos == null) {
-            pos = getForcedFallbackPosition(3);
-            System.out.println("[LabyrinthChunkGenerator] FORCED fallback for tower at " + pos);
+            System.out.println("[LabyrinthChunkGenerator] No dry placement for tower; skipping structure");
+            return;
         }
+        pos = new BlockPos(pos.getX(), getFootprintMedianHeight("tower", pos, rotation, fallbackRadius), pos.getZ());
 
         StructureGenerator.addGladeStructure(
                 "tower", pos, rotation, fallbackRadius, fallbackRadius + 12
@@ -4373,6 +4332,18 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         return Math.max(FLOOR_Y, terrainHeight);
     }
 
+    private int getFootprintMedianHeight(String name, BlockPos pos, Rotation rotation, int fallbackRadius) {
+        int[] bounds = StructureGenerator.getFootprintAabb(name, pos, rotation, fallbackRadius, 0);
+        java.util.List<Integer> heights = new java.util.ArrayList<>();
+        for (int x = bounds[0]; x <= bounds[1]; x += 2) {
+            for (int z = bounds[2]; z <= bounds[3]; z += 2) {
+                heights.add(getPlacementTerrainHeight(x, z));
+            }
+        }
+        heights.sort(Integer::compareTo);
+        return heights.get(heights.size() / 2);
+    }
+
     private BlockPos findBestTowerPosition(String name, Rotation rotation, int fallbackRadius, int margin, int minGap) {
         int minDist = getGladeStructureMinDist();
         int maxDist = GLADE_RADIUS - 5;
@@ -4473,9 +4444,9 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
 
         int minDist = getGladeStructureMinDist();
 
-        // Проверяем всё фактическое пятно структуры.
-        for (int sx = aabb[0]; sx <= aabb[1]; sx += 2) {
-            for (int sz = aabb[2]; sz <= aabb[3]; sz += 2) {
+        // Проверяем каждый блок пятна: узкая излучина может пройти между пробами с шагом 2.
+        for (int sx = aabb[0]; sx <= aabb[1]; sx++) {
+            for (int sz = aabb[2]; sz <= aabb[3]; sz++) {
                 int sd = Math.max(Math.abs(sx), Math.abs(sz));
 
                 if (sd < minDist || sd > GLADE_RADIUS - 5) {
@@ -4488,6 +4459,37 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             }
         }
 
+        return isFootprintLevelEnough(name, x, z, rotation, fallbackRadius);
+    }
+
+    private boolean isFootprintClearOfRiver(String name, int x, int z,
+                                            Rotation rotation, int fallbackRadius, int margin) {
+        int[] aabb = StructureGenerator.getFootprintAabb(
+                name, new BlockPos(x, 0, z), rotation, fallbackRadius, margin);
+        for (int sx = aabb[0]; sx <= aabb[1]; sx++) {
+            for (int sz = aabb[2]; sz <= aabb[3]; sz++) {
+                if (Math.max(Math.abs(sx), Math.abs(sz)) > GLADE_RADIUS - 5) return false;
+                if (isInRiverZone(sx, sz, margin)) return false;
+            }
+        }
+        return isFootprintLevelEnough(name, x, z, rotation, fallbackRadius);
+    }
+
+    private boolean isFootprintLevelEnough(String name, int x, int z,
+                                           Rotation rotation, int fallbackRadius) {
+        int[] bounds = StructureGenerator.getFootprintAabb(
+                name, new BlockPos(x, 0, z), rotation, fallbackRadius, 0);
+        int lowest = Integer.MAX_VALUE;
+        int highest = Integer.MIN_VALUE;
+        int maxDifference = "tower".equals(name) ? 2 : 3;
+        for (int sx = bounds[0]; sx <= bounds[1]; sx += 2) {
+            for (int sz = bounds[2]; sz <= bounds[3]; sz += 2) {
+                int height = getPlacementTerrainHeight(sx, sz);
+                lowest = Math.min(lowest, height);
+                highest = Math.max(highest, height);
+                if (highest - lowest > maxDifference) return false;
+            }
+        }
         return true;
     }
     /**
@@ -4562,10 +4564,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             return false;
         }
 
-        // Слабый запрет на реку — только самая сердцевина
-        if (isInRiverZone(x, z, 1.0)) return false;
-
-        return true;
+        return isFootprintClearOfRiver(name, x, z, rotation, fallbackRadius, margin);
     }
 
     /**
@@ -4596,6 +4595,9 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
                         x, z, fallbackRadius, 2)) {
                     continue;
                 }
+                if (!isFootprintClearOfRiver(name, x, z, rotation, fallbackRadius, margin)) {
+                    continue;
+                }
 
                 System.out.println("[LabyrinthChunkGenerator] Emergency placement '"
                         + name + "' at " + x + "," + z);
@@ -4603,33 +4605,6 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             }
         }
 
-        // Самый крайний случай: игнорируем пересечения (лучше поставить поверх, чем не поставить)
-        for (int distance = maxDist; distance >= minDist; distance -= 4) {
-            for (int angleDeg = 0; angleDeg < 360; angleDeg += 15) {
-                double angle = Math.toRadians(angleDeg);
-                int x = (int) Math.round(Math.cos(angle) * distance);
-                int z = (int) Math.round(Math.sin(angle) * distance);
-
-                System.out.println("[LabyrinthChunkGenerator] EMERGENCY (overlap-allowed) '"
-                        + name + "' at " + x + "," + z);
-                return new BlockPos(x, getPlacementTerrainHeight(x, z), z);
-            }
-        }
-
         return null;
-    }
-
-    /**
-     * ★ Форс-позиция по квадранту (если вообще ничего не сработало) ★
-     */
-    private BlockPos getForcedFallbackPosition(int quadrant) {
-        int r = Math.max(20, GLADE_RADIUS / 2);
-
-        switch (quadrant) {
-            case 0:  return new BlockPos( r, FLOOR_Y, -r);  // СВ
-            case 1:  return new BlockPos( r, FLOOR_Y,  r);  // ЮВ
-            case 2:  return new BlockPos(-r, FLOOR_Y,  r);  // ЮЗ
-            default: return new BlockPos(-r, FLOOR_Y, -r);  // СЗ (tower)
-        }
     }
 }

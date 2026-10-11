@@ -2894,10 +2894,10 @@ public class GriverEntity extends Animal implements GeoEntity {
     private void playDetectionSound() {
         if (this.level().isClientSide || alertSoundCooldown > 0) return;
         this.level().playSound(null, this.blockPosition(), SoundEvents.RAVAGER_ROAR,
-                SoundSource.HOSTILE, 1.0F, 0.55F + this.random.nextFloat() * 0.12F);
+                SoundSource.HOSTILE, 0.55F, 0.55F + this.random.nextFloat() * 0.12F);
         // Тихий металлический слой делает рёв менее похожим на обычного моба.
         this.level().playSound(null, this.blockPosition(), SoundEvents.IRON_GOLEM_DAMAGE,
-                SoundSource.HOSTILE, 0.45F, 0.55F + this.random.nextFloat() * 0.10F);
+                SoundSource.HOSTILE, 0.22F, 0.55F + this.random.nextFloat() * 0.10F);
         alertSoundCooldown = 140;
     }
 
@@ -2924,7 +2924,7 @@ public class GriverEntity extends Animal implements GeoEntity {
 
     @Override
     protected float getSoundVolume() {
-        return 0.95F;
+        return 0.55F;
     }
 
     @Override

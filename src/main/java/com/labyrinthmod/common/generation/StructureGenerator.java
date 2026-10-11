@@ -199,7 +199,7 @@ public class StructureGenerator {
         int chunkZ = chunk.getPos().z;
         for (StructureData data : structures) {
             if (data.intersectsChunk(chunkX, chunkZ)) {
-                data.placement.place(level, null);
+                data.placement.place(level, null, chunk);
 
                 registerOrUpdateProtectedRegion(data);
             }
