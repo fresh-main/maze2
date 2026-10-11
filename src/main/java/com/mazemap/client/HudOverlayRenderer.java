@@ -46,37 +46,6 @@ public final class HudOverlayRenderer {
     private long miniAnimStart = 0L;
     private boolean miniWasOn = false;
 
-    @SubscribeEvent
-    public void onRenderHand(RenderHandEvent event) {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null) return;
-
-        ItemStack stack = event.getItemStack();
-        if (!stack.is(ModItems.PERSONAL_MAP.get())) return;
-
-        // 【1】 НЕ отменяем событие! Рука и модель предмета отрисуются штатно.
-        // event.setCanceled(true);
-
-        // 【2】 Создаем GuiGraphics, используя буфер события руки
-        GuiGraphics gfx = new GuiGraphics(mc, (MultiBufferSource.BufferSource) event.getMultiBufferSource());
-        var pose = event.getPoseStack();
-
-        pose.pushPose();
-
-        // 【3】 Трансформируем позицию и масштаб, чтобы UI-карта легла на ладонь
-        // 0.0055f подобрано так, чтобы 100px карта стала размером ~0.55 блока (как предмет в руке)
-        float scale = 0.0055F;
-        pose.scale(scale, scale, scale);
-
-        // Сдвиг к центру ладони (Y вверх, Z вперед от игрока)
-        // Значения могут потребовать微调 под вашу модель руки, но работают стабильно
-        pose.translate(0.0D, 12.0D, 22.0D);
-
-        // Рендерим карту в координатах 0,0 (сдвиг уже применен к PoseStack)
-        renderMiniMap(gfx, 0, 0, mc.player);
-
-        pose.popPose();
-    }
 
     @SubscribeEvent
     public void onRenderGui(RenderGuiEvent.Post event) {

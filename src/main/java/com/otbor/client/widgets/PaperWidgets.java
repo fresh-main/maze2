@@ -95,4 +95,10 @@ public final class PaperWidgets {
                                               IntConsumer setter) {
         return new PaperSegment(x, y, w, h, options, getter, setter);
     }
+    public static AbstractWidget iconButton(int x, int y, int size,
+                                            String iconKey, String label,
+                                            float baseRotationDeg, long appearDelayMs,
+                                            Runnable onPress) {
+        return new PaperIconButton(x, y, size, iconKey, label, baseRotationDeg, appearDelayMs, onPress);
+    }
 }

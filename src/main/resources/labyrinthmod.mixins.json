@@ -59,7 +59,6 @@
     "SchematicTableScreenMixin",
     "CreativeModeInventoryScreenMixin",
     "create.ContraptionLimitMixin"
-
   ],
   "injectors": {
     "defaultRequire": 1

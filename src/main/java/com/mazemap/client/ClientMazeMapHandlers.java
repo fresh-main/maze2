@@ -18,15 +18,22 @@ import java.util.concurrent.ConcurrentHashMap;
 @OnlyIn(Dist.CLIENT)
 public final class ClientMazeMapHandlers {
     private static final Map<Long, PlayerMapData.Fragment> FRAGMENTS = new ConcurrentHashMap<>();
+
+    /** Растёт при каждом обновлении/очистке кэша — используется для инвалидации текстур. */
+    private static volatile long DATA_VERSION = 0L;
+
     private ClientMazeMapHandlers() {}
 
     public static Map<Long, PlayerMapData.Fragment> getFragments() {
         return FRAGMENTS;
     }
 
-
+    public static long getDataVersion() {
+        return DATA_VERSION;
+    }
 
     public static void handleOpenMap() {
+        // без изменений
         LabyrinthMod.LOGGER.info("[MazeMap] S2COpenMapPacket received (cache has {} fragments)", FRAGMENTS.size());
         Screen current = Minecraft.getInstance().screen;
         if (current instanceof PersonalMapScreen) return;
@@ -40,9 +47,10 @@ public final class ClientMazeMapHandlers {
     public static void handleClearMap() {
         FRAGMENTS.clear();
         FragmentTextureCache.clear();
-        // ClientHudState.clearMarker(); // ❌ УДАЛИТЬ или ЗАКОММЕНТИРОВАТЬ
+        DATA_VERSION++;                 // <— добавили
         MapHandRenderer.forceMapTextureUpload();
     }
+
     public static void handleFragmentSync(S2CFragmentSyncPacket p) {
         long key = ((long) p.cellX << 32) | (p.cellZ & 0xFFFFFFFFL);
         PlayerMapData.Fragment frag = FRAGMENTS.get(key);
@@ -50,11 +58,12 @@ public final class ClientMazeMapHandlers {
             frag = new PlayerMapData.Fragment(p.pixels, p.walkable, p.heights);
             FRAGMENTS.put(key, frag);
         } else {
-            System.arraycopy(p.pixels, 0, frag.pixels, 0, p.pixels.length);
+            System.arraycopy(p.pixels,   0, frag.pixels,   0, p.pixels.length);
             System.arraycopy(p.walkable, 0, frag.walkable, 0, p.walkable.length);
-            System.arraycopy(p.heights, 0, frag.heights, 0, p.heights.length);
+            System.arraycopy(p.heights,  0, frag.heights,  0, p.heights.length);
         }
         FragmentTextureCache.invalidate(key);
+        DATA_VERSION++;                 // <— добавили
         MapHandRenderer.forceMapTextureUpload();
     }
 }

@@ -14,6 +14,7 @@ public class PaperButton extends Button {
     private final long appearDelay;
     private int accentColor = PaperRender.INK_RED;
     private float rotationDeg = 0f;
+    private long lastMs = 0L;
 
     public PaperButton(int x, int y, int w, int h, Component msg, OnPress action) {
         this(x, y, w, h, msg, action, 0);
@@ -45,11 +46,12 @@ public class PaperButton extends Button {
         if (firstRender < 0) firstRender = now;
         long elapsed = now - firstRender - appearDelay;
         appearAnim = elapsed <= 0 ? 0f : Math.min(1f, elapsed / 260f);
+        float dt = lastMs == 0L ? 0f : Math.min(0.05f, (now - lastMs) / 1000f);
+        lastMs = now;
 
         boolean active = this.active;
         boolean hovered = active && this.isHoveredOrFocused();
-        float step = partialTick * 0.18f;
-        hoverAnim = hovered ? Math.min(1f, hoverAnim + step) : Math.max(0f, hoverAnim - step);
+        hoverAnim = PaperRender.approach(hoverAnim, hovered ? 1f : 0f, dt * 6f);
 
         float appear = PaperRender.easeOut(appearAnim);
         float lift = -2.5f * hoverAnim;
@@ -69,14 +71,18 @@ public class PaperButton extends Button {
         gfx.pose().scale(scale, scale, 1f);
         gfx.pose().translate(-w / 2f, -h / 2f, 0);
 
-        float brightness = active ? (0.92f + 0.10f * hoverAnim) : 0.75f;
-        // drawPaperCard вместо drawPaper: на маленьких кнопках разницы визуально нет,
-        // а fill-вызовов в десятки раз меньше (актуально для экранов с 4+ кнопками).
-        PaperRender.drawPaperCard(gfx, 0, 0, w, h, brightness, PaperRender.PAPER_BASE);
+        float brightness = active ? (0.94f + 0.10f * hoverAnim) : 0.75f;
+        PaperRender.drawRoundBox(gfx, 0, 0, w, h,
+                PaperRender.mul(PaperRender.PAPER_BASE, brightness),
+                PaperRender.mul(PaperRender.PAPER_EDGE, brightness), 0.38f);
 
         long seed = ((long) x * 31L) ^ ((long) y * 17L);
         int topInkColor = PaperRender.withAlpha(PaperRender.INK_SOFT, 0.55f + 0.45f * hoverAnim);
         PaperRender.drawInkStroke(gfx, 4, 2, w - 8, 1, topInkColor, seed);
+
+        if (hoverAnim > 0.01f) {
+            gfx.fill(2, 5, 4, h - 5, PaperRender.withAlpha(accentColor, 0.9f * hoverAnim));
+        }
 
         Font font = Minecraft.getInstance().font;
         int textColor = active ? PaperRender.INK_DARK : 0xFF7A6A4E;
@@ -90,9 +96,7 @@ public class PaperButton extends Button {
             int ux = w / 2 - uw / 2;
             int uy = textY + 10;
             PaperRender.drawInkStroke(gfx, ux, uy, uw, 1, PaperRender.withAlpha(accentColor, 0.9f), seed + 1);
-        }
 
-        if (hoverAnim > 0.01f) {
             int a = (int) (hoverAnim * 180);
             gfx.fill(w - 10, 2, w - 3, 3, (a << 24) | (accentColor & 0xFFFFFF));
             gfx.fill(w - 10, 2, w - 9, 6, (a << 24) | (accentColor & 0xFFFFFF));

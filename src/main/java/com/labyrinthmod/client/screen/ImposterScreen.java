@@ -90,7 +90,7 @@ public class ImposterScreen extends Screen {
         addRenderableWidget(Button.builder(
                         Component.literal("§aОбновить"),
                         b -> {
-                            // TODO: запрос на сервер
+                            
                         })
                 .bounds(centerX + 60, startY + PLAYERS_PER_PAGE * 25 + 20, 60, 20)
                 .build()

@@ -130,8 +130,25 @@ public class EmbeddiumOptionsScreen extends Screen {
         try {
             Field f = section.getClass().getDeclaredField(name);
             f.setAccessible(true);
+            Class<?> t = f.getType();
+            if (value instanceof Number n) {
+                if (t == float.class) value = n.floatValue();
+                else if (t == double.class) value = n.doubleValue();
+                else if (t == int.class) value = n.intValue();
+                else if (t == long.class) value = n.longValue();
+            }
             f.set(section, value);
         } catch (Throwable ignored) {}
+    }
+    public static void syncFromVanilla() {
+        if (!isEmbeddiumAvailable() || qualityObj == null) return;
+        Options o = Minecraft.getInstance().options;
+        if (fieldExists(qualityObj, "enableClouds")) {
+            setFieldValue(qualityObj, "enableClouds", o.cloudStatus().get() != CloudStatus.OFF);
+        }
+        if (fieldExists(qualityObj, "entityDistance")) {
+            setFieldValue(qualityObj, "entityDistance", o.entityDistanceScaling().get().floatValue());
+        }
     }
 
     private static int enumOrdinal(Object section, String name) {
@@ -356,15 +373,15 @@ public class EmbeddiumOptionsScreen extends Screen {
             }
             case TAB_QUALITY -> {
                 list.add(new HeaderEntry("MINECRAFT "));
-                list.add(new VanillaEnumEntry("ГРАФИКА ", new String[]{"БЫСТРО ", "КРАСИВО ", "ПРЕВОСХОДНО "}, () -> o.graphicsMode().get().getId(), i -> o.graphicsMode().set(GraphicsStatus.byId(i)), "Общий режим графики Minecraft.\nБЫСТРО = упрощённая (макс. FPS).\nКРАСИВО = стандартная.\nПРЕВОСХОДНО = улучшенные эффекты (требует мощное железо). "));
+                list.add(new VanillaEnumEntry("ГРАФИКА ", new String[]{"БЫСТРО ", "КРАСИВО "}, () -> Math.min(1, o.graphicsMode().get().getId()), i -> o.graphicsMode().set(GraphicsStatus.byId(Math.min(1, i))), "Общий режим графики Minecraft.\nБЫСТРО = упрощённая (макс. FPS).\nКРАСИВО = стандартная. "));
                 list.add(new VanillaIntEntry("ДАЛЬНОСТЬ ЧАНКОВ ", 2, 32, () -> o.renderDistance().get(), v -> o.renderDistance().set(v), v -> v + " ч ", "Дальность прорисовки чанков.\n2-8 = высокий FPS, мало видно.\n12-16 = баланс.\n32 = очень далеко, но сильно нагружает CPU/GPU. "));
                 list.add(new VanillaIntEntry("СИМУЛЯЦИЯ ", 2, 32, () -> o.simulationDistance().get(), v -> o.simulationDistance().set(v), v -> v + " ч ", "Расстояние, на котором работают механизмы и мобы.\nНе влияет на видимость, только на активность.\nМеньшее значение = выше производительность. "));
                 list.add(new VanillaIntEntry("МИПМАППИНГ ", 0, 4, () -> o.mipmapLevels().get(), v -> o.mipmapLevels().set(v), v -> v == 0 ? "ВЫКЛ " : v + "x ", "Уровень мипмаппинга текстур.\nВЫКЛ = текстуры чёткие вблизи, но размыты вдали.\n1-4x = постепенное улучшение качества на расстоянии.\nПовышает качество, немного снижает FPS. "));
-                list.add(new VanillaEnumEntry("ОБЛАКА ", new String[]{"ВЫКЛ ", "БЫСТРО ", "КРАСИВО "}, () -> o.cloudStatus().get().ordinal(), i -> o.cloudStatus().set(CloudStatus.values()[Math.min(2, i)]), "Отображение облаков.\nВЫКЛ = нет облаков (макс. FPS).\nБЫСТРО = простые 2D облака.\nКРАСИВО = объёмные 3D облака. "));
+                list.add(new VanillaEnumEntry("ОБЛАКА ", new String[]{"ВЫКЛ ", "БЫСТРО ", "КРАСИВО "}, () -> o.cloudStatus().get().ordinal(), i -> { o.cloudStatus().set(CloudStatus.values()[Math.min(2, i)]); syncFromVanilla(); }, "Отображение облаков.\nВЫКЛ = нет облаков (макс. FPS).\nБЫСТРО = простые 2D облака.\nКРАСИВО = объёмные 3D облака. "));
                 list.add(new VanillaEnumEntry("ЧАСТИЦЫ ", new String[]{"ВСЕ ", "УМЕНЬШ. ", "МИНИМУМ "}, () -> o.particles().get().getId(), i -> o.particles().set(ParticleStatus.byId(i)), "Количество частиц (дым, огонь, дождь).\nВСЕ = все эффекты (красиво, но нагрузка).\nУМЕНЬШ. = меньше частиц.\nМИНИМУМ = только важные частицы. "));
                 list.add(new VanillaBoolEntry("ПЛАВНОЕ ОСВЕЩЕНИЕ ", () -> o.ambientOcclusion().get(), v -> o.ambientOcclusion().set(v), "Плавное освещение блоков.\nВКЛ = мягкие тени в углах (реалистично).\nВЫКЛ = резкое освещение (выше FPS). "));
                 list.add(new VanillaIntEntry("СМЕШЕНИЕ БИОМОВ ", 0, 7, () -> o.biomeBlendRadius().get(), v -> o.biomeBlendRadius().set(v), v -> v == 0 ? "ВЫКЛ " : v + " ч ", "Плавность перехода цветов между биомами.\n0 = резкая граница.\n7 = максимальная плавность.\nВлияет на цвет травы, листвы, воды. "));
-                list.add(new VanillaIntEntry("ДАЛЬНОСТЬ СУЩНОСТЕЙ ", 50, 500, () -> (int)(o.entityDistanceScaling().get() * 100), v -> o.entityDistanceScaling().set(v / 100.0), v -> v + "% ", "Дальность прорисовки мобов и игроков.\n50% = видны только вблизи.\n100% = стандартно.\n500% = очень далеко (нагрузка на GPU). "));
+                list.add(new VanillaIntEntry("ДАЛЬНОСТЬ СУЩНОСТЕЙ ", 50, 500, () -> (int)(o.entityDistanceScaling().get() * 100), v -> { o.entityDistanceScaling().set(v / 100.0); syncFromVanilla(); }, v -> v + "% ", "Дальность прорисовки мобов и игроков.\n50% = видны только вблизи.\n100% = стандартно.\n500% = очень далеко (нагрузка на GPU). "));
                 list.add(new VanillaBoolEntry("ТЕНИ СУЩНОСТЕЙ ", () -> o.entityShadows().get(), v -> o.entityShadows().set(v), "Тени под сущностями.\nВКЛ = реалистичные тени.\nВЫКЛ = без теней (небольшой прирост FPS). "));
 
                 list.add(new HeaderEntry("EMBEDDIUM "));
@@ -443,6 +460,7 @@ public class EmbeddiumOptionsScreen extends Screen {
     @Override
     protected void init() {
         super.init();
+        syncFromVanilla();
         rebuildUi();
     }
 
@@ -486,7 +504,7 @@ public class EmbeddiumOptionsScreen extends Screen {
         int buttonsX = cardX + (CARD_W - totalBtnW) / 2; // Центрируем относительно карточки
         int buttonsY = this.cardY + actualCardH + 15; // Отступ 15 пикселей снизу от карточки
 
-        addRenderableWidget(PaperWidgets.paperButton(buttonsX, buttonsY, btnW, BTN_H, Component.literal(" <- НАЗАД "), b -> this.minecraft.setScreen(parent), 0L, PaperRender.INK_SOFT, null));
+        addRenderableWidget(PaperWidgets.paperButton(buttonsX, buttonsY, btnW, BTN_H, Component.literal(" <- НАЗАД "), b -> { saveOptions(); this.minecraft.setScreen(parent); }, 0L, PaperRender.INK_SOFT, null));
         addRenderableWidget(PaperWidgets.paperButton(buttonsX + btnW + BTN_GAP, buttonsY, btnW, BTN_H, Component.literal("СБРОС "), b -> { resetOptions(); rebuildUi(); }, 0L, PaperRender.INK_FADED, null));
 
         // НОВАЯ КНОПКА: ПЕРЕХОД В ШЕЙДЕРЫ
@@ -556,15 +574,17 @@ public class EmbeddiumOptionsScreen extends Screen {
             o.entityShadows().set(true);
             o.cloudStatus().set(CloudStatus.FANCY);
             o.fullscreen().set(false);
-            o.guiScale().set(0);
+            o.guiScale().set(2);
             o.framerateLimit().set(120);
             o.enableVsync().set(true);
             o.bobView().set(true);
             o.gamma().set(0.5);
             o.attackIndicator().set(AttackIndicatorStatus.HOTBAR);
             o.mipmapLevels().set(4);
+            syncFromVanilla();
         } catch (Throwable t) { t.printStackTrace(); }
     }
+
 
     private void saveOptions() {
         try {
@@ -855,6 +875,7 @@ public class EmbeddiumOptionsScreen extends Screen {
 
     @Override
     public void onClose() {
+        saveOptions();
         this.minecraft.setScreen(parent);
     }
 }

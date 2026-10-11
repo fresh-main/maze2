@@ -1,10 +1,10 @@
 package com.otbor.client;
 import com.otbor.client.widgets.PaperRender;
 import com.otbor.client.widgets.PaperWidgets;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.Options;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.AbstractButton;
-import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
@@ -22,6 +22,19 @@ public class OtborTitleScreen extends Screen {
 
     public OtborTitleScreen() {
         super(Component.literal("OTBOR "));
+        forceGuiScale();
+    }
+
+    private static void forceGuiScale() {
+        try {
+            Minecraft mc = Minecraft.getInstance();
+            Options options = mc.options;
+            if (options.guiScale().get() != 2) {
+                options.guiScale().set(2);
+                options.save();
+                if (mc.getWindow() != null) mc.resizeDisplay();
+            }
+        } catch (Throwable ignored) {}
     }
 
     private void requestNavigate(Screen target) {
@@ -86,12 +99,10 @@ public class OtborTitleScreen extends Screen {
         noteX = colX + sq / 2;
         noteY = colY - (int)(16 * scaleMultiplier);
 
-        addRenderableWidget(new IconButton(colX, colY, sq, true,
-                Component.literal("Выход из игры"),
+        addRenderableWidget(PaperWidgets.iconButton(colX, colY, sq, "power", "ВЫХОД", -2f, 60L,
                 () -> this.minecraft.stop()));
 
-        addRenderableWidget(new IconButton(colX, colY + sq + sqGap, sq, false,
-                Component.literal("Перевод"),
+        addRenderableWidget(PaperWidgets.iconButton(colX, colY + sq + sqGap, sq, "globe", "ПЕРЕВОД", 1.5f, 75L,
                 () -> comingSoonStart = System.currentTimeMillis()));
 
         addRenderableWidget(PaperWidgets.noteCard(
@@ -285,78 +296,7 @@ public class OtborTitleScreen extends Screen {
     }
 
 
+
     @Override
     public boolean shouldCloseOnEsc() { return false; }
-
-    private static class IconButton extends AbstractButton {
-        private static final String[] POWER = {
-                ".....##.....",
-                ".....##.....",
-                "..#..##..#..",
-                ".##..##..##.",
-                "##...##...##",
-                "##........##",
-                "##........##",
-                "##........##",
-                ".##......##.",
-                "..##....##..",
-                "...######..."
-        };
-        private static final String[] GLOBE = {
-                "...######...",
-                ".##.#..#.##.",
-                ".#..#..#..#.",
-                "#...#..#...#",
-                "############",
-                "#...#..#...#",
-                "#...#..#...#",
-                "############",
-                ".#..#..#..#.",
-                ".##.#..#.##.",
-                "...######..."
-        };
-
-        private final boolean exit;
-        private final Runnable action;
-
-        IconButton(int x, int y, int size, boolean exit, Component narration, Runnable action) {
-            super(x, y, size, size, narration);
-            this.exit = exit;
-            this.action = action;
-        }
-
-        @Override
-        public void onPress() {
-            action.run();
-        }
-
-        @Override
-        protected void renderWidget(@NotNull GuiGraphics gfx, int mouseX, int mouseY, float partialTick) {
-            PaperRender.drawPaperCard(gfx, getX(), getY(), width, height, 1.0f, PaperRender.PAPER_LIGHT);
-            boolean hot = isHoveredOrFocused();
-            if (hot) {
-                gfx.fill(getX(), getY(), getX() + width, getY() + height,
-                        PaperRender.withAlpha(PaperRender.INK_RED, 0.12f));
-            }
-            int color = hot ? PaperRender.INK_RED : PaperRender.INK;
-            String[] bmp = exit ? POWER : GLOBE;
-            int unit = Math.max(1, width / 24);
-            int ix = getX() + (width - bmp[0].length() * unit) / 2;
-            int iy = getY() + (height - bmp.length * unit) / 2;
-            for (int row = 0; row < bmp.length; row++) {
-                for (int col = 0; col < bmp[row].length(); col++) {
-                    if (bmp[row].charAt(col) == '#') {
-                        int px = ix + col * unit;
-                        int py = iy + row * unit;
-                        gfx.fill(px, py, px + unit, py + unit, color);
-                    }
-                }
-            }
-        }
-
-        @Override
-        protected void updateWidgetNarration(@NotNull NarrationElementOutput output) {
-            defaultButtonNarrationText(output);
-        }
-    }
 }

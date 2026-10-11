@@ -325,5 +325,22 @@ public final class PaperRender {
                     com.otbor.OtborSounds.PAGE_FLIP.get(), 1.0f, 0.7f));
         } catch (Throwable ignored) {}
     }
+    public static void fillRound(GuiGraphics gfx, int x, int y, int w, int h, int color) {
+        gfx.fill(x + 1, y, x + w - 1, y + h, color);
+        gfx.fill(x, y + 1, x + w, y + h - 1, color);
+    }
+
+    public static void drawRoundBox(GuiGraphics gfx, int x, int y, int w, int h, int fill, int border, float shadow) {
+        if (shadow > 0f) fillRound(gfx, x + 1, y + 2, w, h, withAlpha(0xFF000000, shadow));
+        fillRound(gfx, x, y, w, h, border);
+        fillRound(gfx, x + 1, y + 1, w - 2, h - 2, fill);
+        gfx.fill(x + 2, y + 1, x + w - 2, y + 2, mul(fill, 1.12f));
+        gfx.fill(x + 2, y + h - 2, x + w - 2, y + h - 1, mul(fill, 0.86f));
+    }
+
+    public static float approach(float current, float target, float maxDelta) {
+        if (current < target) return Math.min(target, current + maxDelta);
+        return Math.max(target, current - maxDelta);
+    }
 
 }

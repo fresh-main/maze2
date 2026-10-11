@@ -12,15 +12,12 @@ import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobSpawnType;
+import net.minecraft.world.level.block.*;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.*;
 import net.minecraft.world.level.biome.BiomeManager;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.BiomeSource;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.DoublePlantBlock;
-import net.minecraft.world.level.block.RotatedPillarBlock;
-import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.chunk.ChunkAccess;
@@ -233,6 +230,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         mazeWalls.clear();
         gladeExits.clear();
         plannedShifts.clear();
+        movingWallCells.clear();
 
         Random rand = new Random(seed);
 
@@ -476,6 +474,14 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
                 plannedShifts.add(new ShiftDefinition(sourceAlong, sourceLine, span, 5, pick.sign() * 5, 0));
             } else {
                 plannedShifts.add(new ShiftDefinition(sourceLine, sourceAlong, 5, span, 0, pick.sign() * 5));
+            }
+        }
+        for (ShiftDefinition shift : plannedShifts) {
+            for (int dx = 0; dx < shift.sizeX(); dx++) {
+                for (int dz = 0; dz < shift.sizeZ(); dz++) {
+                    movingWallCells.add(hash(shift.sourceX() + dx, shift.sourceZ() + dz));
+
+                }
             }
         }
     }
@@ -868,6 +874,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
      *  3. isSolidWall на ЭТОЙ же высоте — стена реально существует рядом
      */
     private BlockState tryGenerateVine(int x, int y, int z, int localTopY) {
+        if (isNearMovingWall(x, z)) return null;
         // ★ ЗАЩИТА 1: выше крыши — ничего ★
         if (y > localTopY) return null;
         int hang = localTopY - y;
@@ -911,6 +918,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
      * торчит на 1-2 блока вверх. Выглядит как заросшая кромка, а не плоская стена.
      */
     private BlockState tryGenerateVineCap(int x, int y, int z, int topY) {
+        if (isNearMovingWall(x, z)) return null;
         int dy = y - topY;
         // Только кромка: 1 блок ниже и до 2 блоков выше
         if (dy < -1 || dy > 2) return null;
@@ -975,6 +983,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
      * Детерминирована: не рвется на границах чанков.
      */
     private BlockState tryGenerateSpanningVine(int x, int y, int z) {
+        if (isNearMovingWall(x, z)) return null;
         int localTop = wallTopAt(x, z);
         // Ограничиваем высоту генерации: только в зоне свисания от верха стены
         if (y < localTop - 15 || y > localTop + 2) return null;
@@ -1341,6 +1350,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         StructureBlendResult structureBlend = dist <= GLADE_RADIUS
                 ? getStructureBlendResult(worldX, worldZ)
                 : StructureBlendResult.NONE;
+        boolean nearMovingWall = isNearMovingWall(worldX, worldZ);
 
         for (int secY = chunk.getMinSection(); secY < chunk.getMaxSection(); secY++) {
             LevelChunkSection section = chunk.getSection(chunk.getSectionIndexFromSectionY(secY));
@@ -1363,6 +1373,12 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
                     }
                 }
                 if (state == null) state = Blocks.AIR.defaultBlockState();
+
+                // ★ Любая листва рядом с движущейся стеной становится воздухом ★
+                if (nearMovingWall && isLeafBlock(state)) {
+                    state = Blocks.AIR.defaultBlockState();
+                }
+
                 section.setBlockState(localX, localY, localZ, state, false);
             }
         }
@@ -1944,6 +1960,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
      * разные размеры (маленькие/средние/большие), азалия на верхушке.
      */
     private BlockState tryGenerateBush(int x, int y, int z) {
+        if (isNearMovingWall(x, z)) return null;
         int height = y - FLOOR_Y;
         if (height < 1 || height > 4) return null;
 
@@ -3255,6 +3272,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         StructureGenerator.placeStructuresInChunk(level, chunk);
 
         ensureDecorationSeed(level);
+        ensureGenerated();
 
         if (!seedInitialized || terrainNoise == null || featureNoise == null) {
             return;
@@ -3268,7 +3286,10 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
         int maxX = chunkPos.getMaxBlockX();
         int maxZ = chunkPos.getMaxBlockZ();
 
-        if (minZ >= -30) return;
+        if (minZ >= -30) {
+            removeLeavesNearMovingWalls(level, chunk);
+            return;
+        }
 
         for (int x = minX; x <= maxX; x++) {
             for (int z = minZ; z <= maxZ; z++) {
@@ -3392,6 +3413,7 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
                 }
             }
         }
+        removeLeavesNearMovingWalls(level, chunk);
     }
 
     private double getTerrainWaterHalfWidth(int x, int z) {
@@ -4630,6 +4652,107 @@ public class LabyrinthChunkGenerator extends ChunkGenerator {
             case 1:  return new BlockPos( r, FLOOR_Y,  r);  // ЮВ
             case 2:  return new BlockPos(-r, FLOOR_Y,  r);  // ЮЗ
             default: return new BlockPos(-r, FLOOR_Y, -r);  // СЗ (tower)
+        }
+    }
+    // =====================================================================
+// ★ УДАЛЕНИЕ ЛИСТВЫ ВОКРУГ ДВИЖУЩИХСЯ СТЕН ★
+// =====================================================================
+
+    /**
+     * Проверяет, находится ли колонка (x, z) рядом с движущейся стеной.
+     *
+     * Сейчас реализован квадратный радиус 2 блока, то есть зона 5×5.
+     * Это надёжнее для стен, чем строгий круг, потому что убирает и диагонали.
+     *
+     * Если нужен строго круглый радиус 2, раскомментируй проверку
+     * dx * dx + dz * dz > 4.
+     */
+    private boolean isNearMovingWall(int x, int z) {
+        if (movingWallCells.isEmpty()) return false;
+
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dz = -2; dz <= 2; dz++) {
+                // Строгий круглый радиус 2:
+                // if (dx * dx + dz * dz > 4) continue;
+
+                if (movingWallCells.contains(hash(x + dx, z + dz))) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Проверка: является ли блок листвой/лиственным декором.
+     *
+     * Через LeavesBlock ловятся ванильные и большинство модовых листьев.
+     * AZALEA/FLOWERING_AZALEA добавлены отдельно, чтобы вычищать также
+     * верхушки кустов, если они используются как лиственный декор.
+     */
+    private boolean isLeafBlock(BlockState state) {
+        if (state == null || state.isAir()) return false;
+
+        return state.getBlock() instanceof LeavesBlock
+                || state.is(net.minecraft.tags.BlockTags.LEAVES)
+                || state.is(Blocks.AZALEA)
+                || state.is(Blocks.FLOWERING_AZALEA);
+
+    }
+
+    /**
+     * Удаляет листву в радиусе 2 блоков вокруг движущихся стен в чанке.
+     *
+     * Вызывается после декорирования, чтобы убрать листву, которую могли
+     * поставить деревья, структуры и другие фичи.
+     */
+    private void removeLeavesNearMovingWalls(WorldGenLevel level, ChunkAccess chunk) {
+        ensureGenerated();
+
+        if (!seedInitialized || terrainNoise == null || featureNoise == null) {
+            return;
+        }
+
+        if (movingWallCells.isEmpty()) {
+            return;
+        }
+
+        ChunkPos chunkPos = chunk.getPos();
+        int minX = chunkPos.getMinBlockX();
+        int minZ = chunkPos.getMinBlockZ();
+
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+
+        for (int lx = 0; lx < 16; lx++) {
+            int wx = minX + lx;
+
+            for (int lz = 0; lz < 16; lz++) {
+                int wz = minZ + lz;
+
+                if (!isNearMovingWall(wx, wz)) {
+                    continue;
+                }
+
+
+                int top = wallTopAt(wx, wz);
+                int minY = Math.max(level.getMinBuildHeight(), FLOOR_Y - 2);
+                int maxY = Math.min(level.getMaxBuildHeight() - 1, top + 8);
+
+                if (maxY < minY) {
+                    continue;
+                }
+
+                for (int y = minY; y <= maxY; y++) {
+                    pos.set(wx, y, wz);
+
+                    BlockState state = level.getBlockState(pos);
+
+                    if (isLeafBlock(state)) {
+                        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 2);
+                    }
+                }
+            }
         }
     }
 }

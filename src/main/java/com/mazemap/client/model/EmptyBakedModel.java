@@ -14,44 +14,18 @@ import java.util.List;
 
 public class EmptyBakedModel implements BakedModel {
 
-    // Правильная сигнатура для 1.20.1 (без ModelData и RenderType)
-    @Override
-    public List<BakedQuad> getQuads(BlockState state, Direction side, RandomSource rand) {
-        return Collections.emptyList();
+    private final BakedModel original;
+
+    public EmptyBakedModel(BakedModel original) {
+        this.original = original;
     }
 
-    @Override
-    public boolean useAmbientOcclusion() {
-        return false;
-    }
-
-    @Override
-    public boolean isGui3d() {
-        return false;
-    }
-
-    @Override
-    public boolean usesBlockLight() {
-        return false;
-    }
-
-    @Override
-    public boolean isCustomRenderer() {
-        return true; // Говорим движку, что мы рендерим предмет сами
-    }
-
-    @Override
-    public TextureAtlasSprite getParticleIcon() {
-        return null;
-    }
-
-    @Override
-    public ItemOverrides getOverrides() {
-        return ItemOverrides.EMPTY;
-    }
-
-    @Override
-    public ItemTransforms getTransforms() {
-        return ItemTransforms.NO_TRANSFORMS;
-    }
+    @Override public List<BakedQuad> getQuads(BlockState state, Direction side, RandomSource rand) { return Collections.emptyList(); }
+    @Override public boolean useAmbientOcclusion() { return original.useAmbientOcclusion(); }
+    @Override public boolean isGui3d() { return original.isGui3d(); }
+    @Override public boolean usesBlockLight() { return original.usesBlockLight(); }
+    @Override public boolean isCustomRenderer() { return true; }
+    @Override public TextureAtlasSprite getParticleIcon() { return original.getParticleIcon(); }
+    @Override public ItemOverrides getOverrides() { return ItemOverrides.EMPTY; }
+    @Override public ItemTransforms getTransforms() { return original.getTransforms(); }
 }

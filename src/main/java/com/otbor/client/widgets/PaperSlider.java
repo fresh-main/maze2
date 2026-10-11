@@ -13,6 +13,8 @@ public class PaperSlider extends AbstractSliderButton {
     private final DoubleConsumer setter;
     private final DoubleFunction<String> labeler;
     private final String title;
+    private float hoverAnim = 0f;
+    private long lastMs = 0L;
     /** Если true — setter вызывается ТОЛЬКО на release слайдера (mouseUp). Иначе — на каждое
      *  изменение value во время drag. Для тяжёлых настроек (renderDistance, graphicsMode,
      *  framerate, gamma, particles, clouds) обязателен deferred-режим: их setter
@@ -70,46 +72,44 @@ public class PaperSlider extends AbstractSliderButton {
 
     @Override
     public void renderWidget(GuiGraphics gfx, int mouseX, int mouseY, float partialTick) {
+        long now = System.currentTimeMillis();
+        float dt = lastMs == 0L ? 0f : Math.min(0.05f, (now - lastMs) / 1000f);
+        lastMs = now;
+        boolean hover = this.active && this.isHoveredOrFocused();
+        hoverAnim = PaperRender.approach(hoverAnim, hover ? 1f : 0f, dt * 7f);
+
         int x = getX();
         int y = getY();
         int w = getWidth();
-        int h = getHeight();
-
         var font = Minecraft.getInstance().font;
-        String t = title;
+
         String v = labeler.apply(this.value);
-        gfx.drawString(font, t, x, y, PaperRender.INK, false);
         int vw = font.width(v);
-        gfx.drawString(font, v, x + w - vw, y, PaperRender.INK_SOFT, false);
+        PaperRender.drawInkText(gfx, font, title, x, y, PaperRender.INK);
+        PaperRender.drawInkText(gfx, font, v, x + w - vw, y,
+                PaperRender.mix(PaperRender.INK_SOFT, PaperRender.INK_RED, hoverAnim));
 
-        int barY = y + 12;
-        int barH = 10;
-
-        PaperRender.drawHandDivider(gfx, x, barY + barH / 2, w,
-                PaperRender.withAlpha(PaperRender.INK, 0.55f));
-
-        int fillW = Math.max(0, (int) ((w - 1) * this.value));
-        for (int i = 0; i < fillW; i += 3) {
-            int k = Math.min(3, fillW - i);
-            gfx.fill(x + i, barY + barH / 2 - 1, x + i + k, barY + barH / 2, PaperRender.INK_RED);
-        }
-
+        int cy = y + 17;
         for (int k = 0; k <= 4; k++) {
-            int tx = x + (w - 1) * k / 4;
-            gfx.fill(tx, barY + barH / 2 - 3, tx + 1, barY + barH / 2 + 3,
-                    PaperRender.withAlpha(PaperRender.INK_SOFT, 0.5f));
+            int tx = x + 4 + (w - 9) * k / 4;
+            gfx.fill(tx, cy - 6, tx + 1, cy - 4, PaperRender.withAlpha(PaperRender.INK_SOFT, 0.4f));
         }
 
-        int knobX = x + (int) ((w - 1) * this.value);
-        int knobY = barY + barH / 2;
-        boolean hover = isHovered();
-        int knobSize = hover ? 8 : 7;
-        gfx.fill(knobX - knobSize + 1, knobY - knobSize + 1, knobX + knobSize + 1, knobY + knobSize + 1, 0x50000000);
-        gfx.fill(knobX - knobSize, knobY - knobSize, knobX + knobSize, knobY + knobSize, PaperRender.PAPER_LIGHT);
-        gfx.fill(knobX - knobSize, knobY - knobSize, knobX + knobSize, knobY - knobSize + 1, PaperRender.INK);
-        gfx.fill(knobX - knobSize, knobY + knobSize - 1, knobX + knobSize, knobY + knobSize, PaperRender.INK);
-        gfx.fill(knobX - knobSize, knobY - knobSize, knobX - knobSize + 1, knobY + knobSize, PaperRender.INK);
-        gfx.fill(knobX + knobSize - 1, knobY - knobSize, knobX + knobSize, knobY + knobSize, PaperRender.INK);
-        gfx.fill(knobX - 2, knobY - 2, knobX + 2, knobY + 2, PaperRender.INK_RED);
+        PaperRender.drawRoundBox(gfx, x, cy - 3, w, 6, PaperRender.mul(PaperRender.PAPER_DARK, 0.85f), PaperRender.INK_FADED, 0f);
+
+        int kx = x + 4 + (int) ((w - 9) * this.value);
+        if (kx > x + 2) {
+            gfx.fill(x + 2, cy - 1, kx, cy + 1, PaperRender.INK_RED);
+            gfx.fill(x + 2, cy - 1, kx, cy, PaperRender.mix(PaperRender.INK_RED, 0xFFE06060, 0.4f));
+        }
+
+        gfx.pose().pushPose();
+        gfx.pose().translate(kx, cy - hoverAnim, 0);
+        float s = 1f + 0.15f * hoverAnim;
+        gfx.pose().scale(s, s, 1f);
+        PaperRender.drawRoundBox(gfx, -4, -6, 8, 12,
+                PaperRender.mix(PaperRender.PAPER_LIGHT, 0xFFF6ECCB, hoverAnim), PaperRender.INK, 0.4f);
+        gfx.fill(-1, -3, 1, 3, PaperRender.INK_RED);
+        gfx.pose().popPose();
     }
 }

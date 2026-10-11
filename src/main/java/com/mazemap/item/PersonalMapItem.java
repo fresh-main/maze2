@@ -1,5 +1,6 @@
 package com.mazemap.item;
 
+import com.mazemap.client.PersonalMapItemRenderer;
 import com.mazemap.network.MazeMapNetwork;
 import com.mazemap.network.packet.S2CFragmentSyncPacket;
 import com.mazemap.network.packet.S2COpenMapPacket;
@@ -15,12 +16,16 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
+import net.minecraftforge.client.extensions.common.IClientItemExtensions;
 import net.minecraftforge.network.PacketDistributor;
 
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 public class PersonalMapItem extends Item {
     public static final String TAG_MAP_DATA = "MapData";
@@ -101,6 +106,10 @@ public class PersonalMapItem extends Item {
             stack.setTag(null);
         }
     }
+    @Override
+    public void initializeClient(Consumer<IClientItemExtensions> consumer) {
+        consumer.accept(new PersonalMapItemRenderer());
+    }
 
     public static ItemStack findInInventory(Player player) {
         if (player.getMainHandItem().is(com.mazemap.registry.ModItems.PERSONAL_MAP.get())) {
@@ -117,6 +126,14 @@ public class PersonalMapItem extends Item {
         return ItemStack.EMPTY;
     }
     @Override
+    public boolean shouldCauseReequipAnimation(ItemStack oldStack, ItemStack newStack, boolean slotChanged) {
+        return slotChanged || oldStack.getItem() != newStack.getItem();
+    }
+    public static UUID peekMapUUID(ItemStack stack) {
+        CompoundTag tag = stack.getTag();
+        return tag != null && tag.hasUUID(TAG_MAP_UUID) ? tag.getUUID(TAG_MAP_UUID) : null;
+    }
+    @Override
     public void appendHoverText(ItemStack stack, @org.jetbrains.annotations.Nullable Level level, List<Component> tooltip, TooltipFlag flag) {
         super.appendHoverText(stack, level, tooltip, flag);
         MapDurabilityHandler.appendTooltip(stack, tooltip, flag);
@@ -127,15 +144,18 @@ public class PersonalMapItem extends Item {
     private static final String TAG_MARKER_Z = "MarkerZ";
 
     public static boolean hasMarker(ItemStack stack) {
-        return stack.getOrCreateTag().getBoolean(TAG_HAS_MARKER);
+        CompoundTag tag = stack.getTag();
+        return tag != null && tag.getBoolean(TAG_HAS_MARKER);
     }
 
     public static int getMarkerX(ItemStack stack) {
-        return stack.getOrCreateTag().getInt(TAG_MARKER_X);
+        CompoundTag tag = stack.getTag();
+        return tag != null ? tag.getInt(TAG_MARKER_X) : 0;
     }
 
     public static int getMarkerZ(ItemStack stack) {
-        return stack.getOrCreateTag().getInt(TAG_MARKER_Z);
+        CompoundTag tag = stack.getTag();
+        return tag != null ? tag.getInt(TAG_MARKER_Z) : 0;
     }
 
     public static void setMarker(ItemStack stack, int x, int z) {

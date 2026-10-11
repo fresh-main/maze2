@@ -313,7 +313,10 @@ public class OtborInstructionScreen extends Screen {
                 inX, sy, inW, 18,
                 new String[]{"облака выкл ", "быстро ", "красиво "},
                 () -> o.cloudStatus().get().ordinal(),
-                i -> o.cloudStatus().set(CloudStatus.values()[Math.max(0, Math.min(CloudStatus.values().length - 1, i))])
+                i -> {
+                    o.cloudStatus().set(CloudStatus.values()[Math.max(0, Math.min(CloudStatus.values().length - 1, i))]);
+                    com.otbor.client.EmbeddiumOptionsScreen.syncFromVanilla();
+                }
         ));
         sy += 22;
 
@@ -329,6 +332,10 @@ public class OtborInstructionScreen extends Screen {
                 },
                 0L, PaperRender.INK_RED, null
         ));
+    }
+    @Override
+    public void removed() {
+        Minecraft.getInstance().options.save();
     }
 
     private void buildControls(int cx, int y) {
