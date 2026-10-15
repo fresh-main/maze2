@@ -1,9 +1,11 @@
 package com.labyrinthmod.client;
 
 import com.labyrinthmod.LabyrinthMod;
+import com.labyrinthmod.client.sound.GlobalMusicPlayer;
 import com.mazemap.client.PersonalMapItemTexture;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
+import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
@@ -13,6 +15,13 @@ import net.minecraftforge.fml.common.Mod;
         value = Dist.CLIENT
 )
 public class ClientForgeEventSubscriber {
+
+    @SubscribeEvent
+    public static void onClientTick(TickEvent.ClientTickEvent event) {
+        if (event.phase == TickEvent.Phase.END) {
+            GlobalMusicPlayer.clientTick();
+        }
+    }
 
     @SubscribeEvent
     public static void onClientDisconnect(ClientPlayerNetworkEvent.LoggingOut event) {

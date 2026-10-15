@@ -59,6 +59,14 @@
     "category": "music",
     "sounds": [{ "name": "labyrinthmod:music/menu_epic", "stream": true }]
   },
+  "glade_ambient": {
+    "category": "music",
+    "sounds": [{ "name": "labyrinthmod:music/glade_ambient", "stream": true }]
+  },
+  "maze_ambient": {
+    "category": "music",
+    "sounds": [{ "name": "labyrinthmod:music/maze_ambient", "stream": true }]
+  },
   "page_flip": {
     "category": "ambient",
     "subtitle": "otbor.subtitle.page_flip",

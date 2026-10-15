@@ -1,5 +1,4 @@
 package com.otbor.client;
-import com.labyrinthmod.common.init.ModSounds;
 import com.otbor.client.widgets.PaperRender;
 import com.otbor.client.widgets.PaperWidgets;
 import net.minecraft.client.Minecraft;
@@ -8,8 +7,6 @@ import net.minecraft.client.gui.components.AbstractButton;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
-import net.minecraft.client.resources.sounds.AbstractSoundInstance;
-import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
@@ -17,8 +14,6 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.minecraft.sounds.SoundEvent;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import org.jetbrains.annotations.NotNull;
 import org.lwjgl.glfw.GLFW;
@@ -155,45 +150,6 @@ public class OtborTitleScreen extends Screen {
                 false, -1.5f, 180L,
                 b -> requestNavigate(new OtborInstructionScreen(this))
         )));
-    }
-
-    @Override
-    public void tick() {
-        super.tick();
-        if (menuMusic == null || !Minecraft.getInstance().getSoundManager().isActive(menuMusic)) {
-            startNextMenuTrack();
-        }
-    }
-
-    @Override
-    public void removed() {
-        if (menuMusic != null) {
-            menuMusic.stopMe();
-            menuMusic = null;
-        }
-        super.removed();
-    }
-
-    private void startNextMenuTrack() {
-        if (this.minecraft == null || menuMusic != null && this.minecraft.getSoundManager().isActive(menuMusic)) return;
-        menuMusic = new MenuMusicInstance(ModSounds.MENU_EPIC.get());
-        this.minecraft.getSoundManager().play(menuMusic);
-    }
-
-    private static class MenuMusicInstance extends AbstractSoundInstance {
-        MenuMusicInstance(SoundEvent event) {
-            super(event, SoundSource.MUSIC, SoundInstance.createUnseededRandom());
-            this.looping = true;
-            this.delay = 0;
-            this.volume = 0.24f;
-            this.pitch = 1.0f;
-            this.relative = true;
-            this.attenuation = Attenuation.NONE;
-        }
-
-        void stopMe() {
-            Minecraft.getInstance().getSoundManager().stop(this);
-        }
     }
 
     @Override

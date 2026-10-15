@@ -1,0 +1,15 @@
+GLADE MUSIC
+Title: Forest Ambience
+Author: TinyWorlds / Rick Hoppmann
+Source: https://opengameart.org/content/forest-ambience
+License: CC0 1.0 Universal (public domain dedication; attribution is not required)
+License URL: https://creativecommons.org/publicdomain/zero/1.0/
+The original MP3 was converted to Ogg Vorbis for Minecraft.
+
+MAZE MUSIC
+Title: Loopable Dungeon Ambience
+Author: JaggedStone
+Source: https://opengameart.org/content/loopable-dungeon-ambience
+License: CC0 1.0 Universal (public domain dedication; attribution is not required)
+License URL: https://creativecommons.org/publicdomain/zero/1.0/
+The downloaded Ogg Vorbis file is included without modification.

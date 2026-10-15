@@ -38,11 +38,17 @@ public final class MapDurabilityHandler {
 
     /** Потратить 1 единицу прочности. Возвращает true, если прочность успешно списана. */
     public static boolean consumeDurability(ItemStack stack) {
+        return consumeDurability(stack, 1);
+    }
+
+    /** Потратить указанное количество прочности одним атомарным списанием. */
+    public static boolean consumeDurability(ItemStack stack, int amount) {
         if (stack.isEmpty()) return false;
         if (isInfinite(stack)) return true;
+        amount = Math.max(1, amount);
         int current = getDurability(stack);
         if (current <= 0) return false;
-        setDurability(stack, current - 1);
+        setDurability(stack, current - amount);
         return true;
     }
 

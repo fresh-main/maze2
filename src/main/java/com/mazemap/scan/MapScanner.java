@@ -13,6 +13,7 @@ import net.minecraft.tags.FluidTags;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.LeavesBlock;
+import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.phys.AABB;
@@ -27,7 +28,9 @@ import java.util.Set;
 
 public final class MapScanner {
     /** Захватывает крупную крону целиком, даже если игрок стоит около ствола. */
-    public static final int SCAN_RADIUS = 32;
+    public static final int SCAN_RADIUS = 48;
+    /** Увеличенный обзор расходует больше чернил за каждый обновлённый фрагмент. */
+    public static final int DURABILITY_COST_PER_FRAGMENT = 2;
     /** Большой визуальный радиус сканируется раз в секунду, чтобы не нагружать сервер. */
     public static final int SCAN_INTERVAL_TICKS = 20;
     public static final int MAX_SCAN_Y = 300;
@@ -49,15 +52,18 @@ public final class MapScanner {
         if (isTreeFoliage(state)) return true;
         // Механизмы Create часто имеют MapColor.NONE и неполную форму коллизии,
         // поэтому обычная проверка полной грани скрывала их с карты.
-        if (isCreateBlock(state)) return !state.getShape(level, pos).isEmpty();
         if (state.is(BlockTags.REPLACEABLE) ||
                 state.is(BlockTags.FLOWERS) || state.is(BlockTags.TALL_FLOWERS) ||
                 state.is(BlockTags.SMALL_FLOWERS) || state.is(BlockTags.SAPLINGS) ||
                 state.is(BlockTags.CROPS)) return false;
 
-        if (state.getMapColor(level, pos) == MapColor.PLANT || state.getMapColor(level, pos) == MapColor.NONE) return false;
+        if (state.getMapColor(level, pos) == MapColor.PLANT) return false;
 
-        return state.isCollisionShapeFullBlock(level, pos);
+        // Полная кубическая коллизия скрывала ступени, плиты, стены, заборы,
+        // люки и декоративные механизмы. Карте нужна видимая форма блока,
+        // поэтому достаточно непустого outline shape и обычного рендера модели.
+        return state.getRenderShape() != RenderShape.INVISIBLE
+                && !state.getShape(level, pos).isEmpty();
     }
 
     private static boolean isCreateBlock(BlockState state) {
@@ -143,8 +149,10 @@ public final class MapScanner {
                 // Визуальный слой должен начинаться над кроной. Вариант NO_LEAVES
                 // начинал поиск под листвой, из-за чего дерево распадалось на землю,
                 // ствол и случайные куски кроны.
+                // WORLD_SURFACE также поднимает начало поиска над блоками без полной
+                // коллизии (люками, рельсами и частью декора Create).
                 int startYRender = Math.min(MAX_SCAN_Y,
-                        level.getHeight(Heightmap.Types.MOTION_BLOCKING, worldX, worldZ));
+                        level.getHeight(Heightmap.Types.WORLD_SURFACE, worldX, worldZ));
                 int surfaceYRender = Integer.MIN_VALUE;
                 for (int y = startYRender; y >= level.getMinBuildHeight(); y--) {
                     cursor.set(worldX, y, worldZ);
@@ -248,9 +256,10 @@ public final class MapScanner {
 
                 long fragKey = ((long) cellX << 32) | (cellZ & 0xFFFFFFFFL);
 
-                // 💎 Списание прочности: 1 единица за каждый измененный фрагмент
+                // 💎 Списание прочности за каждый изменённый фрагмент.
                 if (fragChanged && !changedFragments.contains(fragKey)) {
-                    if (!com.mazemap.util.MapDurabilityHandler.consumeDurability(mapStack)) {
+                    if (!com.mazemap.util.MapDurabilityHandler.consumeDurability(
+                            mapStack, DURABILITY_COST_PER_FRAGMENT)) {
                         return; // Прочность = 0. Карта замораживается, сканирование прерывается.
                     }
                 }
