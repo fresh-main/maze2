@@ -101,4 +101,8 @@ public final class PaperWidgets {
                                             Runnable onPress) {
         return new PaperIconButton(x, y, size, iconKey, label, baseRotationDeg, appearDelayMs, onPress);
     }
+    public static float[] notePin(AbstractWidget widget) {
+        if (widget instanceof NoteCard card) return new float[]{card.getPinX(), card.getPinY()};
+        return null;
+    }
 }

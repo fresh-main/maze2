@@ -343,4 +343,30 @@ public final class PaperRender {
         return Math.max(target, current - maxDelta);
     }
 
+    public static void drawSoftShadow(GuiGraphics gfx, int x, int y, int w, int h, int spread, float alpha) {
+        int layers = Math.max(1, spread);
+        int a = (int) (255 * Math.max(0f, Math.min(1f, alpha)) / layers);
+        if (a <= 0) return;
+        int color = a << 24;
+        for (int i = layers; i >= 1; i--) {
+            gfx.fill(x - i + 2, y - i + 3, x + w + i + 2, y + h + i + 3, color);
+        }
+    }
+
+    public static void drawRing(GuiGraphics gfx, int cx, int cy, int r, int color) {
+        drawCircleOutline(gfx, cx, cy, r, color);
+    }
+
+    public static void drawThread(GuiGraphics gfx, float x1, float y1, float x2, float y2, float sag, int color) {
+        int steps = Math.max(2, (int) Math.hypot(x2 - x1, y2 - y1));
+        int shadow = withAlpha(0xFF000000, 0.35f);
+        for (int i = 0; i <= steps; i++) {
+            float t = i / (float) steps;
+            int x = Math.round(x1 + (x2 - x1) * t);
+            int y = Math.round(y1 + (y2 - y1) * t + sag * 4f * t * (1f - t));
+            gfx.fill(x + 1, y + 3, x + 2, y + 4, shadow);
+            gfx.fill(x, y, x + 1, y + 2, color);
+        }
+    }
+
 }
