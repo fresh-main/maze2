@@ -16,6 +16,7 @@ import net.minecraftforge.network.NetworkEvent;
 import net.minecraftforge.network.PacketDistributor;
 
 import java.io.File;
+import java.util.List;
 import java.util.function.Supplier;
 
 /**
@@ -95,20 +96,19 @@ public class AdminActionPacket {
         sendSync(player, level, m, selectedEntityId, false);
     }
 
-    /**
-     * @param includePoints если true — шлём весь список patrolPoints + spawnPoint (heavy:
-     *        3000+ блокпозов = 24КБ network + сериализация). Если false — клиент держит
-     *        свой кэш, points поле не передаётся вообще. Использовать true только при
-     *        реальной смене точек (RECALC/CLEAR).
-     */
     private static void sendSync(ServerPlayer player, ServerLevel level, PatrolManager m,
                                  int selectedEntityId, boolean includePoints) {
         var grivers = OpenAdminMenuPacket.snapshotGriversLight(level, m, selectedEntityId);
         var players = OpenAdminMenuPacket.snapshotPlayersLight(level);
+
+        // Собираем moving surfaces компактно (best-effort)
+        List<OpenAdminMenuPacket.MovingSurfaceSnapshot> moving = OpenAdminMenuPacket.collectMovingSurfaces(
+                level, m.getBoundsMin(), m.getBoundsMax());
+
         SyncAdminDataPacket pkt = includePoints
                 ? new SyncAdminDataPacket(grivers, players, m.isGlobalPatrolActive(),
-                        m.getPatrolPoints(), m.getSpawnPoint())
-                : SyncAdminDataPacket.light(grivers, players, m.isGlobalPatrolActive());
+                m.getPatrolPoints(), m.getSpawnPoint(), moving)
+                : SyncAdminDataPacket.light(grivers, players, m.isGlobalPatrolActive(), moving);
         NetworkHandler.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), pkt);
     }
 

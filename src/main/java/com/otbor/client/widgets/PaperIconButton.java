@@ -1,40 +1,15 @@
 package com.otbor.client.widgets;
 
+import com.mojang.math.Axis;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractButton;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.Mth;
 
 public class PaperIconButton extends AbstractButton {
-
-    private static final String[] POWER = {
-            ".....##.....",
-            ".....##.....",
-            "..#..##..#..",
-            ".##..##..##.",
-            "##...##...##",
-            "##........##",
-            "##........##",
-            "##........##",
-            ".##......##.",
-            "..##....##..",
-            "...######..."
-    };
-    private static final String[] GLOBE = {
-            "...######...",
-            ".##.#..#.##.",
-            ".#..#..#..#.",
-            "#...#..#...#",
-            "############",
-            "#...#..#...#",
-            "#...#..#...#",
-            "############",
-            ".#..#..#..#.",
-            ".##.#..#.##.",
-            "...######..."
-    };
 
     private final String iconKey;
     private final String label;
@@ -44,6 +19,8 @@ public class PaperIconButton extends AbstractButton {
 
     private float hoverAnim = 0f;
     private long firstRender = -1L;
+    private long lastMs = 0L;
+    private long pressStart = 0L;
 
     public PaperIconButton(int x, int y, int size, String iconKey, String label,
                            float baseRotationDeg, long appearDelayMs, Runnable action) {
@@ -57,6 +34,7 @@ public class PaperIconButton extends AbstractButton {
 
     @Override
     public void onPress() {
+        pressStart = System.currentTimeMillis();
         action.run();
     }
 
@@ -69,17 +47,21 @@ public class PaperIconButton extends AbstractButton {
     protected void renderWidget(GuiGraphics gfx, int mouseX, int mouseY, float partialTick) {
         long now = System.currentTimeMillis();
         if (firstRender < 0) firstRender = now;
-        long elapsed = now - firstRender - appearDelay;
+        float dt = lastMs == 0L ? 0f : Math.min(0.05f, (now - lastMs) / 1000f);
+        lastMs = now;
+        float elapsed = now - firstRender - appearDelay;
         float appear = PaperRender.easeOut(elapsed <= 0 ? 0f : Math.min(1f, elapsed / 260f));
 
         boolean hovered = this.active && this.isHoveredOrFocused();
-        float step = partialTick * 0.18f;
-        hoverAnim = hovered ? Math.min(1f, hoverAnim + step) : Math.max(0f, hoverAnim - step);
+        hoverAnim = PaperRender.approach(hoverAnim, hovered ? 1f : 0f, dt * 6f);
+        float press = pressStart == 0L ? 0f : Mth.clamp(1f - (now - pressStart) / 180f, 0f, 1f);
+        float time = now / 1000f;
 
-        float lift = -3f * hoverAnim;
+        float sway = Mth.sin(time * 0.9f + baseRotationDeg * 3f) * 0.3f * (1f - hoverAnim);
+        float rotation = baseRotationDeg * (1f - 0.4f * hoverAnim) + sway;
+        float lift = -3f * hoverAnim + 1.5f * press;
         float slideIn = (1f - appear) * 18f;
-        float rotation = baseRotationDeg * (1f - 0.4f * hoverAnim);
-        float scale = 0.96f + 0.04f * appear + 0.02f * hoverAnim;
+        float scale = 0.96f + 0.04f * appear + 0.03f * hoverAnim - 0.03f * press;
 
         int x = getX();
         int y = getY();
@@ -89,37 +71,27 @@ public class PaperIconButton extends AbstractButton {
 
         gfx.pose().pushPose();
         gfx.pose().translate(x + w / 2f, y + h / 2f + slideIn + lift, 0);
-        gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(rotation));
+        gfx.pose().mulPose(Axis.ZP.rotationDegrees(rotation));
         gfx.pose().scale(scale, scale, 1f);
         gfx.pose().translate(-w / 2f, -h / 2f, 0);
 
+        if (hoverAnim > 0.01f) PaperRender.drawSoftShadow(gfx, 0, 0, w, h, 4, 0.2f * hoverAnim);
+
         float brightness = this.active ? 0.95f + 0.08f * hoverAnim : 0.75f;
         PaperRender.drawPaperCard(gfx, 0, 0, w, h, brightness, PaperRender.PAPER_BASE);
+        PaperRender.drawTape(gfx, w / 2 - 11, -4, 22, 9, 0xB8);
 
         long seed = ((long) x * 31L) ^ ((long) y * 17L);
-        PaperRender.drawInkStroke(gfx, 4, 2, w - 8, 1,
+        PaperRender.drawInkStroke(gfx, 4, 3, w - 8, 1,
                 PaperRender.withAlpha(PaperRender.INK_SOFT, 0.55f + 0.45f * hoverAnim), seed);
 
-        String[] bmp = "power".equals(iconKey) ? POWER : GLOBE;
-        int unit = Math.max(1, w / 24);
-        int iconW = bmp[0].length() * unit;
-        int iconH = bmp.length * unit;
-        int gap = 6;
-        int blockH = iconH + gap + font.lineHeight;
+        int iconPx = PixelIcons.scaleFor(w / 2) * 16;
+        int gap = 5;
+        int blockH = iconPx + gap + font.lineHeight;
         int top = (h - blockH) / 2;
-        int ix = (w - iconW) / 2;
-        int iconColor = PaperRender.mix(PaperRender.INK, PaperRender.INK_RED, hoverAnim);
-        for (int row = 0; row < bmp.length; row++) {
-            for (int col = 0; col < bmp[row].length(); col++) {
-                if (bmp[row].charAt(col) == '#') {
-                    int px = ix + col * unit;
-                    int py = top + row * unit;
-                    gfx.fill(px, py, px + unit, py + unit, iconColor);
-                }
-            }
-        }
+        PixelIcons.drawButtonIcon(gfx, iconKey, w / 2, top + iconPx / 2, w / 2, hoverAnim);
 
-        int labelY = top + iconH + gap;
+        int labelY = top + iconPx + gap;
         int maxW = w - 8;
         int lw = font.width(label);
         float labelScale = lw > maxW ? (float) maxW / lw : 1f;
@@ -135,11 +107,10 @@ public class PaperIconButton extends AbstractButton {
             int uw = (int) ((renderW + 6) * hoverAnim);
             PaperRender.drawInkStroke(gfx, w / 2 - uw / 2, labelY + 10, uw, 1,
                     PaperRender.withAlpha(PaperRender.INK_RED, 0.9f), seed + 1);
-
             int a = (int) (hoverAnim * 180);
             int c = (a << 24) | (PaperRender.INK_RED & 0xFFFFFF);
-            gfx.fill(w - 10, 2, w - 3, 3, c);
-            gfx.fill(w - 10, 2, w - 9, 6, c);
+            gfx.fill(w - 10, 3, w - 3, 4, c);
+            gfx.fill(w - 10, 3, w - 9, 7, c);
         }
 
         gfx.pose().popPose();

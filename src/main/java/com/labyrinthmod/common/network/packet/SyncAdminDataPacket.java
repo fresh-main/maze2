@@ -25,27 +25,35 @@ public class SyncAdminDataPacket {
     public final List<BlockPos> points;       // null если pointsIncluded=false
     public final BlockPos spawnPoint;         // null если pointsIncluded=false
 
+    // Новое поле (добавить рядом с другими полями)
+    public final List<OpenAdminMenuPacket.MovingSurfaceSnapshot> movingSurfaces;
+
+    // Обновлённый конструктор
     public SyncAdminDataPacket(List<OpenAdminMenuPacket.GriverSnapshot> grivers,
                                List<OpenAdminMenuPacket.PlayerSnapshot> players,
                                boolean patrolActive,
                                List<BlockPos> points,
-                               BlockPos spawnPoint) {
+                               BlockPos spawnPoint,
+                               List<OpenAdminMenuPacket.MovingSurfaceSnapshot> movingSurfaces) {
         this.grivers = grivers;
         this.players = players;
         this.patrolActive = patrolActive;
-        // Backwards-compat ctor: если points передан — всегда включаем.
         this.pointsIncluded = (points != null);
         this.points = points;
         this.spawnPoint = spawnPoint;
+        this.movingSurfaces = movingSurfaces == null ? new ArrayList<>() : movingSurfaces;
     }
 
-    /** Лёгкий конструктор без points (regular sync). */
+    // Лёгкий конструктор (factory) с movingSurfaces
     public static SyncAdminDataPacket light(List<OpenAdminMenuPacket.GriverSnapshot> grivers,
                                             List<OpenAdminMenuPacket.PlayerSnapshot> players,
-                                            boolean patrolActive) {
-        return new SyncAdminDataPacket(grivers, players, patrolActive, null, null);
+                                            boolean patrolActive,
+                                            List<OpenAdminMenuPacket.MovingSurfaceSnapshot> movingSurfaces) {
+        return new SyncAdminDataPacket(grivers, players, patrolActive, null, null, movingSurfaces);
     }
 
+
+    // encode: после обычных полей сериализуем movingSurfaces
     public static void encode(SyncAdminDataPacket p, FriendlyByteBuf buf) {
         buf.writeBoolean(p.patrolActive);
         buf.writeInt(p.grivers.size());
@@ -82,8 +90,19 @@ public class SyncAdminDataPacket {
             buf.writeBoolean(p.spawnPoint != null);
             if (p.spawnPoint != null) buf.writeBlockPos(p.spawnPoint);
         }
-    }
 
+        // moving surfaces
+        buf.writeInt(p.movingSurfaces == null ? 0 : p.movingSurfaces.size());
+        if (p.movingSurfaces != null) {
+            for (OpenAdminMenuPacket.MovingSurfaceSnapshot ms : p.movingSurfaces) {
+                buf.writeInt(ms.x);
+                buf.writeInt(ms.z);
+                buf.writeInt(ms.y);
+                buf.writeInt(ms.mapColorId);
+            }
+        }
+    }
+    // decode: читаем movingSurfaces в конце и передаём в ctor
     public static SyncAdminDataPacket decode(FriendlyByteBuf buf) {
         boolean active = buf.readBoolean();
         int n = buf.readInt();
@@ -124,7 +143,18 @@ public class SyncAdminDataPacket {
             for (int i = 0; i < ptc; i++) points.add(buf.readBlockPos());
             spawn = buf.readBoolean() ? buf.readBlockPos() : null;
         }
-        return new SyncAdminDataPacket(gs, ps, active, points, spawn);
+
+        int mc = buf.readInt();
+        List<OpenAdminMenuPacket.MovingSurfaceSnapshot> moving = new ArrayList<>(mc);
+        for (int i = 0; i < mc; i++) {
+            int x = buf.readInt();
+            int z = buf.readInt();
+            int y = buf.readInt();
+            int col = buf.readInt();
+            moving.add(new OpenAdminMenuPacket.MovingSurfaceSnapshot(x, z, y, col));
+        }
+
+        return new SyncAdminDataPacket(gs, ps, active, points, spawn, moving);
     }
 
     public static void handle(SyncAdminDataPacket p, Supplier<NetworkEvent.Context> ctxSup) {

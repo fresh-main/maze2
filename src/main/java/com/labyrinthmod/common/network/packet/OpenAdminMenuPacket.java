@@ -43,6 +43,7 @@ public class OpenAdminMenuPacket {
 
     public final List<ZoneSnapshot> exclusionZones;
     public final List<PlayerSnapshot> players;
+    private final List<MovingSurfaceSnapshot> movingSurfaces;
 
     public static class PlayerSnapshot {
         public final UUID id;
@@ -83,13 +84,15 @@ public class OpenAdminMenuPacket {
         }
     }
 
+    // заменить существующий конструктор на этот (он теперь принимает movingSurfaces)
     public OpenAdminMenuPacket(List<BlockPos> points, BlockPos spawnPoint, int minDistance, int maxDistance, int revisitCooldown,
                                long emergenceTime, boolean timeBasedEnabled, boolean patrolActive,
                                List<GriverSnapshot> grivers,
                                BlockPos boundsMin, BlockPos boundsMax,
                                int mapWidth, int mapHeight, int mapFloorY, byte[] mapData,
                                List<ZoneSnapshot> exclusionZones,
-                               List<PlayerSnapshot> players) {
+                               List<PlayerSnapshot> players,
+                               List<MovingSurfaceSnapshot> movingSurfaces) {
         this.points = points; this.spawnPoint = spawnPoint;
         this.minDistance = minDistance; this.maxDistance = maxDistance; this.revisitCooldown = revisitCooldown;
         this.emergenceTime = emergenceTime; this.timeBasedEnabled = timeBasedEnabled;
@@ -99,6 +102,7 @@ public class OpenAdminMenuPacket {
         this.mapData = mapData;
         this.exclusionZones = exclusionZones;
         this.players = players;
+        this.movingSurfaces = movingSurfaces == null ? Collections.emptyList() : movingSurfaces;
     }
 
     public static OpenAdminMenuPacket fromServer(Level level, PatrolManager m) {
@@ -139,14 +143,7 @@ public class OpenAdminMenuPacket {
         return ps;
     }
 
-    /**
-     * @param selectedEntityId entity id ВЫДЕЛЕННОГО гривера в админ-меню. Только для него
-     *  строится тяжёлый block-by-block displayPath через A* (4× buildMicroPath = до 100k
-     *  итераций). Остальные гриверы шлют пустой path/microPath/zoneBounds — на карте они
-     *  всё равно отображаются как одна точка-маркер. До этого fromServer считал пути
-     *  для ВСЕХ гриверов на каждый sendSync (каждый клик в админке) → серверный тик
-     *  залипал → пинг скакал.
-     */
+    // заменить fromServer(...) на этот вариант — он собирает компактный снимок moving surfaces
     public static OpenAdminMenuPacket fromServer(Level level, PatrolManager m, int selectedEntityId) {
         List<GriverSnapshot> gs = new ArrayList<>();
         AABB area = new AABB(-30000000, -1000, -30000000, 30000000, 1000, 30000000);
@@ -164,13 +161,12 @@ public class OpenAdminMenuPacket {
             }
         }
 
-        // Карта. Кешируется в PatrolManager — пересобирается только когда меняются
-        // bounds. До этого собиралась на каждом открытии меню (до 600×600×11 =
-        // 4 млн getBlockState вызовов) → 100-300мс залипания серверного тика.
+        // Карта.
         BlockPos bMin = m.getBoundsMin();
         BlockPos bMax = m.getBoundsMax();
         int mw = 0, mh = 0, fy = 0;
         byte[] data = new byte[0];
+        List<MovingSurfaceSnapshot> moving = new ArrayList<>();
         if (bMin != null && bMax != null) {
             PatrolManager.MapCache cache = m.getOrBuildMapCache(level);
             if (cache != null) {
@@ -178,6 +174,113 @@ public class OpenAdminMenuPacket {
                 mh = cache.height;
                 fy = cache.floorY;
                 data = cache.data;
+
+                // Собираем moving surfaces (компактно: по колонке сохраняем верхнюю движущуюся поверхность)
+                try {
+                    int minX = Math.min(bMin.getX(), bMax.getX());
+                    int minZ = Math.min(bMin.getZ(), bMax.getZ());
+                    int maxX = Math.max(bMin.getX(), bMax.getX());
+                    int maxZ = Math.max(bMin.getZ(), bMax.getZ());
+
+                    // AABB поиска — немного расширяем по Y
+                    AABB search = new AABB(minX, fy - 64, minZ, maxX, fy + 128, maxZ);
+
+                    Map<Long, MovingSurfaceSnapshot> best = new HashMap<>();
+                    // Пытаемся использовать классы contraption'ов (используется в MapScanner)
+                    var contraptions = level.getEntitiesOfClass(
+                            (Class)Class.forName("com.simibubi.create.content.contraptions.entity.AbstractContraptionEntity"),
+                            search, entity -> {
+                                try {
+                                    return (boolean)entity.getClass().getMethod("isAlive").invoke(entity);
+                                } catch (Throwable t) {
+                                    return true;
+                                }
+                            }
+                    );
+
+                    for (Object entity : contraptions) {
+                        try {
+                            // contraption.getBlocks().entrySet()
+                            var getContraption = entity.getClass().getMethod("getContraption");
+                            Object contr = getContraption.invoke(entity);
+                            var getBlocks = contr.getClass().getMethod("getBlocks");
+                            @SuppressWarnings("unchecked")
+                            java.util.Map<?, ?> blocks = (java.util.Map<?, ?>) getBlocks.invoke(contr);
+
+                            // toGlobalVector(Vec3, float)
+                            var toGlobalVector = entity.getClass().getMethod("toGlobalVector", net.minecraft.world.phys.Vec3.class, float.class);
+
+                            for (var entryObj : blocks.entrySet()) {
+                                var entry = (java.util.Map.Entry<?, ?>) entryObj;
+                                // key: BlockPos-like local pos (in contraption), value: BlockInfo-like with state()
+                                Object localPos = entry.getKey();
+                                Object blockInfo = entry.getValue();
+                                // get BlockState
+                                var stateMethod = blockInfo.getClass().getMethod("state");
+                                Object stateObj = stateMethod.invoke(blockInfo);
+                                if (stateObj == null) continue;
+
+                                // world center
+                                // create Vec3.atCenterOf(localPos)
+                                // localPos likely is BlockPos; use toString fallback if fails
+                                net.minecraft.world.phys.Vec3 center;
+                                try {
+                                    // create Vec3.atCenterOf
+                                    var atCenter = net.minecraft.world.phys.Vec3.class.getMethod("atCenterOf", net.minecraft.core.BlockPos.class);
+                                    center = (net.minecraft.world.phys.Vec3) atCenter.invoke(null, localPos);
+                                } catch (Throwable ex) {
+                                    continue;
+                                }
+
+                                net.minecraft.world.phys.Vec3 worldCenter;
+                                try {
+                                    worldCenter = (net.minecraft.world.phys.Vec3) toGlobalVector.invoke(entity, center, 1.0F);
+                                } catch (Throwable ex) {
+                                    continue;
+                                }
+
+                                int minXi = (int) Math.floor(worldCenter.x - 0.499D);
+                                int maxXi = (int) Math.floor(worldCenter.x + 0.499D);
+                                int minYi = (int) Math.floor(worldCenter.y - 0.499D);
+                                int maxYi = (int) Math.floor(worldCenter.y + 0.499D);
+                                int minZi = (int) Math.floor(worldCenter.z - 0.499D);
+                                int maxZi = (int) Math.floor(worldCenter.z + 0.499D);
+
+                                for (int x = minXi; x <= maxXi; x++) {
+                                    if (x < minX || x > maxX) continue;
+                                    for (int z = minZi; z <= maxZi; z++) {
+                                        if (z < minZ || z > maxZ) continue;
+                                        int yTop = maxYi;
+                                        long key = (((long)x) << 32) | (z & 0xFFFFFFFFL);
+                                        MovingSurfaceSnapshot prev = best.get(key);
+                                        if (prev == null || yTop > prev.y) {
+                                            // compute mapColor id
+                                            net.minecraft.core.BlockPos cursor = new net.minecraft.core.BlockPos(x, yTop, z);
+                                            // stateObj is BlockState-like; try to cast
+                                            net.minecraft.world.level.block.state.BlockState bs = (net.minecraft.world.level.block.state.BlockState) stateObj;
+                                            net.minecraft.world.level.material.MapColor mc = bs.getMapColor(level, cursor);
+                                            int colorId = mc == null ? 0 : mc.col; // fallback: use 'col' or 'id' field (MC versions differ)
+                                            // try fields: id or id field name; fallbacks above
+                                            try {
+                                                // many versions have 'id' int field
+                                                java.lang.reflect.Field f = mc.getClass().getField("id");
+                                                colorId = f.getInt(mc);
+                                            } catch (Throwable ignored) {}
+                                            best.put(key, new MovingSurfaceSnapshot(x, z, yTop, colorId));
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (Throwable ignored) {
+                            // если API Create недоступен или отражение не сработало — пропускаем этот entity
+                        }
+                    }
+
+                    moving.addAll(best.values());
+                } catch (Throwable t) {
+                    // сбор moving surfaces — best-effort. Если что-то упало, просто оставим список пустым.
+                    LabyrinthMod.LOGGER.debug("[OpenAdminMenuPacket] collect moving surfaces failed: {}", t.toString());
+                }
             }
         }
 
@@ -196,10 +299,11 @@ public class OpenAdminMenuPacket {
                 m.getMinDistanceBetweenGrivers(), m.getMaxTargetDistance(), m.getRevisitCooldown(),
                 m.getEmergenceTime(), m.isTimeBasedEmergenceEnabled(),
                 m.isGlobalPatrolActive(), gs,
-                bMin, bMax, mw, mh, fy, data, zs, ps
+                bMin, bMax, mw, mh, fy, data, zs, ps, moving
         );
     }
 
+    // заменить encode(...) — после players добавляем movingSurfaces
     public static void encode(OpenAdminMenuPacket p, FriendlyByteBuf buf) {
         buf.writeInt(p.points.size());
         for (BlockPos pos : p.points) buf.writeBlockPos(pos);
@@ -255,8 +359,20 @@ public class OpenAdminMenuPacket {
             buf.writeUtf(ps.name);
             buf.writeBlockPos(ps.pos);
         }
+
+        // moving surfaces
+        buf.writeInt(p.movingSurfaces == null ? 0 : p.movingSurfaces.size());
+        if (p.movingSurfaces != null) {
+            for (MovingSurfaceSnapshot ms : p.movingSurfaces) {
+                buf.writeInt(ms.x);
+                buf.writeInt(ms.z);
+                buf.writeInt(ms.y);
+                buf.writeInt(ms.mapColorId);
+            }
+        }
     }
 
+    // заменить decode(...) — читаем movingSurfaces в конце
     public static OpenAdminMenuPacket decode(FriendlyByteBuf buf) {
         int pc = buf.readInt();
         List<BlockPos> points = new ArrayList<>(pc);
@@ -317,8 +433,18 @@ public class OpenAdminMenuPacket {
             ps.add(new PlayerSnapshot(pid, name, pos));
         }
 
+        int mc = buf.readInt();
+        List<MovingSurfaceSnapshot> moving = new ArrayList<>(mc);
+        for (int i = 0; i < mc; i++) {
+            int x = buf.readInt();
+            int z = buf.readInt();
+            int y = buf.readInt();
+            int mapColorId = buf.readInt();
+            moving.add(new MovingSurfaceSnapshot(x, z, y, mapColorId));
+        }
+
         return new OpenAdminMenuPacket(points, spawn, minDist, maxDist, cooldown, emergence, timeBased, active, gs,
-                bMin, bMax, mw, mh2, fy, data, zs, ps);
+                bMin, bMax, mw, mh2, fy, data, zs, ps, moving);
     }
 
     public static void handle(OpenAdminMenuPacket p, Supplier<NetworkEvent.Context> ctxSup) {
@@ -328,6 +454,115 @@ public class OpenAdminMenuPacket {
             Proxy.getInstance().openAdminScreen(p);
         });
         ctx.setPacketHandled(true);
+    }
+    // вставить внутри OpenAdminMenuPacket (новый inner-класс)
+    public static class MovingSurfaceSnapshot {
+        public final int x;
+        public final int z;
+        public final int y;
+        public final int mapColorId;
+
+        public MovingSurfaceSnapshot(int x, int z, int y, int mapColorId) {
+            this.x = x;
+            this.z = z;
+            this.y = y;
+            this.mapColorId = mapColorId;
+        }
+    }
+    public static java.util.List<MovingSurfaceSnapshot> collectMovingSurfaces(Level level, BlockPos bMin, BlockPos bMax) {
+        List<MovingSurfaceSnapshot> moving = new ArrayList<>();
+        if (bMin == null || bMax == null) return moving;
+        try {
+            int minX = Math.min(bMin.getX(), bMax.getX());
+            int minZ = Math.min(bMin.getZ(), bMax.getZ());
+            int maxX = Math.max(bMin.getX(), bMax.getX());
+            int maxZ = Math.max(bMin.getZ(), bMax.getZ());
+
+            // Search AABB slightly expanded vertically
+            AABB search = new AABB(minX, Math.min(bMin.getY(), bMax.getY()) - 64, minZ,
+                    maxX, Math.max(bMin.getY(), bMax.getY()) + 128, maxZ);
+
+            // Try to find Create-style contraptions via reflection (best-effort).
+            Class<?> contrClass;
+            try {
+                contrClass = Class.forName("com.simibubi.create.content.contraptions.entity.AbstractContraptionEntity");
+            } catch (ClassNotFoundException cnf) {
+                // If Create not present — nothing to collect here.
+                return moving;
+            }
+
+            var contraptions = level.getEntitiesOfClass((Class) contrClass, search,
+                    e -> {
+                        try {
+                            return (boolean) e.getClass().getMethod("isAlive").invoke(e);
+                        } catch (Throwable t) {
+                            return true;
+                        }
+                    });
+
+            Map<Long, MovingSurfaceSnapshot> best = new HashMap<>();
+            for (Object entity : contraptions) {
+                try {
+                    // contraption = entity.getContraption()
+                    var getContraption = entity.getClass().getMethod("getContraption");
+                    Object contr = getContraption.invoke(entity);
+                    if (contr == null) continue;
+
+                    // blocks = contr.getBlocks()
+                    var getBlocks = contr.getClass().getMethod("getBlocks");
+                    @SuppressWarnings("unchecked")
+                    Map<?, ?> blocks = (Map<?, ?>) getBlocks.invoke(contr);
+                    if (blocks == null) continue;
+
+                    var toGlobalVector = entity.getClass().getMethod("toGlobalVector", net.minecraft.world.phys.Vec3.class, float.class);
+
+                    for (var entryObj : blocks.entrySet()) {
+                        var entry = (java.util.Map.Entry<?, ?>) entryObj;
+                        Object localPos = entry.getKey();
+                        Object blockInfo = entry.getValue();
+                        if (localPos == null || blockInfo == null) continue;
+
+                        // world center of block: try Vec3.atCenterOf(localPos) then toGlobalVector
+                        net.minecraft.world.phys.Vec3 localCenter;
+                        try {
+                            localCenter = (net.minecraft.world.phys.Vec3)
+                                    net.minecraft.world.phys.Vec3.class.getMethod("atCenterOf", net.minecraft.core.BlockPos.class)
+                                            .invoke(null, localPos);
+                        } catch (Throwable ex) {
+                            continue;
+                        }
+
+                        net.minecraft.world.phys.Vec3 worldCenter;
+                        try {
+                            worldCenter = (net.minecraft.world.phys.Vec3) toGlobalVector.invoke(entity, localCenter, 1.0F);
+                        } catch (Throwable ex) {
+                            continue;
+                        }
+
+                        int minXi = (int) Math.floor(worldCenter.x - 0.499D);
+                        int maxYi = (int) Math.floor(worldCenter.y + 0.499D);
+                        int minZi = (int) Math.floor(worldCenter.z - 0.499D);
+
+                        // clamp to bounds
+                        if (minXi < minX || minXi > maxX || minZi < minZ || minZi > maxZ) continue;
+
+                        long key = (((long) minXi) << 32) | (minZi & 0xFFFFFFFFL);
+                        MovingSurfaceSnapshot prev = best.get(key);
+                        if (prev == null || maxYi > prev.y) {
+                            // mapColorId unused for now — set 0 (we only need coords for overlay)
+                            best.put(key, new MovingSurfaceSnapshot(minXi, minZi, maxYi, 0));
+                        }
+                    }
+                } catch (Throwable ignored) {
+                    // best-effort: ignore entities we cannot reflect into
+                }
+            }
+
+            moving.addAll(best.values());
+        } catch (Throwable t) {
+            LabyrinthMod.LOGGER.debug("[OpenAdminMenuPacket] collectMovingSurfaces failed: {}", t.toString());
+        }
+        return moving;
     }
 
 }

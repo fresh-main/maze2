@@ -4,6 +4,8 @@ import com.otbor.client.widgets.PaperWidgets;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
 import net.minecraft.client.gui.components.AbstractButton;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -14,6 +16,11 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import org.jetbrains.annotations.NotNull;
+import org.lwjgl.glfw.GLFW;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
 
 public class OtborTitleScreen extends Screen {
     private static final long EXIT_TRANSITION_MS = 240L;
@@ -25,6 +32,14 @@ public class OtborTitleScreen extends Screen {
     private long comingSoonStart = 0L;
     private int noteX;
     private int noteY;
+    private MenuMusicInstance menuMusic;
+    private final List<AbstractWidget> noteCards = new ArrayList<>();
+    private float parX = 0f;
+    private float parY = 0f;
+    private float[] moteX = new float[0];
+    private float[] moteY = new float[0];
+    private float[] moteSpeed = new float[0];
+    private float[] moteSeed = new float[0];
 
     public OtborTitleScreen() {
         super(Component.literal("OTBOR "));
@@ -54,29 +69,30 @@ public class OtborTitleScreen extends Screen {
         super.init();
         this.enterStart = System.currentTimeMillis();
         scaleMultiplier = 1.0f;
+        noteCards.clear();
+        initMotes();
 
         int cx = this.width / 2;
-
-        int cardW = (int)(168 * scaleMultiplier);
-        int cardH = (int)(220 * scaleMultiplier);
-        int gap = (int)(20 * scaleMultiplier);
-        int sq = (int)(56 * scaleMultiplier);
-        int sqGap = (int)(12 * scaleMultiplier);
+        int gap = 20;
+        int sq = 56;
+        int sqGap = 12;
         int extra = sq + gap;
-
         int count = 4;
-        int totalRowW = cardW * count + gap * (count - 1) + extra;
-        int cardsY = Math.max(this.height - cardH - (int)(100 * scaleMultiplier), (int)(200 * scaleMultiplier));
 
-        if (totalRowW > this.width - (int)(40 * scaleMultiplier)) {
-            cardW = Math.max((int)(120 * scaleMultiplier), (this.width - (int)(40 * scaleMultiplier) - gap * (count - 1) - extra) / count);
+        int minCardsY = 164;
+        int cardH = Mth.clamp(this.height - minCardsY - 24, 140, 220);
+        int cardsY = Math.max(minCardsY, this.height - cardH - 100);
+        int cardW = 168;
+        int totalRowW = cardW * count + gap * (count - 1) + extra;
+        if (totalRowW > this.width - 40) {
+            cardW = Math.max(120, (this.width - 40 - gap * (count - 1) - extra) / count);
             totalRowW = cardW * count + gap * (count - 1) + extra;
         }
 
         int startX = cx - totalRowW / 2;
         int step = cardW + gap;
 
-        addRenderableWidget(PaperWidgets.noteCard(
+        noteCards.add(addRenderableWidget(PaperWidgets.noteCard(
                 startX, cardsY, cardW, cardH,
                 0,
                 Component.literal("ВОЙТИ В"),
@@ -86,9 +102,9 @@ public class OtborTitleScreen extends Screen {
                 PaperWidgets.NoteCardVariant.BASE,
                 false, -4f, 0L,
                 b -> requestNavigate(new EnterMazeScreen(this))
-        ));
+        )));
 
-        addRenderableWidget(PaperWidgets.noteCard(
+        noteCards.add(addRenderableWidget(PaperWidgets.noteCard(
                 startX + step, cardsY, cardW, cardH,
                 1,
                 Component.literal("ИГРАТЬ"),
@@ -98,12 +114,12 @@ public class OtborTitleScreen extends Screen {
                 PaperWidgets.NoteCardVariant.BASE,
                 false, 0.5f, 45L,
                 b -> requestNavigate(new OtborWorldSelectionScreen(this))
-        ));
+        )));
 
         int colX = startX + step * 2;
         int colY = cardsY + (cardH - (sq * 2 + sqGap)) / 2;
         noteX = colX + sq / 2;
-        noteY = colY - (int)(16 * scaleMultiplier);
+        noteY = colY - 16;
 
         addRenderableWidget(PaperWidgets.iconButton(colX, colY, sq, "power", "ВЫХОД", -2f, 60L,
                 () -> this.minecraft.stop()));
@@ -111,7 +127,7 @@ public class OtborTitleScreen extends Screen {
         addRenderableWidget(PaperWidgets.iconButton(colX, colY + sq + sqGap, sq, "globe", "ПЕРЕВОД", 1.5f, 75L,
                 () -> comingSoonStart = System.currentTimeMillis()));
 
-        addRenderableWidget(PaperWidgets.noteCard(
+        noteCards.add(addRenderableWidget(PaperWidgets.noteCard(
                 startX + step * 2 + extra, cardsY, cardW, cardH,
                 2,
                 Component.literal("УЗНАТЬ"),
@@ -121,9 +137,9 @@ public class OtborTitleScreen extends Screen {
                 PaperWidgets.NoteCardVariant.LIGHT,
                 true, 2.5f, 90L,
                 b -> requestNavigate(new TheTruthScreen(this))
-        ));
+        )));
 
-        addRenderableWidget(PaperWidgets.noteCard(
+        noteCards.add(addRenderableWidget(PaperWidgets.noteCard(
                 startX + step * 3 + extra, cardsY, cardW, cardH,
                 3,
                 Component.literal("ИНСТРУКЦИЯ"),
@@ -133,16 +149,19 @@ public class OtborTitleScreen extends Screen {
                 PaperWidgets.NoteCardVariant.DARK,
                 false, -1.5f, 180L,
                 b -> requestNavigate(new OtborInstructionScreen(this))
-        ));
+        )));
     }
 
     @Override
     public void render(@NotNull GuiGraphics gfx, int mouseX, int mouseY, float partialTick) {
+        parX += ((mouseX - this.width / 2f) / Math.max(1, this.width) * 8f - parX) * 0.1f;
+        parY += ((mouseY - this.height / 2f) / Math.max(1, this.height) * 4f - parY) * 0.1f;
+
         PaperRender.drawBoardBackground(gfx, this.width, this.height);
-
+        renderMotes(gfx);
         renderHeader(gfx, partialTick);
-
         renderCornerScribbles(gfx);
+        renderThreads(gfx);
 
         super.render(gfx, mouseX, mouseY, partialTick);
 
@@ -193,10 +212,12 @@ public class OtborTitleScreen extends Screen {
         int bannerH = (int)(110 * scaleMultiplier);
         int bannerX = cx - bannerW / 2;
         int bannerY = (int)(30 * scaleMultiplier);
+        long ms = System.currentTimeMillis();
+        float sway = Mth.sin(ms / 1000f * 0.5f) * 0.12f;
 
         gfx.pose().pushPose();
-        gfx.pose().translate(cx, bannerY + bannerH / 2f, 0);
-        gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-0.8f));
+        gfx.pose().translate(cx + parX, bannerY + bannerH / 2f + parY, 0);
+        gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-0.8f + sway));
         gfx.pose().translate(-bannerW / 2f, -bannerH / 2f, 0);
 
         PaperRender.drawPaperCard(gfx, 0, 0, bannerW, bannerH, 1.0f, PaperRender.PAPER_LIGHT);
@@ -218,7 +239,9 @@ public class OtborTitleScreen extends Screen {
         gfx.pose().translate(bannerW / 2f - w1 / 2f, (int)(26 * scaleMultiplier), 0);
         gfx.pose().scale(s1, s1, 1f);
         int glitch = (int) (55 + 35 * pulse);
-        gfx.drawString(font, line1, 1, 0, (glitch << 24) | 0x7A1F1F, false);
+        boolean glitching = (ms % 6000L) < 140L;
+        int gx = glitching ? (((ms / 35L) % 2L == 0L) ? 3 : -3) : 1;
+        gfx.drawString(font, line1, gx, 0, (glitch << 24) | 0x7A1F1F, false);
         gfx.drawString(font, line1, 0, 0, PaperRender.INK, false);
         gfx.pose().popPose();
 
@@ -238,8 +261,8 @@ public class OtborTitleScreen extends Screen {
 
         gfx.pose().popPose();
 
-        int stampCx = bannerX + bannerW - (int)(20 * scaleMultiplier);
-        int stampCy = bannerY + bannerH - (int)(12 * scaleMultiplier);
+        int stampCx = bannerX + bannerW - (int)(20 * scaleMultiplier) + (int) parX;
+        int stampCy = bannerY + bannerH - (int)(12 * scaleMultiplier) + (int) parY;
         gfx.pose().pushPose();
         gfx.pose().translate(stampCx, stampCy, 0);
         gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(14f));
@@ -375,5 +398,65 @@ public class OtborTitleScreen extends Screen {
         protected void updateWidgetNarration(@NotNull NarrationElementOutput output) {
             defaultButtonNarrationText(output);
         }
+    }
+    private void initMotes() {
+        Random rnd = new Random(0x0B0E5L);
+        int n = 28;
+        moteX = new float[n];
+        moteY = new float[n];
+        moteSpeed = new float[n];
+        moteSeed = new float[n];
+        for (int i = 0; i < n; i++) {
+            moteX[i] = rnd.nextFloat() * Math.max(1, this.width);
+            moteY[i] = rnd.nextFloat() * Math.max(1, this.height);
+            moteSpeed[i] = 2f + rnd.nextFloat() * 5f;
+            moteSeed[i] = rnd.nextFloat() * 6.28f;
+        }
+    }
+
+    private void renderMotes(GuiGraphics gfx) {
+        float t = System.currentTimeMillis() / 1000f;
+        float hgt = Math.max(1, this.height);
+        for (int i = 0; i < moteX.length; i++) {
+            float y = ((moteY[i] - t * moteSpeed[i]) % hgt + hgt) % hgt;
+            float x = moteX[i] + Mth.sin(t * 0.4f + moteSeed[i]) * 10f;
+            float a = 0.10f + 0.10f * (0.5f + 0.5f * Mth.sin(t * 0.8f + moteSeed[i] * 2f));
+            int xi = (int) x;
+            int yi = (int) y;
+            gfx.fill(xi, yi, xi + 1, yi + 1, PaperRender.withAlpha(PaperRender.PAPER_LIGHT, a));
+        }
+    }
+
+    private void renderThreads(GuiGraphics gfx) {
+        float[] prev = null;
+        for (AbstractWidget card : noteCards) {
+            float[] pin = PaperWidgets.notePin(card);
+            if (pin == null) continue;
+            if (prev != null) {
+                float sag = Math.min(18f, Math.abs(pin[0] - prev[0]) * 0.12f);
+                PaperRender.drawThread(gfx, prev[0], prev[1], pin[0], pin[1], sag,
+                        PaperRender.withAlpha(PaperRender.INK_RED, 0.9f));
+            }
+            prev = pin;
+        }
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (exitStart != 0L) return true;
+        if (keyCode == GLFW.GLFW_KEY_RIGHT || keyCode == GLFW.GLFW_KEY_LEFT) {
+            moveFocus(keyCode == GLFW.GLFW_KEY_RIGHT ? 1 : -1);
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    private void moveFocus(int dir) {
+        List<? extends GuiEventListener> list = this.children();
+        int n = list.size();
+        if (n == 0) return;
+        int cur = list.indexOf(this.getFocused());
+        int next = cur < 0 ? (dir > 0 ? 0 : n - 1) : Math.floorMod(cur + dir, n);
+        this.setFocused(list.get(next));
     }
 }

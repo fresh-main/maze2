@@ -43,6 +43,7 @@ public class AdminScreen extends Screen {
     private byte[] mapData;
     private List<OpenAdminMenuPacket.ZoneSnapshot> exclusionZones;
 
+
     private static final int MAX_MAP_SIZE = 500;
 
     // Кэш текстуры карты
@@ -66,6 +67,7 @@ public class AdminScreen extends Screen {
     // Выбранный гривер
     private int selectedGriverEntityId = -1;
     private int refreshCooldown = 0;
+    private java.util.List<OpenAdminMenuPacket.MovingSurfaceSnapshot> movingSurfaces = java.util.Collections.emptyList();
 
     public AdminScreen(OpenAdminMenuPacket data) {
         super(Component.literal("Labyrinth Admin Menu"));
@@ -94,6 +96,25 @@ public class AdminScreen extends Screen {
             this.mapDataHeight = data.mapHeight;
             this.mapData = data.mapData;
             this.exclusionZones = data.exclusionZones;
+
+            // Попробуем рефлексией получить movingSurfaces из пакета, если поле присутствует.
+            try {
+                java.lang.reflect.Field f = data.getClass().getDeclaredField("movingSurfaces");
+                f.setAccessible(true);
+                Object val = f.get(data);
+                if (val instanceof java.util.List) {
+                    @SuppressWarnings("unchecked")
+                    java.util.List<OpenAdminMenuPacket.MovingSurfaceSnapshot> casted =
+                            (java.util.List<OpenAdminMenuPacket.MovingSurfaceSnapshot>) val;
+                    this.movingSurfaces = casted == null ? java.util.Collections.emptyList() : casted;
+                } else {
+                    this.movingSurfaces = java.util.Collections.emptyList();
+                }
+            } catch (Throwable t) {
+                // Поле отсутствует или ошибка — оставляем пустой список
+                this.movingSurfaces = java.util.Collections.emptyList();
+            }
+
             buildMapTexture();
             firstOpen = false;
         } else {
@@ -118,6 +139,27 @@ public class AdminScreen extends Screen {
                 img.setPixelRGBA(i, j, color);
             }
         }
+
+        // Накладываем движущиеся поверхности (если есть) — рисуем их ярким оранжевым цветом поверх карты.
+        if (this.movingSurfaces != null && boundsMin != null && boundsMax != null && mapDataWidth > 0 && mapDataHeight > 0) {
+            int baseMinX = Math.min(boundsMin.getX(), boundsMax.getX());
+            int baseMinZ = Math.min(boundsMin.getZ(), boundsMax.getZ());
+            for (var ms : this.movingSurfaces) {
+                if (ms == null) continue;
+                int px = ms.x - baseMinX;
+                int pz = ms.z - baseMinZ;
+                if (px < 0 || pz < 0 || px >= mapDataWidth || pz >= mapDataHeight) continue;
+                // Цвет можно варьировать по высоте или по mapColorId; пока — яркий оранжевый.
+                int overlay = 0xFFFF7700;
+                img.setPixelRGBA(px, pz, overlay);
+                // Немного расширим область, чтобы движение было заметнее
+                if (px + 1 < mapDataWidth) img.setPixelRGBA(px + 1, pz, overlay);
+                if (px - 1 >= 0) img.setPixelRGBA(px - 1, pz, overlay);
+                if (pz + 1 < mapDataHeight) img.setPixelRGBA(px, pz + 1, overlay);
+                if (pz - 1 >= 0) img.setPixelRGBA(px, pz - 1, overlay);
+            }
+        }
+
         mapTexture = new DynamicTexture(img);
         mapTextureLoc = Minecraft.getInstance().getTextureManager().register("labyrinthmod_map", mapTexture);
     }
@@ -139,6 +181,26 @@ public class AdminScreen extends Screen {
         if (p.spawnPoint != null) this.spawnPoint = p.spawnPoint;
         if (startStopButton != null) {
             startStopButton.setMessage(Component.literal(patrolActive ? "Остановить патруль" : "Запустить патруль"));
+        }
+
+        // Попытка рефлексивно прочитать movingSurfaces из SyncAdminDataPacket (если сервер его посылает).
+        try {
+            java.lang.reflect.Field f = p.getClass().getDeclaredField("movingSurfaces");
+            f.setAccessible(true);
+            Object val = f.get(p);
+            if (val instanceof java.util.List) {
+                @SuppressWarnings("unchecked")
+                java.util.List<OpenAdminMenuPacket.MovingSurfaceSnapshot> casted =
+                        (java.util.List<OpenAdminMenuPacket.MovingSurfaceSnapshot>) val;
+                this.movingSurfaces = casted == null ? java.util.Collections.emptyList() : casted;
+            }
+        } catch (Throwable ignored) {
+            // Поле отсутствует — ничего не делаем (остаются старые/пустые movingSurfaces)
+        }
+
+        // Если у нас уже есть карта — перестроим текстуру, чтобы отразить новые позиции движущихся стен.
+        if (this.mapData != null && this.mapData.length > 0) {
+            buildMapTexture();
         }
     }
 
