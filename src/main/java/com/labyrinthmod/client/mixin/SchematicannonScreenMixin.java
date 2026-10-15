@@ -19,8 +19,10 @@ public abstract class SchematicannonScreenMixin {
             at = @At(
                     value = "INVOKE",
                     target = "Lcom/simibubi/create/content/schematics/cannon/SchematicannonScreen;renderPrintingProgress(Lnet/minecraft/client/gui/GuiGraphics;IIF)V",
-                    shift = At.Shift.BEFORE
-            )
+                    shift = At.Shift.BEFORE,
+                    remap = false
+            ),
+            remap = true
     )
     private void otbor$paperSchematicannonBackground(GuiGraphics gfx, float partialTick,
                                                       int mouseX, int mouseY, CallbackInfo ci) {
@@ -44,7 +46,7 @@ public abstract class SchematicannonScreenMixin {
         gfx.fill(arrowEnd - 3, arrowY - 1, arrowEnd, arrowY + 1, PaperRender.INK_FADED);
     }
 
-    @Inject(method = "renderBg", at = @At("TAIL"))
+    @Inject(method = "renderBg", at = @At("TAIL"), remap = true)
     private void otbor$hideCreateTitleStrip(GuiGraphics gfx, float partialTick,
                                              int mouseX, int mouseY, CallbackInfo ci) {
         SchematicannonScreen self = (SchematicannonScreen) (Object) this;
@@ -58,9 +60,11 @@ public abstract class SchematicannonScreenMixin {
             method = "renderBg",
             at = @At(
                     value = "INVOKE",
-                    target = "Lcom/simibubi/create/content/schematics/cannon/SchematicannonScreen;renderPlayerInventory(Lnet/minecraft/client/gui/GuiGraphics;II)V"
+                    target = "Lcom/simibubi/create/content/schematics/cannon/SchematicannonScreen;renderPlayerInventory(Lnet/minecraft/client/gui/GuiGraphics;II)V",
+                    remap = false
             ),
-            require = 0
+            require = 0,
+            remap = true
     )
     private void otbor$hidePlayerInventoryPanel(SchematicannonScreen screen,
                                                  GuiGraphics gfx, int x, int y) {

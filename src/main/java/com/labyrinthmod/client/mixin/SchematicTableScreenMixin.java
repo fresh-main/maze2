@@ -17,8 +17,10 @@ public abstract class SchematicTableScreenMixin {
             at = @At(
                     value = "INVOKE",
                     target = "Lcom/simibubi/create/foundation/gui/AllGuiTextures;render(Lnet/minecraft/client/gui/GuiGraphics;II)V",
-                    shift = At.Shift.AFTER
-            )
+                    shift = At.Shift.AFTER,
+                    remap = false
+            ),
+            remap = true
     )
     private void otbor$paperTableBackground(GuiGraphics gfx, float partialTick,
                                              int mouseX, int mouseY, CallbackInfo ci) {
@@ -29,7 +31,7 @@ public abstract class SchematicTableScreenMixin {
                 1.0f, PaperRender.PAPER_LIGHT);
     }
 
-    @Inject(method = "renderBg", at = @At("TAIL"))
+    @Inject(method = "renderBg", at = @At("TAIL"), remap = true)
     private void otbor$hideOriginalTitle(GuiGraphics gfx, float partialTick,
                                           int mouseX, int mouseY, CallbackInfo ci) {
         SchematicTableScreen self = (SchematicTableScreen) (Object) this;
