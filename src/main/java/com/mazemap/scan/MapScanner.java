@@ -97,12 +97,18 @@ public final class MapScanner {
         if (id == null) return false;
         String path = id.getPath();
         return path.contains("brick") || path.contains("cobble") || path.contains("masonry")
-                || path.contains("plank") || path.contains("concrete")
+                || path.contains("concrete")
                 || path.contains("terracotta") || path.contains("glass") || path.contains("tile")
-                || path.contains("wall") || path.contains("fence") || path.contains("door")
-                || path.contains("stairs") || path.contains("slab") || path.contains("pillar")
-                || path.contains("beam") || path.contains("metal") || path.contains("iron")
+                || path.contains("metal") || path.contains("iron")
                 || path.contains("copper") || path.contains("foundation");
+    }
+
+    /**
+     * Плиты, ступени, люки, двери, ограды и модовый декор не должны получать
+     * сплошной цвет стены. Проверка формы охватывает и неизвестные блоки из модов.
+     */
+    private static boolean isMapDetail(BlockState state, ServerLevel level, BlockPos pos) {
+        return !state.isCollisionShapeFullBlock(level, pos);
     }
 
     /**
@@ -190,13 +196,15 @@ public final class MapScanner {
 
                     int heightFactor = (surfaceYRender - 64) / 16;
                     int finalBrightness = Math.max(0, Math.min(3, baseBrightness + heightFactor));
+                    cursor.set(worldX, surfaceYRender, worldZ);
+                    boolean mapDetail = isMapDetail(surfaceBlock, level, cursor);
                     if (isTreeFoliage(surfaceBlock)) {
                         color = treePixel(surfaceBlock);
                     } else if (surfaceBlock.getFluidState().is(FluidTags.WATER)) {
                         color = PlayerMapData.PIXEL_WATER;
-                    } else if (isCreateBlock(surfaceBlock)) {
+                    } else if (!mapDetail && isCreateBlock(surfaceBlock)) {
                         color = PlayerMapData.PIXEL_CREATE;
-                    } else if (isStructureBlock(surfaceBlock)) {
+                    } else if (!mapDetail && isStructureBlock(surfaceBlock)) {
                         color = PlayerMapData.PIXEL_STRUCTURE;
                     } else {
                         int packed = (mapColor.id << 2) | finalBrightness;

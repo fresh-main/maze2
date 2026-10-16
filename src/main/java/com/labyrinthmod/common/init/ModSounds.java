@@ -43,6 +43,10 @@ public class ModSounds {
     public static final RegistryObject<SoundEvent> MENU_EPIC = variable("menu_epic");
     public static final RegistryObject<SoundEvent> GLADE_AMBIENT = variable("glade_ambient");
     public static final RegistryObject<SoundEvent> MAZE_AMBIENT = variable("maze_ambient");
+    public static final RegistryObject<SoundEvent> GLADE_NIGHT = variable("glade_night");
+    public static final RegistryObject<SoundEvent> MAZE_NIGHT = variable("maze_night");
+    public static final RegistryObject<SoundEvent> DESERT_DAY = variable("desert_day");
+    public static final RegistryObject<SoundEvent> DESERT_NIGHT = variable("desert_night");
 
     private static RegistryObject<SoundEvent> fixed(String name, float range) {
         return SOUNDS.register(name, () -> SoundEvent.createFixedRangeEvent(

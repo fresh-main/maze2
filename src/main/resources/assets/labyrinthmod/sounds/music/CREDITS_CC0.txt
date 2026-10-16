@@ -13,3 +13,31 @@ Source: https://opengameart.org/content/loopable-dungeon-ambience
 License: CC0 1.0 Universal (public domain dedication; attribution is not required)
 License URL: https://creativecommons.org/publicdomain/zero/1.0/
 The downloaded Ogg Vorbis file is included without modification.
+
+GLADE NIGHT AMBIENCE
+Title: Cricket Ambience (from Random Sounds Samples)
+Author: Augmentality / Brandon Morris (submitted by HaelDB)
+Source: https://opengameart.org/content/random-sounds-samples
+License: CC0 1.0 Universal / public domain option
+File: glade_night.ogg
+
+MAZE NIGHT AMBIENCE
+Title: Dark Cavern Ambient 002
+Author: Paul Wortmann
+Source: https://opengameart.org/content/dark-cavern-ambient
+License: CC0 1.0 Universal
+File: maze_night.ogg
+
+DESERT DAY AMBIENCE
+Title: Desert Theme (caravan)
+Author: yd
+Source: https://opengameart.org/content/desert-theme
+License: CC0 1.0 Universal
+File: desert_day.ogg
+
+DESERT NIGHT AMBIENCE
+Title: wind whoosh loop
+Author: SketchMan3
+Source: https://opengameart.org/content/wind-whoosh-loop
+License: CC0 1.0 Universal
+File: desert_night.ogg

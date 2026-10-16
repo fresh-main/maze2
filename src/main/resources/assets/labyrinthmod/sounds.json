@@ -67,6 +67,22 @@
     "category": "music",
     "sounds": [{ "name": "labyrinthmod:music/maze_ambient", "stream": true }]
   },
+  "glade_night": {
+    "category": "music",
+    "sounds": [{ "name": "labyrinthmod:music/glade_night", "stream": true }]
+  },
+  "maze_night": {
+    "category": "music",
+    "sounds": [{ "name": "labyrinthmod:music/maze_night", "stream": true }]
+  },
+  "desert_day": {
+    "category": "music",
+    "sounds": [{ "name": "labyrinthmod:music/desert_day", "stream": true }]
+  },
+  "desert_night": {
+    "category": "music",
+    "sounds": [{ "name": "labyrinthmod:music/desert_night", "stream": true }]
+  },
   "page_flip": {
     "category": "ambient",
     "subtitle": "otbor.subtitle.page_flip",

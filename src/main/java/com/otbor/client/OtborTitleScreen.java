@@ -10,9 +10,6 @@ import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import org.jetbrains.annotations.NotNull;
@@ -32,7 +29,6 @@ public class OtborTitleScreen extends Screen {
     private long comingSoonStart = 0L;
     private int noteX;
     private int noteY;
-    private MenuMusicInstance menuMusic;
     private final List<AbstractWidget> noteCards = new ArrayList<>();
     private float parX = 0f;
     private float parY = 0f;
