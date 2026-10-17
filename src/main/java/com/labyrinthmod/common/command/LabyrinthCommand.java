@@ -121,7 +121,6 @@ public class LabyrinthCommand {
             // Контрапция существует (либо только что собрана) — перемещаем её
             boolean success = LabyrinthAssembler.moveZone(level, zone, zoneToB);
             if (success) {
-                zone.toggleState();
                 moved++;
             } else {
                 failed++;

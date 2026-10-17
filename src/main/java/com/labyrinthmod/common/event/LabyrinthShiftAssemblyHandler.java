@@ -152,23 +152,25 @@ public final class LabyrinthShiftAssemblyHandler {
         int failed = 0;
 
         for (LabyrinthShiftZone zone : data.getAllZones().values()) {
+            // A saved contraption can exist in a chunk that is still loading.
+            // Do not clear its UUID or capture unrelated world blocks there.
+            if (!isAreaLoaded(level, zone.minPos, zone.maxPos)) {
+                continue;
+            }
+
             // Пропускаем уже собранные
             if (zone.contraptionEntityId != null) {
                 // Проверяем что сущность ещё жива
                 OrientedContraptionEntity existing =
                         LabyrinthAssembler.findContraptionEntity(level, zone);
                 if (existing != null) {
+                    recoverInterruptedMove(level, data, zone, existing);
                     skipped++;
                     continue;
                 }
                 // Сущность потеряна — нужно пересобрать
                 LabyrinthMod.LOGGER.warn(
                         "[LabyrinthShift] Zone {} entity lost, re-assembling", zone.id);
-            }
-
-            // Проверяем что чанки зоны загружены
-            if (!isAreaLoaded(level, zone.minPos, zone.maxPos)) {
-                continue;
             }
 
             // Проверяем наличие блоков
@@ -226,5 +228,39 @@ public final class LabyrinthShiftAssemblyHandler {
             if (!level.getBlockState(pos).isAir()) return true;
         }
         return false;
+    }
+
+    /**
+     * Active movement is intentionally kept in memory only.  If the server is
+     * stopped during the five second animation, Create saves the entity at an
+     * intermediate coordinate while the zone still describes the source.  Put
+     * the entity back on that authoritative source coordinate on the next load.
+     *
+     * This also repairs worlds written by older builds, which persisted the B
+     * flag before movement but left the A bounds in SavedData.
+     */
+    private static void recoverInterruptedMove(ServerLevel level,
+                                               LabyrinthZoneSavedData data,
+                                               LabyrinthShiftZone zone,
+                                               OrientedContraptionEntity entity) {
+        double expectedX = zone.minPos.getX() + 0.5D;
+        double expectedY = zone.minPos.getY();
+        double expectedZ = zone.minPos.getZ() + 0.5D;
+        double epsilon = 1.0E-4D;
+
+        if (Math.abs(entity.getX() - expectedX) <= epsilon
+                && Math.abs(entity.getY() - expectedY) <= epsilon
+                && Math.abs(entity.getZ() - expectedZ) <= epsilon) {
+            return;
+        }
+
+        entity.setPos(expectedX, expectedY, expectedZ);
+        if (zone.isVariantB) {
+            zone.isVariantB = false;
+        }
+        data.setDirty();
+        LabyrinthMod.LOGGER.warn(
+                "[LabyrinthShift] Recovered interrupted/inconsistent zone {} at {}",
+                zone.id, zone.minPos);
     }
 }

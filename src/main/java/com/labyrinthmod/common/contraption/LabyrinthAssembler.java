@@ -2,6 +2,7 @@ package com.labyrinthmod.common.contraption;
 
 import com.labyrinthmod.LabyrinthMod;
 import com.labyrinthmod.common.data.LabyrinthShiftZone;
+import com.labyrinthmod.common.data.LabyrinthZoneSavedData;
 import com.simibubi.create.content.contraptions.OrientedContraptionEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -132,6 +133,14 @@ public class LabyrinthAssembler {
                 move.entity.setPos(move.targetX, move.entity.getY(), move.targetZ);
                 move.zone.minPos = move.targetMin;
                 move.zone.maxPos = move.targetMax;
+                move.zone.isVariantB = move.targetVariantB;
+
+                // minPos/maxPos and the variant must be persisted together.  The
+                // old implementation saved isVariantB when movement started but
+                // never marked the new bounds dirty when movement finished.  A
+                // reload therefore paired variant B with variant A coordinates
+                // and every later shift moved the wall farther out of place.
+                LabyrinthZoneSavedData.get(level).setDirty();
 
                 // ★ ИСПРАВЛЕНИЕ: после завершения движения обновляем свет
                 // как в старой позиции (там теперь пусто), так и в новой ★
@@ -165,11 +174,13 @@ public class LabyrinthAssembler {
         // ★ НОВОЕ: запоминаем исходную область для обновления света после движения ★
         final BlockPos sourceMin;
         final BlockPos sourceMax;
+        final boolean targetVariantB;
         int ticksRemaining;
 
         ActiveMove(LabyrinthShiftZone zone, OrientedContraptionEntity entity,
                    double stepX, double stepZ, double targetX, double targetZ,
-                   BlockPos targetMin, BlockPos targetMax, int ticksRemaining) {
+                   BlockPos targetMin, BlockPos targetMax,
+                   boolean targetVariantB, int ticksRemaining) {
             this.zone = zone;
             this.entity = entity;
             this.stepX = stepX;
@@ -180,6 +191,7 @@ public class LabyrinthAssembler {
             this.targetMax = targetMax;
             this.sourceMin = zone.minPos;
             this.sourceMax = zone.maxPos;
+            this.targetVariantB = targetVariantB;
             this.ticksRemaining = ticksRemaining;
         }
     }
@@ -236,7 +248,8 @@ public class LabyrinthAssembler {
         refreshLighting(level, sweptMin, sweptMax);
 
         activeMoves.put(zone.id, new ActiveMove(zone, oce, stepX, stepZ,
-                targetX, targetZ, targetMin, targetMax, MOVE_DURATION_TICKS));
+                targetX, targetZ, targetMin, targetMax,
+                toVariantB, MOVE_DURATION_TICKS));
 
         LabyrinthMod.LOGGER.info(
                 "[LabyrinthAssembler] Zone {} {} started, dir=({},{})",
