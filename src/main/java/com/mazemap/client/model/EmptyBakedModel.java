@@ -1,5 +1,6 @@
 package com.mazemap.client.model;
 
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.block.model.ItemOverrides;
 import net.minecraft.client.renderer.block.model.ItemTransforms;
@@ -7,6 +8,7 @@ import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.Collections;
@@ -23,7 +25,18 @@ public class EmptyBakedModel implements BakedModel {
     @Override public List<BakedQuad> getQuads(BlockState state, Direction side, RandomSource rand) { return Collections.emptyList(); }
     @Override public boolean useAmbientOcclusion() { return original.useAmbientOcclusion(); }
     @Override public boolean isGui3d() { return original.isGui3d(); }
-    @Override public boolean usesBlockLight() { return original.usesBlockLight(); }
+    @Override public boolean usesBlockLight() { return false; }
+
+    @Override
+    public BakedModel applyTransform(ItemDisplayContext context, PoseStack poseStack, boolean leftHand) {
+        BakedModel source = original;
+        if (context == ItemDisplayContext.GUI) {
+            BakedModel gui = ModelEventHandler.getGuiModel();
+            if (gui != null) source = gui;
+        }
+        source.getTransforms().getTransform(context).apply(leftHand, poseStack);
+        return this;
+    }
     @Override public boolean isCustomRenderer() { return true; }
     @Override public TextureAtlasSprite getParticleIcon() { return original.getParticleIcon(); }
     @Override public ItemOverrides getOverrides() { return ItemOverrides.EMPTY; }

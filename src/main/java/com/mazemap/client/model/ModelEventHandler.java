@@ -2,8 +2,11 @@ package com.mazemap.client.model;
 
 import com.labyrinthmod.LabyrinthMod;
 import com.mazemap.registry.ModItems;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.model.BakedModel;
+import net.minecraft.client.resources.model.ModelManager;
 import net.minecraft.client.resources.model.ModelResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ModelEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -28,5 +31,18 @@ public class ModelEventHandler {
         }
         baseModel = original;
         event.getModels().put(key, new EmptyBakedModel(original));
+    }
+    public static final ResourceLocation GUI_MODEL =
+            ResourceLocation.fromNamespaceAndPath(LabyrinthMod.MOD_ID, "item/personal_map_gui");
+
+    @SubscribeEvent
+    public static void onRegisterAdditional(ModelEvent.RegisterAdditional event) {
+        event.register(GUI_MODEL);
+    }
+
+    public static BakedModel getGuiModel() {
+        ModelManager manager = Minecraft.getInstance().getModelManager();
+        BakedModel model = manager.getModel(GUI_MODEL);
+        return model == manager.getMissingModel() ? null : model;
     }
 }

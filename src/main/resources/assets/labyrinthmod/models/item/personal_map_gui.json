@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "labyrinthmod:item/personal_map_icon"
+  }
+}

@@ -10,23 +10,39 @@ import net.minecraft.resources.ResourceLocation;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-
-/**
- * Текстура карты для предмета. Источник пикселей — FragmentTextureCache,
- * т.е. ровно то, что рисует PersonalMapScreen. Ничего своего не считаем.
- *
- * Масштаб:
- *   фрагмент 32 блока → 64 px (FragmentTextureCache), т.е. 2 px/block.
- *   наша текстура: 128 px на 64 блока мира → тоже 2 px/block.
- *   Значит просто копируем 64×64 из каждой видимой текстуры в нужное место.
- */
+import com.labyrinthmod.LabyrinthMod;
+import java.io.InputStream;
 public class PersonalMapItemTexture {
 
     private static final int TEX_SIZE   = 128;                // размер текстуры предмета
-    private static final int PX_PER_BLOCK = 2;                // = FRAGMENT_SIZE / FRAGMENT_SIZE_BLOCKS
-    private static final int SHOWN_BLOCKS = TEX_SIZE / PX_PER_BLOCK; // = 64
+    private static final int PX_PER_BLOCK = 2;                // = FRAGMENT_SIZE / FRAGMENT_SIZE_BLOCKS// = 64
+    public static final int SHOWN_BLOCKS = TEX_SIZE / PX_PER_BLOCK;
 
     private static final Map<UUID, CachedTexture> CACHE = new ConcurrentHashMap<>();
+    private static final ResourceLocation BLANK_LOC =
+            ResourceLocation.fromNamespaceAndPath(LabyrinthMod.MOD_ID, "textures/gui/personal_map_blank.png");
+    private static final int FALLBACK_COLOR = 0xFFB0DCE8;
+    private static NativeImage blank;
+    private static boolean blankTried;
+
+    private static NativeImage blank() {
+        if (blank == null && !blankTried) {
+            blankTried = true;
+            try (InputStream in = Minecraft.getInstance().getResourceManager().open(BLANK_LOC)) {
+                NativeImage img = NativeImage.read(in);
+                if (img.getWidth() == TEX_SIZE && img.getHeight() == TEX_SIZE) blank = img;
+                else img.close();
+            } catch (Exception ignored) {
+            }
+        }
+        return blank;
+    }
+
+    private static void fillBackground(NativeImage dst) {
+        NativeImage b = blank();
+        if (b != null) dst.copyFrom(b);
+        else dst.fillRect(0, 0, TEX_SIZE, TEX_SIZE, FALLBACK_COLOR);
+    }
 
     private static final class CachedTexture {
         final ResourceLocation id;
@@ -37,33 +53,20 @@ public class PersonalMapItemTexture {
             this.id = ResourceLocation.fromNamespaceAndPath("mazemap",
                     "dynamic/map_item_" + mapId.toString().replace("-", ""));
             NativeImage img = new NativeImage(TEX_SIZE, TEX_SIZE, true);
-            img.fillRect(0, 0, TEX_SIZE, TEX_SIZE, 0xFFE8DCB0);
+            fillBackground(img);
             this.texture = new DynamicTexture(img);
             Minecraft.getInstance().getTextureManager().register(id, texture);
         }
     }
 
     public static ResourceLocation getTexture(UUID mapId) {
-        CachedTexture c = CACHE.computeIfAbsent(mapId, CachedTexture::new);
-        Minecraft mc = Minecraft.getInstance();
-
-        int cx = (mc.player != null) ? (int) Math.floor(mc.player.getX()) : 0;
-        int cz = (mc.player != null) ? (int) Math.floor(mc.player.getZ()) : 0;
-        long version = ClientMazeMapHandlers.getDataVersion();
-
-        if (version != c.lastVersion || cx != c.lastCx || cz != c.lastCz) {
-            redraw(c, cx, cz);
-            c.lastVersion = version;
-            c.lastCx = cx;
-            c.lastCz = cz;
-        }
-        return c.id;
+        return getView(mapId).texture;
     }
 
     private static void redraw(CachedTexture c, int centerX, int centerZ) {
         NativeImage dst = c.texture.getPixels();
         if (dst == null) return;
-        dst.fillRect(0, 0, TEX_SIZE, TEX_SIZE, 0xFFE8DCB0);
+        fillBackground(dst);
 
         int fragSize   = PlayerMapData.FRAGMENT_SIZE;         // 64
         int fragBlocks = PlayerMapData.FRAGMENT_SIZE_BLOCKS;  // 32
@@ -115,8 +118,57 @@ public class PersonalMapItemTexture {
     }
 
     public static void clearCache() {
+        if (blank != null) {
+            blank.close();
+            blank = null;
+        }
+        blankTried = false;
         Minecraft mc = Minecraft.getInstance();
         for (CachedTexture ct : CACHE.values()) mc.getTextureManager().release(ct.id);
         CACHE.clear();
     }
+    public static final class View {
+        public final ResourceLocation texture;
+        public final int worldLeft;
+        public final int worldTop;
+
+        private View(ResourceLocation texture, int worldLeft, int worldTop) {
+            this.texture = texture;
+            this.worldLeft = worldLeft;
+            this.worldTop = worldTop;
+        }
+    }
+
+    private static ResourceLocation whiteId;
+
+    public static ResourceLocation getWhite() {
+        if (whiteId == null) {
+            NativeImage img = new NativeImage(1, 1, false);
+            img.setPixelRGBA(0, 0, 0xFFFFFFFF);
+            ResourceLocation id = ResourceLocation.fromNamespaceAndPath("mazemap", "dynamic/white");
+            Minecraft.getInstance().getTextureManager().register(id, new DynamicTexture(img));
+            whiteId = id;
+        }
+        return whiteId;
+    }
+
+    public static View getView(UUID mapId) {
+        CachedTexture c = CACHE.computeIfAbsent(mapId, CachedTexture::new);
+        Minecraft mc = Minecraft.getInstance();
+
+        int cx = (mc.player != null) ? (int) Math.floor(mc.player.getX()) : 0;
+        int cz = (mc.player != null) ? (int) Math.floor(mc.player.getZ()) : 0;
+        long version = ClientMazeMapHandlers.getDataVersion();
+
+        if (version != c.lastVersion || cx != c.lastCx || cz != c.lastCz) {
+            redraw(c, cx, cz);
+            c.lastVersion = version;
+            c.lastCx = cx;
+            c.lastCz = cz;
+        }
+        return new View(c.id, c.lastCx - SHOWN_BLOCKS / 2, c.lastCz - SHOWN_BLOCKS / 2);
+    }
+
+
+
 }
