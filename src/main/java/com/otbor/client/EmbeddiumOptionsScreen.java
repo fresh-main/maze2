@@ -685,11 +685,11 @@ public class EmbeddiumOptionsScreen extends Screen {
         renderBackgroundDetails(gfx);
 
         Font font = this.font;
-        String kicker = "ФАЙЛ №04 · ДВИЖОК ";
+        String kicker = Component.translatable("otbor.embeddium.kicker").getString();
         int kw = font.width(kicker);
         gfx.drawString(font, kicker, this.width / 2 - kw / 2, 20, 0xFFB8A581, false);
 
-        String title = "ПРОДВИНУТЫЕ НАСТРОЙКИ ";
+        String title = Component.translatable("otbor.embeddium.title").getString();
         float ts = 1.5f;
         int tw = (int) (font.width(title) * ts);
         gfx.pose().pushPose();
@@ -853,14 +853,14 @@ public class EmbeddiumOptionsScreen extends Screen {
         gfx.pose().pushPose();
         gfx.pose().translate(this.width - 140, 50, 0);
         gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(15f));
-        PaperRender.drawScribble(gfx, this.font, "не трогать", 0, 0, PaperRender.withAlpha(PaperRender.INK_RED, 0.35f));
+        PaperRender.drawScribble(gfx, this.font, Component.translatable("otbor.embeddium.stamp.do_not_touch").getString(), 0, 0, PaperRender.withAlpha(PaperRender.INK_RED, 0.35f));
         gfx.pose().popPose();
 
         // Пометка слева внизу
         gfx.pose().pushPose();
         gfx.pose().translate(50, this.height - 70, 0);
         gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-7f));
-        PaperRender.drawScribble(gfx, this.font, "проверено отделом", 0, 0, PaperRender.withAlpha(PaperRender.INK_FADED, 0.45f));
+        PaperRender.drawScribble(gfx, this.font, Component.translatable("otbor.embeddium.stamp.checked_by").getString(), 0, 0, PaperRender.withAlpha(PaperRender.INK_FADED, 0.45f));
         gfx.pose().popPose();
 
         // Маленький пульсирующий штамп рядом с заголовком
@@ -868,7 +868,7 @@ public class EmbeddiumOptionsScreen extends Screen {
         gfx.pose().translate(this.width / 2f + 150, 45, 0);
         gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(12f));
         float pulse = 0.7f + 0.3f * Mth.sin((gt + 0f) * 0.03f);
-        PaperRender.drawRoundStamp(gfx, this.font, 0, 0, 26, "ПРОВЕРЕНО", "ОТДЕЛ", PaperRender.withAlpha(PaperRender.INK_RED, 0.25f * pulse));
+        PaperRender.drawRoundStamp(gfx, this.font, 0, 0, 26, Component.translatable("otbor.embeddium.stamp.checked").getString(), Component.translatable("otbor.embeddium.stamp.department").getString(), PaperRender.withAlpha(PaperRender.INK_RED, 0.25f * pulse));
         gfx.pose().popPose();
     }
 

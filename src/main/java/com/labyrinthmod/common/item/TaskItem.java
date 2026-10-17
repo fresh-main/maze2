@@ -48,7 +48,7 @@ public class TaskItem extends Item {
                     tooltipComponents.add(Component.literal(desc).withStyle(ChatFormatting.GRAY));
                 }
                 if (!author.isEmpty()) {
-                    tooltipComponents.add(Component.literal("Автор: " + author).withStyle(ChatFormatting.DARK_GRAY));
+                    tooltipComponents.add(Component.translatable("labyrinthmod.quest.author", author).withStyle(ChatFormatting.DARK_GRAY));
                 }
             }
         }

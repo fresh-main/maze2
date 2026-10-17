@@ -84,7 +84,7 @@ public class LootTableCommand {
         List<ResourceLocation> tables = getFilteredLootTables(source, filter);
 
         if (tables.isEmpty()) {
-            source.sendFailure(Component.literal("Таблицы лута не найдены."));
+            source.sendFailure(Component.translatable("labyrinthmod.loot_table.none_found"));
             return 0;
         }
 
@@ -126,7 +126,7 @@ public class LootTableCommand {
         List<ResourceLocation> tables = getFilteredLootTables(source, filter);
 
         if (tables.isEmpty()) {
-            source.sendFailure(Component.literal("Таблицы лута не найдены."));
+            source.sendFailure(Component.translatable("labyrinthmod.loot_table.none_found"));
             return 0;
         }
 

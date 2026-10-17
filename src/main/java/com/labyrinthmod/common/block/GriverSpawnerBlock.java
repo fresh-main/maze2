@@ -44,7 +44,7 @@ public class GriverSpawnerBlock extends Block implements EntityBlock {
                 .orElse(false);
 
         if (!isOperator) {
-            player.sendSystemMessage(Component.literal("§kЭтот блок могут использовать только операторы!"));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.spawner.operators_only"));
             return InteractionResult.FAIL;
         }
 

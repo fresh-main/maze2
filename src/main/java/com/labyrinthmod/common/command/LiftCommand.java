@@ -51,9 +51,9 @@ public class LiftCommand {
                             final int finalCount = activatedCount;
                             if (activatedCount > 0) {
                                 playMechanismSound(level, targetName, positions);
-                                source.sendSuccess(() -> Component.literal("Активировано блоков: " + finalCount + " (сигнал на 10 тиков)"), true);
+                                source.sendSuccess(() -> Component.translatable("labyrinthmod.lift.activated", finalCount), true);
                             } else {
-                                source.sendFailure(Component.literal("Не найдено блоков с именем '" + targetName + "'"));
+                                source.sendFailure(Component.translatable("labyrinthmod.lift.no_blocks", targetName));
                             }
                             return 1;
                         })

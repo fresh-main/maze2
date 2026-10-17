@@ -52,7 +52,7 @@ public class LabyrinthCommand {
      */
     private static int shiftToggle(CommandSourceStack source) {
         if (source.getServer() == null) {
-            source.sendFailure(Component.literal("§cКоманда доступна только на сервере!"));
+            source.sendFailure(Component.translatable("labyrinthmod.command.server_only"));
             return 0;
         }
 
@@ -64,15 +64,14 @@ public class LabyrinthCommand {
             level = source.getServer().overworld();
             generator = level.getChunkSource().getGenerator();
             if (!(generator instanceof LabyrinthChunkGenerator)) {
-                source.sendFailure(Component.literal(
-                        "§cЭто измерение не использует LabyrinthChunkGenerator!"));
+                source.sendFailure(Component.translatable("labyrinthmod.command.not_labyrinth_dimension"));
                 return 0;
             }
         }
 
         LabyrinthZoneSavedData data = LabyrinthZoneSavedData.get(level);
         if (data.getAllZones().isEmpty()) {
-            source.sendFailure(Component.literal("§cНет зон сдвига в этом мире."));
+            source.sendFailure(Component.translatable("labyrinthmod.command.no_shift_zones"));
             return 0;
         }
 
@@ -192,7 +191,7 @@ public class LabyrinthCommand {
         source.sendSuccess(() -> Component.literal(""), false);
         source.sendSuccess(() -> Component.literal("§6§l=== LABYRINTH MOD COMMANDS ==="), false);
         source.sendSuccess(() -> Component.literal(""), false);
-        source.sendSuccess(() -> Component.literal("§e§l【Сдвиг стен】"), false);
+        source.sendSuccess(() -> Component.translatable("labyrinthmod.command.help.shift"), false);
         source.sendSuccess(() -> Component.literal(
                 "§7/labyrinth shift §8- §fПереключить все стены A ↔ B"), false);
         source.sendSuccess(() -> Component.literal(
@@ -200,7 +199,7 @@ public class LabyrinthCommand {
         source.sendSuccess(() -> Component.literal(
                 "§7/labyrinth shift status §8- §fПоказать состояние зон"), false);
         source.sendSuccess(() -> Component.literal(""), false);
-        source.sendSuccess(() -> Component.literal("§e§l【Основные】"), false);
+        source.sendSuccess(() -> Component.translatable("labyrinthmod.command.help.general"), false);
         source.sendSuccess(() -> Component.literal(
                 "§7/labyrinth help §8- §fПоказать эту справку"), false);
         source.sendSuccess(() -> Component.literal(
@@ -214,7 +213,7 @@ public class LabyrinthCommand {
             ConfigSyncHandler.syncToAllPlayers(player);
         }
         source.sendSuccess(
-                () -> Component.literal("§aКонфиг перезагружен и синхронизирован с клиентами!"), true);
+                () -> Component.translatable("labyrinthmod.command.config_reloaded"), true);
         return 1;
     }
 }

@@ -62,12 +62,9 @@ public class UpdateSettingsPacket {
             m.setEmergenceTime(p.emergenceTime);
             m.setTimeBasedEmergenceEnabled(p.timeBasedEnabled);
 
-            player.sendSystemMessage(Component.literal(
-                    "§a[Patrol] Настройки применены: minDist=" + m.getMinDistanceBetweenGrivers()
-                            + ", maxDist=" + m.getMaxTargetDistance()
-                            + ", cooldown=" + m.getRevisitCooldown()
-                            + ", emergenceTime=" + m.getEmergenceTime()
-                            + ", timeBased=" + m.isTimeBasedEmergenceEnabled()));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.patrol.settings_applied",
+                    m.getMinDistanceBetweenGrivers(), m.getMaxTargetDistance(), m.getRevisitCooldown(),
+                    m.getEmergenceTime(), m.isTimeBasedEmergenceEnabled()));
 
             // Раньше сервер слал клиенту весь OpenAdminMenuPacket с КАРТОЙ (~360КБ +
             // 4 млн getBlockState на построение). Это и было главной причиной пинг-спайков

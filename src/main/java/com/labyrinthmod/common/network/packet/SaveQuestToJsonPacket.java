@@ -75,9 +75,9 @@ public class SaveQuestToJsonPacket {
 
                 // Сохраняем на сервере в JSON и обновляем пул только после успешной записи.
                 if (DailyQuestManager.saveQuestToJson(quest)) {
-                    player.sendSystemMessage(Component.literal("§aЗадание успешно сохранено в JSON!"));
+                    player.sendSystemMessage(Component.translatable("labyrinthmod.quest_save.success"));
                 } else {
-                    player.sendSystemMessage(Component.literal("§cНе удалось сохранить задание. Подробности есть в логе сервера."));
+                    player.sendSystemMessage(Component.translatable("labyrinthmod.quest_save.failure"));
                 }
             }
         });

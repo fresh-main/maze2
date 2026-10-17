@@ -27,7 +27,7 @@ public class GriverPossessionHandler {
                     data.setPossessedEntityId(griver.getId());
                 });
 
-                player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§aВы сели на гривера!"));
+                player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("labyrinthmod.griver.mounted"));
                 event.setCanceled(true);
             }
         }
@@ -48,7 +48,7 @@ public class GriverPossessionHandler {
                     data.setPossessedEntityId(-1);
                 });
 
-                player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§cВы слезли с гривера"));
+                player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("labyrinthmod.griver.dismounted"));
             }
         }
     }

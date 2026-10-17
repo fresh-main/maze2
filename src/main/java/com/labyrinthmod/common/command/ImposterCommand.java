@@ -31,7 +31,7 @@ public class ImposterCommand {
 
     private static int openTablet(CommandContext<CommandSourceStack> ctx) {
         if (!(ctx.getSource().getEntity() instanceof ServerPlayer player)) {
-            ctx.getSource().sendFailure(Component.literal("§cЭта команда только для игроков!"));
+            ctx.getSource().sendFailure(Component.translatable("labyrinthmod.imposter_command.players_only"));
             return 0;
         }
 
@@ -41,14 +41,14 @@ public class ImposterCommand {
                 .orElse(false);
 
         if (!isImposter) {
-            player.sendSystemMessage(Component.literal("§cТолько предатели могут использовать эту команду!"));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.imposter_command.imposters_only"));
             return 0;
         }
 
         // Проверяем, есть ли уже активная атака
         if (ImposterTabletItem.isAttackActive()) {
             long remaining = (ImposterTabletItem.getAttackEndTime() - System.currentTimeMillis()) / 1000;
-            player.sendSystemMessage(Component.literal("§cГриверы уже атакуют " + ImposterTabletItem.getCurrentTargetName() + "! Осталось " + remaining + " секунд."));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.imposter_command.attack_active", ImposterTabletItem.getCurrentTargetName(), remaining));
             return 0;
         }
 
@@ -57,14 +57,14 @@ public class ImposterCommand {
         if (remainingCooldown > 0) {
             long minutes = remainingCooldown / 60000;
             long seconds = (remainingCooldown % 60000) / 1000;
-            player.sendSystemMessage(Component.literal("§cДо следующей атаки: " + minutes + "м " + seconds + "с"));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.imposter_command.cooldown", minutes, seconds));
             return 0;
         }
 
         // Получаем список игроков
         List<OpenImposterScreenPacket.PlayerInfo> onlinePlayers = OpenImposterScreenPacket.getOnlinePlayers(player);
         if (onlinePlayers.isEmpty()) {
-            player.sendSystemMessage(Component.literal("§cНет доступных целей!"));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.imposter_command.no_targets"));
             return 0;
         }
 
@@ -72,13 +72,13 @@ public class ImposterCommand {
         NetworkHandler.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
                 new OpenImposterScreenPacket(onlinePlayers));
 
-        player.sendSystemMessage(Component.literal("§aПланшет открыт!"));
+        player.sendSystemMessage(Component.translatable("labyrinthmod.imposter_command.tablet_opened"));
         return 1;
     }
 
     private static int showCooldown(CommandContext<CommandSourceStack> ctx) {
         if (!(ctx.getSource().getEntity() instanceof ServerPlayer player)) {
-            ctx.getSource().sendFailure(Component.literal("§cЭта команда только для игроков!"));
+            ctx.getSource().sendFailure(Component.translatable("labyrinthmod.imposter_command.players_only"));
             return 0;
         }
 
@@ -87,7 +87,7 @@ public class ImposterCommand {
                 .orElse(false);
 
         if (!isImposter) {
-            player.sendSystemMessage(Component.literal("§cТолько предатели могут использовать эту команду!"));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.imposter_command.imposters_only"));
             return 0;
         }
 
@@ -95,9 +95,9 @@ public class ImposterCommand {
         if (remainingCooldown > 0) {
             long minutes = remainingCooldown / 60000;
             long seconds = (remainingCooldown % 60000) / 1000;
-            player.sendSystemMessage(Component.literal("§cДо следующей атаки: " + minutes + "м " + seconds + "с"));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.imposter_command.cooldown", minutes, seconds));
         } else {
-            player.sendSystemMessage(Component.literal("§aВы можете использовать планшет!"));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.imposter_command.ready"));
         }
 
         return 1;

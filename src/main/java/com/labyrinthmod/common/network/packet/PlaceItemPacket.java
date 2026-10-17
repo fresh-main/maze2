@@ -121,11 +121,11 @@ public class PlaceItemPacket {
                         scrollTag.putBoolean("Completed", true);
                         invItem.setTag(scrollTag);
 
-                        player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§a✓ Задание выполнено: " + title));
+                        player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("labyrinthmod.quest.completed", title));
                         if (!reward.isEmpty()) {
-                            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§6Награда: " + reward));
+                            player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("labyrinthmod.quest.reward", reward));
                         }
-                        player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§7Свиток остался в инвентаре как память"));
+                        player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("labyrinthmod.quest.scroll_kept"));
 
                         completed = true;
                         break;
@@ -133,7 +133,7 @@ public class PlaceItemPacket {
                 }
 
                 if (!completed) {
-                    player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§cНет подходящего задания или недостаточно предметов"));
+                    player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("labyrinthmod.quest.no_match_or_items"));
                 }
             }
         });

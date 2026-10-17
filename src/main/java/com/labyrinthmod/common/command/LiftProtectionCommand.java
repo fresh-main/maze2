@@ -26,7 +26,7 @@ public final class LiftProtectionCommand {
 
     private static int status(CommandSourceStack source) {
         boolean enabled = StructureProtectionHandler.isProtectionEnabled();
-        source.sendSuccess(() -> Component.literal("Защита структур: " + (enabled ? "§aвключена" : "§cвыключена")), false);
+        source.sendSuccess(() -> Component.translatable(enabled ? "labyrinthmod.lift_protection.enabled" : "labyrinthmod.lift_protection.disabled"), false);
         return enabled ? 1 : 0;
     }
 }

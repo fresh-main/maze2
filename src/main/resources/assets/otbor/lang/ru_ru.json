@@ -318,5 +318,10 @@
   "otbor.loading.substage.5": "компиляция графических эффектов...",
   "otbor.loading.substage.6": "активация дополнительных модулей...",
   "otbor.loading.substage.7": "финальная проверка...",
-  "otbor.loading.substage.8": "открытие портала..."
+  "otbor.loading.substage.8": "открытие портала...",
+  "otbor.embeddium.kicker": "ДЕЛО №04 · ГРАФИЧЕСКИЙ ДВИЖОК",
+  "otbor.embeddium.stamp.do_not_touch": "не трогать",
+  "otbor.embeddium.stamp.checked_by": "проверено отделом",
+  "otbor.embeddium.stamp.checked": "ПРОВЕРЕНО",
+  "otbor.embeddium.stamp.department": "ОТДЕЛ"
 }

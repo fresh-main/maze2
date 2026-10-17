@@ -318,5 +318,10 @@
   "otbor.loading.substage.5": "compiling visual effects...",
   "otbor.loading.substage.6": "activating additional modules...",
   "otbor.loading.substage.7": "final checks...",
-  "otbor.loading.substage.8": "opening portal..."
+  "otbor.loading.substage.8": "opening portal...",
+  "otbor.embeddium.kicker": "FILE No. 04 · RENDER ENGINE",
+  "otbor.embeddium.stamp.do_not_touch": "do not touch",
+  "otbor.embeddium.stamp.checked_by": "verified by department",
+  "otbor.embeddium.stamp.checked": "VERIFIED",
+  "otbor.embeddium.stamp.department": "DEPT."
 }

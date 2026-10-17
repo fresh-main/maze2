@@ -63,7 +63,7 @@ public class FirstAidPaperStyleHandler {
         g.renderOutline(px + 3, py + 3, pw - 6, ph - 6, 0xFFB4A488);
 
         // Заголовок
-        g.drawCenteredString(mc.font, "ПЕРЕВЯЗКА", px + pw / 2, py + 10, 0xFF8B1E1E);
+        g.drawCenteredString(mc.font, Component.translatable("labyrinthmod.first_aid.title"), px + pw / 2, py + 10, 0xFF8B1E1E);
     }
 
     // Расширяем кнопки, чтобы текст помещался

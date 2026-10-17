@@ -531,7 +531,7 @@ public class GriverEntity extends Animal implements GeoEntity {
     public InteractionResult mobInteract(Player player, InteractionHand hand) {
         // Только операторы могут взаимодействовать с гривером
         if (!player.hasPermissions(2) && !player.isCreative()) {
-            player.sendSystemMessage(Component.literal("§cУ вас нет прав на взаимодействие с гривером!"));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.griver.no_interaction_permission"));
             return InteractionResult.FAIL;
         }
 
@@ -540,7 +540,7 @@ public class GriverEntity extends Animal implements GeoEntity {
         if (itemstack.getItem() == Items.SADDLE && !this.isSaddled()) {
             itemstack.shrink(1);
             this.setSaddled(true);
-            player.sendSystemMessage(Component.literal("§aГривер оседлан!"));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.griver.saddled"));
             return InteractionResult.SUCCESS;
         }
 
@@ -548,7 +548,7 @@ public class GriverEntity extends Animal implements GeoEntity {
             // Перед посадкой отключаем всё ИИ
             disableAIForRiding();
             player.startRiding(this);
-            player.sendSystemMessage(Component.literal("§aВы сели на гривера!"));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.griver.mounted"));
             return InteractionResult.SUCCESS;
         }
 

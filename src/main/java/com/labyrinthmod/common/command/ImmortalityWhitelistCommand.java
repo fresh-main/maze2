@@ -30,7 +30,7 @@ public class ImmortalityWhitelistCommand {
                                             ServerPlayer target = EntityArgument.getPlayer(context, "player");
                                             ImmortalityWhitelist.addPlayer(target.getUUID());
                                             context.getSource().sendSuccess(
-                                                    () -> Component.literal("§aИгрок " + target.getName().getString() + " добавлен в белый список бессмертия!"),
+                                                    () -> Component.translatable("labyrinthmod.immortal_whitelist.added", target.getName().getString()),
                                                     true
                                             );
                                             return 1;
@@ -44,7 +44,7 @@ public class ImmortalityWhitelistCommand {
                                             ServerPlayer target = EntityArgument.getPlayer(context, "player");
                                             ImmortalityWhitelist.removePlayer(target.getUUID());
                                             context.getSource().sendSuccess(
-                                                    () -> Component.literal("§cИгрок " + target.getName().getString() + " удалён из белого списка!"),
+                                                    () -> Component.translatable("labyrinthmod.immortal_whitelist.removed", target.getName().getString()),
                                                     true
                                             );
                                             return 1;
@@ -57,19 +57,19 @@ public class ImmortalityWhitelistCommand {
                                     var players = ImmortalityWhitelist.getAll();
                                     if (players.isEmpty()) {
                                         context.getSource().sendSuccess(
-                                                () -> Component.literal("§7Белый список пуст."),
+                                                () -> Component.translatable("labyrinthmod.immortal_whitelist.empty"),
                                                 false
                                         );
                                     } else {
-                                        StringBuilder sb = new StringBuilder("§aБелый список: ");
+                                        java.util.List<String> names = new java.util.ArrayList<>();
                                         for (UUID uuid : players) {
                                             // Пытаемся получить ник, если игрок онлайн
                                             ServerPlayer online = context.getSource().getServer().getPlayerList().getPlayer(uuid);
                                             String name = online != null ? online.getName().getString() : uuid.toString().substring(0, 8);
-                                            sb.append(name).append(", ");
+                                            names.add(name);
                                         }
                                         context.getSource().sendSuccess(
-                                                () -> Component.literal(sb.toString()),
+                                                () -> Component.translatable("labyrinthmod.immortal_whitelist.list", String.join(", ", names)),
                                                 false
                                         );
                                     }
@@ -81,7 +81,7 @@ public class ImmortalityWhitelistCommand {
                                 .executes(context -> {
                                     ImmortalityWhitelist.clear();
                                     context.getSource().sendSuccess(
-                                            () -> Component.literal("§cБелый список очищен!"),
+                                            () -> Component.translatable("labyrinthmod.immortal_whitelist.cleared"),
                                             true
                                     );
                                     return 1;

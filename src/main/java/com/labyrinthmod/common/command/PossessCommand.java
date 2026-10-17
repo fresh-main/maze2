@@ -26,25 +26,25 @@ public class PossessCommand {
 
     private static int possessEntity(CommandSourceStack source, int entityId) {
         if (!(source.getEntity() instanceof ServerPlayer player)) {
-            source.sendFailure(Component.literal("§cЭта команда только для игроков!"));
+            source.sendFailure(Component.translatable("labyrinthmod.possess.players_only"));
             return 0;
         }
 
         // Дополнительная проверка прав
         if (!player.hasPermissions(2) && !player.isCreative()) {
-            source.sendFailure(Component.literal("§cУ вас нет прав на использование этой команды!"));
+            source.sendFailure(Component.translatable("labyrinthmod.possess.no_permission"));
             return 0;
         }
 
         Entity target = player.level().getEntity(entityId);
 
         if (!(target instanceof GriverEntity griver)) {
-            source.sendFailure(Component.literal("§cСущность с ID " + entityId + " не является гривером!"));
+            source.sendFailure(Component.translatable("labyrinthmod.possess.not_griver", entityId));
             return 0;
         }
 
         if (griver.isVehicle()) {
-            source.sendFailure(Component.literal("§cНа этом гривере уже кто-то едет!"));
+            source.sendFailure(Component.translatable("labyrinthmod.possess.already_ridden"));
             return 0;
         }
 
@@ -57,11 +57,11 @@ public class PossessCommand {
                 data.setPossessedEntityId(entityId);
             });
 
-            source.sendSuccess(() -> Component.literal("§aВы сели на гривера! Используйте WASD для движения, ПРОБЕЛ для прыжка"), true);
+            source.sendSuccess(() -> Component.translatable("labyrinthmod.possess.mounted"), true);
             return 1;
         }
 
-        source.sendFailure(Component.literal("§cГривер не оседлан! Сначала используйте седло"));
+        source.sendFailure(Component.translatable("labyrinthmod.possess.not_saddled"));
         return 0;
     }
 }
