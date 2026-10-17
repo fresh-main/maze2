@@ -134,7 +134,6 @@ public class LabyrinthMod {
                 e.enqueueWork(com.otbor.network.OtborNetwork::register));
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
-            preSeedRussianLanguage();
             modEventBus.addListener((FMLClientSetupEvent e) -> e.enqueueWork(() -> {
                 try {
                     Minecraft mc = Minecraft.getInstance();
@@ -148,23 +147,7 @@ public class LabyrinthMod {
                             LOGGER.info("[otbor] GUI scale forced to {} on client setup", LOCKED_GUI_SCALE);
                         }
 
-                        String langCode = mc.options.languageCode;
-                        boolean langChanged = false;
-                        if (!"ru_ru".equalsIgnoreCase(langCode)) {
-                            mc.options.languageCode = "ru_ru";
-                            try {
-                                var lm = mc.getLanguageManager();
-                                if (lm != null) lm.setSelected("ru_ru");
-                            } catch (Throwable lt) {
-                                LOGGER.warn("[otbor] failed to switch language manager", lt);
-                            }
-                            changed = true;
-                            langChanged = true;
-                            LOGGER.info("[otbor] language forced to ru_ru on client setup (was: {})", langCode);
-                        }
-
                         if (changed) mc.options.save();
-                        if (langChanged) ClientEvents.requestLanguageReload();
                     }
                 } catch (Throwable t) {
                     LOGGER.warn("[otbor] failed to apply client setup options", t);
@@ -487,43 +470,6 @@ public class LabyrinthMod {
         BiomeDebugChat.clear();
 
         MazeMapStorage.flush();
-    }
-
-    private static void preSeedRussianLanguage() {
-        try {
-            Path optionsFile = FMLPaths.GAMEDIR.get().resolve("options.txt");
-            if (!Files.exists(optionsFile)) {
-                Files.writeString(optionsFile, "lang:ru_ru\n");
-                LOGGER.info("[otbor] options.txt did not exist — created with lang:ru_ru (first launch)");
-                return;
-            }
-
-            List<String> lines = Files.readAllLines(optionsFile);
-            int langLine = -1;
-            String currentLang = null;
-            for (int i = 0; i < lines.size(); i++) {
-                String line = lines.get(i);
-                if (line.startsWith("lang:")) {
-                    langLine = i;
-                    currentLang = line.substring(5).trim();
-                    break;
-                }
-            }
-
-            if (langLine < 0) {
-                lines.add("lang:ru_ru");
-                Files.write(optionsFile, lines, StandardOpenOption.TRUNCATE_EXISTING);
-                LOGGER.info("[otbor] options.txt had no lang line — appended lang:ru_ru");
-            } else if ("en_us".equalsIgnoreCase(currentLang) || currentLang.isEmpty()) {
-                lines.set(langLine, "lang:ru_ru");
-                Files.write(optionsFile, lines, StandardOpenOption.TRUNCATE_EXISTING);
-                LOGGER.info("[otbor] options.txt had lang:{} — rewrote to lang:ru_ru", currentLang);
-            }
-        } catch (IOException ioe) {
-            LOGGER.warn("[otbor] failed to pre-seed lang in options.txt: {}", ioe.toString());
-        } catch (Throwable t) {
-            LOGGER.warn("[otbor] unexpected error pre-seeding lang", t);
-        }
     }
 
     public static class CapabilityHandler {

@@ -42,7 +42,7 @@ public class BoundsStickItem extends Item {
         if (player.isShiftKeyDown()) {
             m.clearBounds();
             awaitingMin.remove(player.getUUID());
-            player.sendSystemMessage(Component.literal("§c[Bounds] Границы сброшены").withStyle(ChatFormatting.RED));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.bounds.reset").withStyle(ChatFormatting.RED));
             return InteractionResult.SUCCESS;
         }
 
@@ -50,25 +50,25 @@ public class BoundsStickItem extends Item {
         if (isMin) {
             m.setBoundsMin(pos);
             awaitingMin.put(player.getUUID(), true);
-            player.sendSystemMessage(Component.literal("§6[Bounds] Min угол: " + pos.getX() + " " + pos.getY() + " " + pos.getZ()));
-            player.sendSystemMessage(Component.literal("§7Кликните 2й угол (Max)"));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.bounds.min_corner", pos.getX(), pos.getY(), pos.getZ()));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.bounds.select_max"));
         } else {
             m.setBoundsMax(pos);
             awaitingMin.put(player.getUUID(), false);
-            player.sendSystemMessage(Component.literal("§a[Bounds] Max угол: " + pos.getX() + " " + pos.getY() + " " + pos.getZ()));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.bounds.max_corner", pos.getX(), pos.getY(), pos.getZ()));
             BlockPos min = m.getBoundsMin();
             int sx = Math.abs(pos.getX() - min.getX()) + 1;
             int sz = Math.abs(pos.getZ() - min.getZ()) + 1;
-            player.sendSystemMessage(Component.literal("§aГраницы: " + sx + "×" + sz + " блоков"));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.bounds.size", sx, sz));
         }
         return InteractionResult.SUCCESS;
     }
 
     @Override
     public void appendHoverText(@NotNull ItemStack stack, Level level, @NotNull List<Component> tooltip, @NotNull TooltipFlag flag) {
-        tooltip.add(Component.literal("ПКМ 1й блок — Min угол лабиринта").withStyle(ChatFormatting.GRAY));
-        tooltip.add(Component.literal("ПКМ 2й блок — Max угол лабиринта").withStyle(ChatFormatting.GRAY));
-        tooltip.add(Component.literal("Shift+ПКМ — сбросить границы").withStyle(ChatFormatting.GRAY));
-        tooltip.add(Component.literal("Автогенерация точек происходит только в этой зоне").withStyle(ChatFormatting.DARK_GRAY));
+        tooltip.add(Component.translatable("labyrinthmod.bounds.tooltip.min").withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("labyrinthmod.bounds.tooltip.max").withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("labyrinthmod.bounds.tooltip.reset").withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("labyrinthmod.bounds.tooltip.area").withStyle(ChatFormatting.DARK_GRAY));
     }
 }

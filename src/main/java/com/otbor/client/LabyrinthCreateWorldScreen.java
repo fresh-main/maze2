@@ -27,7 +27,7 @@ public class LabyrinthCreateWorldScreen extends Screen {
     private boolean allowCheats = false;
 
     // Параметры ввода имени
-    private String worldName = "Новый Лабиринт";
+    private String worldName = Component.translatable("otbor.create.default_name").getString();
     private long cursorBlink = 0;
     private boolean isNameFocused = true;
 
@@ -52,7 +52,7 @@ public class LabyrinthCreateWorldScreen extends Screen {
     private boolean pendingRebuild = false;
 
     public LabyrinthCreateWorldScreen(Screen parent) {
-        super(Component.literal("СОЗДАНИЕ ЛАБИРИНТА"));
+        super(Component.translatable("otbor.create.title"));
         this.parent = parent;
     }
 
@@ -72,13 +72,13 @@ public class LabyrinthCreateWorldScreen extends Screen {
 
         addRenderableWidget(PaperWidgets.paperButton(
                 paperX + 40, btnY, btnW, btnH,
-                Component.literal("✖ ОТМЕНА"),
+                Component.translatable("otbor.common.cancel"),
                 b -> minecraft.setScreen(parent),
                 0L, PaperRender.INK_SOFT, -1.5f));
 
         addRenderableWidget(PaperWidgets.paperButton(
                 paperX + paperW - btnW - 40, btnY, btnW, btnH,
-                Component.literal("▶ СОЗДАТЬ МИР"),
+                Component.translatable("otbor.create.create_world"),
                 b -> createLabyrinthWorld(),
                 0L, PaperRender.INK_RED, 1.5f));
     }
@@ -123,14 +123,14 @@ public class LabyrinthCreateWorldScreen extends Screen {
         Font font = this.font;
         int cx = paperX + paperW / 2;
 
-        String title = "ЧЕРТЁЖ №07 · КОНФИГУРАЦИЯ ОБЪЕКТА";
+        String title = Component.translatable("otbor.create.heading").getString();
         gfx.drawString(font, title, cx - font.width(title) / 2, paperY + 25, PaperRender.INK_DARK, false);
         PaperRender.drawHandDivider(gfx, paperX + 40, paperY + 40, paperW - 80, PaperRender.INK_SOFT);
 
         gfx.pose().pushPose();
         gfx.pose().translate(paperX + 60, paperY + 20, 0);
         gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-12f));
-        PaperRender.drawRectStamp(gfx, font, "СЕКРЕТНО", 0, 0, PaperRender.withAlpha(PaperRender.INK_RED, 0.6f));
+        PaperRender.drawRectStamp(gfx, font, Component.translatable("otbor.truth.secret").getString(), 0, 0, PaperRender.withAlpha(PaperRender.INK_RED, 0.6f));
         gfx.pose().popPose();
 
         int previewCy = paperY + 150;
@@ -149,13 +149,13 @@ public class LabyrinthCreateWorldScreen extends Screen {
         int rightColX = paperX + paperW - 210;
         int paramY = paperY + 65;
 
-        drawAdjuster(gfx, font, leftColX, paramY, "РАДИУС ПОЛЯНЫ", gladeRadius, 50, 120, 10, mouseX, mouseY);
-        drawAdjuster(gfx, font, leftColX, paramY + 50, "ШИРИНА ЛАБИРИНТА", mainMazeWidth, 60, 150, 10, mouseX, mouseY);
-        drawAdjuster(gfx, font, leftColX, paramY + 100, "ШИРИНА СЕКТОРОВ", sectorWidth, 48, 120, 12, mouseX, mouseY);
+        drawAdjuster(gfx, font, leftColX, paramY, Component.translatable("otbor.create.glade_radius").getString(), gladeRadius, 50, 120, 10, mouseX, mouseY);
+        drawAdjuster(gfx, font, leftColX, paramY + 50, Component.translatable("otbor.create.maze_width").getString(), mainMazeWidth, 60, 150, 10, mouseX, mouseY);
+        drawAdjuster(gfx, font, leftColX, paramY + 100, Component.translatable("otbor.create.sector_width").getString(), sectorWidth, 48, 120, 12, mouseX, mouseY);
 
-        drawCycleOption(gfx, font, rightColX, paramY, "ФОРМАТ ВЫЖИВАНИЯ", getGameModeName(), mouseX, mouseY);
-        drawCycleOption(gfx, font, rightColX, paramY + 50, "СЛОЖНОСТЬ", getDifficultyName(), mouseX, mouseY);
-        drawCycleOption(gfx, font, rightColX, paramY + 100, "ДОПУСК КОМАНД", allowCheats ? "РАЗРЕШЕНО" : "ЗАПРЕЩЕНО", mouseX, mouseY);
+        drawCycleOption(gfx, font, rightColX, paramY, Component.translatable("otbor.create.gamemode").getString(), getGameModeName(), mouseX, mouseY);
+        drawCycleOption(gfx, font, rightColX, paramY + 50, Component.translatable("otbor.create.difficulty").getString(), getDifficultyName(), mouseX, mouseY);
+        drawCycleOption(gfx, font, rightColX, paramY + 100, Component.translatable("otbor.create.cheats").getString(), Component.translatable(allowCheats ? "otbor.lan.enabled" : "otbor.lan.disabled").getString(), mouseX, mouseY);
 
         int btnY = paperY + paperH - 45;
         nameBoxW = Math.max(120, Math.min(240, paperW - 2 * (40 + 130 + 15)));
@@ -163,7 +163,7 @@ public class LabyrinthCreateWorldScreen extends Screen {
         nameBoxX = cx - nameBoxW / 2;
         nameBoxY = btnY + 3;
 
-        String nameLabel = "НАЗВАНИЕ ОБЪЕКТА:";
+        String nameLabel = Component.translatable("otbor.create.name_label").getString();
         gfx.drawString(font, nameLabel, cx - font.width(nameLabel) / 2, nameBoxY - 12, PaperRender.INK_FADED, false);
 
         int borderColor = isNameFocused ? PaperRender.INK_RED : PaperRender.INK_SOFT;
@@ -527,13 +527,13 @@ public class LabyrinthCreateWorldScreen extends Screen {
         gfx.fill(x, y, x + 1, y + h, PaperRender.INK_SOFT);
         gfx.fill(x + w - 1, y, x + w, y + h, PaperRender.INK_SOFT);
 
-        gfx.drawString(font, "УСЛОВНЫЕ ОБОЗНАЧЕНИЯ:", x + 5, y + 4, PaperRender.INK_DARK, false);
+        gfx.drawString(font, Component.translatable("otbor.create.legend"), x + 5, y + 4, PaperRender.INK_DARK, false);
         gfx.fill(x + 5, y + 16, x + 15, y + 18, PaperRender.INK);
-        gfx.drawString(font, "- Кольцевая стена", x + 20, y + 14, PaperRender.INK_SOFT, false);
+        gfx.drawString(font, Component.translatable("otbor.create.legend.ring_wall"), x + 20, y + 14, PaperRender.INK_SOFT, false);
         gfx.fill(x + 5, y + 28, x + 15, y + 30, PaperRender.INK_FADED);
-        gfx.drawString(font, "- Стена лабиринта", x + 20, y + 26, PaperRender.INK_SOFT, false);
+        gfx.drawString(font, Component.translatable("otbor.create.legend.maze_wall"), x + 20, y + 26, PaperRender.INK_SOFT, false);
         gfx.fill(x + 5, y + 40, x + 15, y + 42, PaperRender.INK_RED);
-        gfx.drawString(font, "- Проход", x + 20, y + 38, PaperRender.INK_SOFT, false);
+        gfx.drawString(font, Component.translatable("otbor.create.legend.passage"), x + 20, y + 38, PaperRender.INK_SOFT, false);
     }
 
     private void drawCompassRose(GuiGraphics gfx, int cx, int cy, int radius) {
@@ -643,16 +643,16 @@ public class LabyrinthCreateWorldScreen extends Screen {
     }
 
     private String getGameModeName() {
-        if (gameMode == GameType.SURVIVAL) return "ВЫЖИВАНИЕ";
-        if (gameMode == GameType.CREATIVE) return "ТВОРЧЕСТВО";
-        return "ПРИКЛЮЧЕНИЕ";
+        if (gameMode == GameType.SURVIVAL) return Component.translatable("otbor.lan.survival").getString();
+        if (gameMode == GameType.CREATIVE) return Component.translatable("otbor.lan.creative").getString();
+        return Component.translatable("otbor.lan.adventure").getString();
     }
 
     private String getDifficultyName() {
-        if (difficulty == Difficulty.PEACEFUL) return "МИРНЫЙ";
-        if (difficulty == Difficulty.EASY) return "ЛЕГКИЙ";
-        if (difficulty == Difficulty.NORMAL) return "ОБЫЧНЫЙ";
-        return "СЛОЖНЫЙ";
+        if (difficulty == Difficulty.PEACEFUL) return Component.translatable("otbor.create.difficulty.peaceful").getString();
+        if (difficulty == Difficulty.EASY) return Component.translatable("otbor.create.difficulty.easy").getString();
+        if (difficulty == Difficulty.NORMAL) return Component.translatable("otbor.create.difficulty.normal").getString();
+        return Component.translatable("otbor.create.difficulty.hard").getString();
     }
 
     @Override

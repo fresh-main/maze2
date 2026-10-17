@@ -32,7 +32,7 @@ public class AdminNoteEditorScreen extends Screen {
     private MultiLineEditBox editBox;
 
     public AdminNoteEditorScreen(Screen parent, UUID target, String targetName, String initialCustomText) {
-        super(Component.literal("Редактор записки: " + targetName));
+        super(Component.translatable("infection.note_editor.title", targetName));
         this.parent = parent;
         this.target = target;
         this.targetName = targetName;
@@ -47,26 +47,26 @@ public class AdminNoteEditorScreen extends Screen {
         int boxY = 50;
 
         editBox = new MultiLineEditBox(this.font, boxX, boxY, BOX_W, BOX_H,
-                Component.literal("Кастомный текст"),
-                Component.literal("Кастомный текст"));
+                Component.translatable("infection.note_editor.custom_text"),
+                Component.translatable("infection.note_editor.custom_text"));
         editBox.setValue(initialText);
         editBox.setCharacterLimit(4000);
         addRenderableWidget(editBox);
 
         int btnY = boxY + BOX_H + 10;
 
-        addRenderableWidget(Button.builder(Component.literal("Сохранить"),
+        addRenderableWidget(Button.builder(Component.translatable("infection.gui.save"),
                         b -> save(false))
                 .bounds(boxX, btnY, 180, 20).build());
 
-        addRenderableWidget(Button.builder(Component.literal("Сбросить (очистить)"),
+        addRenderableWidget(Button.builder(Component.translatable("infection.note_editor.reset"),
                         b -> save(true))
                 .bounds(boxX + 190, btnY, 180, 20)
                 .tooltip(net.minecraft.client.gui.components.Tooltip.create(
-                        Component.literal("Стереть кастомный текст. Авто-самочувствие останется.")))
+                        Component.translatable("infection.note_editor.reset_tooltip")))
                 .build());
 
-        addRenderableWidget(Button.builder(Component.literal("Отмена"),
+        addRenderableWidget(Button.builder(Component.translatable("infection.gui.cancel"),
                         b -> this.minecraft.setScreen(parent))
                 .bounds(this.width / 2 - 50, btnY + 26, 100, 20).build());
     }
@@ -88,7 +88,7 @@ public class AdminNoteEditorScreen extends Screen {
         gfx.drawString(this.font, t, this.width / 2 - this.font.width(t) / 2, 16, 0xFFFFE0E0, false);
 
         // подсказка
-        String hint = "Авто-самочувствие по стадии остаётся. Это — отдельный, ваш текст.";
+        String hint = Component.translatable("infection.note_editor.hint").getString();
         gfx.drawString(this.font, hint, this.width / 2 - this.font.width(hint) / 2, 30,
                 0xFF999999, false);
 

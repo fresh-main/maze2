@@ -34,7 +34,7 @@ public class ConfigSyncHandler {
             NetworkHandler.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), packet);
         });
 
-        source.sendSystemMessage(Component.literal("§aКонфиг синхронизирован со всеми игроками!"));
+        source.sendSystemMessage(Component.translatable("labyrinthmod.config.sync_all_success"));
     }
 
     // Синхронизация конкретному игроку

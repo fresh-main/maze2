@@ -102,7 +102,7 @@ public final class NewFractionAbilities {
         if (map.isEmpty()) return;
         PersonalMapItem.clearData(map);
         MazeMapNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new S2CClearMapPacket());
-        player.displayClientMessage(Component.literal("§cПрогресс карты потерян из-за ранения головы"), true);
+        player.displayClientMessage(Component.translatable("labyrinthmod.map.head_injury_lost_progress"), true);
     }
 
     @SubscribeEvent

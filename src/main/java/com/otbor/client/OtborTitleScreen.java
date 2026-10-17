@@ -38,7 +38,7 @@ public class OtborTitleScreen extends Screen {
     private float[] moteSeed = new float[0];
 
     public OtborTitleScreen() {
-        super(Component.literal("OTBOR "));
+        super(Component.translatable("otbor.title"));
         forceGuiScale();
     }
 
@@ -91,8 +91,8 @@ public class OtborTitleScreen extends Screen {
         noteCards.add(addRenderableWidget(PaperWidgets.noteCard(
                 startX, cardsY, cardW, cardH,
                 0,
-                Component.literal("ВОЙТИ В"),
-                "выбор сервера",
+                Component.translatable("otbor.menu.server"),
+                Component.translatable("otbor.menu.server.subtitle").getString(),
                 "",
                 "door",
                 PaperWidgets.NoteCardVariant.BASE,
@@ -103,9 +103,9 @@ public class OtborTitleScreen extends Screen {
         noteCards.add(addRenderableWidget(PaperWidgets.noteCard(
                 startX + step, cardsY, cardW, cardH,
                 1,
-                Component.literal("ИГРАТЬ"),
-                "одиночное приключение",
-                "выбор мира",
+                Component.translatable("otbor.menu.play"),
+                Component.translatable("otbor.menu.play.subtitle").getString(),
+                Component.translatable("otbor.menu.play.detail").getString(),
                 "compass",
                 PaperWidgets.NoteCardVariant.BASE,
                 false, 0.5f, 45L,
@@ -117,18 +117,18 @@ public class OtborTitleScreen extends Screen {
         noteX = colX + sq / 2;
         noteY = colY - 16;
 
-        addRenderableWidget(PaperWidgets.iconButton(colX, colY, sq, "power", "ВЫХОД", -2f, 60L,
+        addRenderableWidget(PaperWidgets.iconButton(colX, colY, sq, "power", Component.translatable("otbor.menu.quit").getString(), -2f, 60L,
                 () -> this.minecraft.stop()));
 
-        addRenderableWidget(PaperWidgets.iconButton(colX, colY + sq + sqGap, sq, "globe", "ПЕРЕВОД", 1.5f, 75L,
-                () -> comingSoonStart = System.currentTimeMillis()));
+        addRenderableWidget(PaperWidgets.iconButton(colX, colY + sq + sqGap, sq, "globe", Component.translatable("otbor.menu.translation").getString(), 1.5f, 75L,
+                () -> requestNavigate(new OtborLanguageScreen(this))));
 
         noteCards.add(addRenderableWidget(PaperWidgets.noteCard(
                 startX + step * 2 + extra, cardsY, cardW, cardH,
                 2,
-                Component.literal("УЗНАТЬ"),
-                "кто создал этот ад?",
-                "досье разработчиков",
+                Component.translatable("otbor.menu.truth"),
+                Component.translatable("otbor.menu.truth.subtitle").getString(),
+                Component.translatable("otbor.menu.truth.detail").getString(),
                 "eye",
                 PaperWidgets.NoteCardVariant.LIGHT,
                 true, 2.5f, 90L,
@@ -138,9 +138,9 @@ public class OtborTitleScreen extends Screen {
         noteCards.add(addRenderableWidget(PaperWidgets.noteCard(
                 startX + step * 3 + extra, cardsY, cardW, cardH,
                 3,
-                Component.literal("ИНСТРУКЦИЯ"),
+                Component.translatable("otbor.menu.instructions"),
                 "О.Т.Б.О.Р",
-                "настройки и управление",
+                Component.translatable("otbor.menu.instructions.subtitle").getString(),
                 "gear",
                 PaperWidgets.NoteCardVariant.DARK,
                 false, -1.5f, 180L,
@@ -220,7 +220,7 @@ public class OtborTitleScreen extends Screen {
         PaperRender.drawTape(gfx, (int)(30 * scaleMultiplier), (int)(-8 * scaleMultiplier), (int)(60 * scaleMultiplier), (int)(14 * scaleMultiplier), 0xC0);
         PaperRender.drawTape(gfx, bannerW - (int)(90 * scaleMultiplier), (int)(-8 * scaleMultiplier), (int)(60 * scaleMultiplier), (int)(14 * scaleMultiplier), 0xC0);
 
-        String kicker = "ДЕЛО №047 · СОВЕРШЕННО СЕКРЕТНО";
+        String kicker = Component.translatable("otbor.title.kicker").getString();
         int kickerW = font.width(kicker);
         gfx.drawString(font, kicker, bannerW / 2 - kickerW / 2, (int)(10 * scaleMultiplier),
                 PaperRender.INK_FADED, false);
@@ -228,7 +228,7 @@ public class OtborTitleScreen extends Screen {
         long gt = PaperRender.gameTime();
         float pulse = 0.5f + 0.5f * Mth.sin((gt + partialTick) * 0.05f);
 
-        String line1 = "БЕГУЩИЙ";
+        String line1 = Component.translatable("otbor.title.heading.1").getString();
         float s1 = 3.0f * scaleMultiplier;
         int w1 = (int) (font.width(line1) * s1);
         gfx.pose().pushPose();
@@ -241,7 +241,7 @@ public class OtborTitleScreen extends Screen {
         gfx.drawString(font, line1, 0, 0, PaperRender.INK, false);
         gfx.pose().popPose();
 
-        String line2 = "В ЛАБИРИНТЕ 2";
+        String line2 = Component.translatable("otbor.title.heading.2").getString();
         float s2 = 2.4f * scaleMultiplier;
         int w2 = (int) (font.width(line2) * s2);
         gfx.pose().pushPose();
@@ -308,7 +308,7 @@ public class OtborTitleScreen extends Screen {
             comingSoonStart = 0L;
             return;
         }
-        String text = "СКОРО...";
+        String text = Component.translatable("otbor.title.coming_soon").getString();
         int w = this.font.width(text) + 16;
         int h = this.font.lineHeight + 10;
         gfx.pose().pushPose();

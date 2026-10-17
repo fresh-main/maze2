@@ -114,8 +114,7 @@ public class AdminActionPacket {
 
     private static void startGlobalPatrol(ServerPlayer player, ServerLevel level, PatrolManager m) {
         if (m.getPatrolPoints().isEmpty()) {
-            player.sendSystemMessage(Component.literal(
-                    "§c[Patrol] Нет точек патрулирования. Нажми «Расчитать точки» в меню или /griver autogen."));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.admin_action.no_patrol_points"));
             return;
         }
         m.setGlobalPatrolActive(true);
@@ -143,8 +142,7 @@ public class AdminActionPacket {
         }
 
         if (grivers.isEmpty()) {
-            player.sendSystemMessage(Component.literal(
-                    "§c[Patrol] В мире нет ни одного гривера. Заспавни их перед запуском."));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.admin_action.no_grivers"));
             // Активацию не отменяем: новые гриверы автоматически подключатся к патрулю.
         }
 
@@ -167,8 +165,7 @@ public class AdminActionPacket {
             }
         }
 
-        player.sendSystemMessage(Component.literal(
-                "§a[Patrol] Запущен. Гриверов: " + grivers.size() + ", точек: " + m.getPatrolPoints().size()));
+        player.sendSystemMessage(Component.translatable("labyrinthmod.admin_action.patrol_started", grivers.size(), m.getPatrolPoints().size()));
         sendSync(player, level, m, -1);
     }
 
@@ -187,8 +184,7 @@ public class AdminActionPacket {
 
     private static void recalculatePoints(ServerPlayer player, ServerLevel level, PatrolManager m, int spacing) {
         if (!m.hasBounds()) {
-            player.sendSystemMessage(Component.literal(
-                    "§c[Patrol] Сначала задайте границы лабиринта: /griver bounds min/max"));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.admin_action.set_bounds_first"));
             return;
         }
         int s = spacing > 0 ? spacing : 8;
@@ -198,12 +194,10 @@ public class AdminActionPacket {
         // yRadius = 0: сканируем строго на этаже игрока, без вертикального диапазона.
         int added = m.autogeneratePoints(level, s, floorY, 0);
         if (added < 0) {
-            player.sendSystemMessage(Component.literal("§c[Patrol] Ошибка автогенерации"));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.admin_action.autogen_error"));
             return;
         }
-        player.sendSystemMessage(Component.literal(
-                "§a[Patrol] Расчёт точек: §f" + added + " §7(было: " + before
-                        + ", шаг: " + s + ", Y=" + floorY + ")"));
+        player.sendSystemMessage(Component.translatable("labyrinthmod.admin_action.points_calculated", added, before, s, floorY));
         sendSync(player, level, m, -1, true); // points changed
     }
 
@@ -224,10 +218,10 @@ public class AdminActionPacket {
             File f = m.getMapFile(name.isEmpty() ? "default" : name);
             CompoundTag tag = m.exportMapData();
             NbtIo.writeCompressed(tag, f);
-            player.sendSystemMessage(Component.literal("§a[Patrol] Карта сохранена: " + f.getAbsolutePath()));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.admin_action.map_saved", f.getAbsolutePath()));
         } catch (Exception e) {
             LabyrinthMod.LOGGER.error("Export map failed", e);
-            player.sendSystemMessage(Component.literal("§cОшибка экспорта: " + e.getMessage()));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.admin_action.export_error", e.getMessage()));
         }
     }
 
@@ -235,15 +229,15 @@ public class AdminActionPacket {
         try {
             File f = m.getMapFile(name.isEmpty() ? "default" : name);
             if (!f.exists()) {
-                player.sendSystemMessage(Component.literal("§cФайл не найден: " + f.getName()));
+                player.sendSystemMessage(Component.translatable("labyrinthmod.admin_action.file_missing", f.getName()));
                 return;
             }
             CompoundTag tag = NbtIo.readCompressed(f);
             m.importMapData(tag);
-            player.sendSystemMessage(Component.literal("§a[Patrol] Карта загружена из " + f.getName()));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.admin_action.map_loaded", f.getName()));
         } catch (Exception e) {
             LabyrinthMod.LOGGER.error("Import map failed", e);
-            player.sendSystemMessage(Component.literal("§cОшибка импорта: " + e.getMessage()));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.admin_action.import_error", e.getMessage()));
         }
     }
 

@@ -10,7 +10,7 @@ import net.minecraft.network.chat.Component;
 public class TimeAccelScreen extends Screen {
 
     public TimeAccelScreen() {
-        super(Component.literal("УПРАВЛЕНИЕ ВРЕМЕНЕМ"));
+        super(Component.translatable("labyrinthmod.time.title"));
     }
 
     @Override
@@ -44,7 +44,7 @@ public class TimeAccelScreen extends Screen {
 
         // КНОПКА СБРОСА
         addRenderableWidget(new PaperButton(centerX - 60, y + 34, 120, 20,
-                Component.literal("СБРОС"),
+                Component.translatable("labyrinthmod.time.reset"),
                 btn -> { applySpeed(1.0); onClose(); }));
     }
 
@@ -59,7 +59,7 @@ public class TimeAccelScreen extends Screen {
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         renderBackground(g);
         super.render(g, mouseX, mouseY, partialTick);
-        g.drawCenteredString(font, "УПРАВЛЕНИЕ ВРЕМЕНЕМ", width / 2, height / 2 - 78, 0xFF8B1E1E);
+        g.drawCenteredString(font, Component.translatable("labyrinthmod.time.title"), width / 2, height / 2 - 78, 0xFF8B1E1E);
         g.drawCenteredString(font, TimeAccelHandler.formatStatus(), width / 2, height / 2 - 60, 0xFF4A1F1F);
     }
 

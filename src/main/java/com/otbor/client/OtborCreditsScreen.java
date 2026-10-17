@@ -254,7 +254,7 @@ public class OtborCreditsScreen extends Screen {
     private final int lastCreditIdx;
 
     public OtborCreditsScreen() {
-        super(Component.literal("ТИТРЫ"));
+        super(Component.translatable("otbor.credits.title"));
         // Динамическая сборка финального списка чанков:
         //   0 → INTRO
         //   1..len(POEM) → стих

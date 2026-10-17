@@ -97,14 +97,14 @@ public class OtborDisconnectedScreen extends Screen {
         Font font = this.font;
 
         // Шапка-кикер (мелкий слегка выгоревший текст).
-        String kicker = "ПРОТОКОЛ ИЗЪЯТИЯ · ВНЕШТАТНАЯ СИТУАЦИЯ";
+        String kicker = Component.translatable("otbor.disconnect.kicker").getString();
         int kw = font.width(kicker);
         gfx.drawString(font, kicker, paperW / 2 - kw / 2, 8,
                 PaperRender.withAlpha(PaperRender.INK_FADED, 0.9f), false);
 
         // Большой заголовок (то, что пришло из ванильного DisconnectedScreen).
         String title = this.title.getString().toUpperCase(java.util.Locale.ROOT);
-        if (title.isEmpty()) title = "СВЯЗЬ ОБОРВАНА";
+        if (title.isEmpty()) title = Component.translatable("otbor.disconnect.title").getString();
         float titleScale = 2.1f;
         int titleW = (int) (font.width(title) * titleScale);
         int titleY = 24;
@@ -124,7 +124,7 @@ public class OtborDisconnectedScreen extends Screen {
         PaperRender.drawInkStroke(gfx, paperW / 2 - lineW / 2, lineY, lineW, 1, lineColor, 13L);
 
         // Малая подпись «причина».
-        String causeLabel = "ПРИЧИНА";
+        String causeLabel = Component.translatable("otbor.disconnect.cause").getString();
         gfx.drawString(font, causeLabel, paperW / 2 - font.width(causeLabel) / 2, lineY + 8,
                 PaperRender.INK_FADED, false);
 
@@ -138,7 +138,7 @@ public class OtborDisconnectedScreen extends Screen {
         gfx.pose().pushPose();
         gfx.pose().translate(paperW - 60, paperH - 38, 0);
         gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-9f));
-        PaperRender.drawRectStamp(gfx, font, "СВЯЗЬ ОБОРВАНА", 0, 0,
+        PaperRender.drawRectStamp(gfx, font, Component.translatable("otbor.disconnect.stamp").getString(), 0, 0,
                 PaperRender.withAlpha(PaperRender.INK_RED, 0.85f));
         gfx.pose().popPose();
 

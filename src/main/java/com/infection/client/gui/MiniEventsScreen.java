@@ -30,7 +30,7 @@ public class MiniEventsScreen extends Screen {
     private final List<S2CInfectionListPacket.Entry> entries;
 
     public MiniEventsScreen(Screen parent, List<S2CInfectionListPacket.Entry> entries) {
-        super(Component.literal("ИНВЕНТИКИ"));
+        super(Component.translatable("infection.events.title"));
         this.parent = parent;
         this.entries = entries == null ? Collections.emptyList() : entries;
     }
@@ -43,7 +43,8 @@ public class MiniEventsScreen extends Screen {
         for (MiniEventType type : MiniEventType.values()) {
             int finalRowY = rowY;
             addRenderableWidget(Button.builder(
-                            Component.literal(type.displayName).copy().append(" — выбрать"),
+                            type.displayNameComponent().copy()
+                                    .append(Component.translatable("infection.events.select")),
                             b -> select(type))
                     .bounds(panelX + 8, finalRowY + 8, PANEL_W - 16, 20)
                     .build());
@@ -51,7 +52,7 @@ public class MiniEventsScreen extends Screen {
         }
 
         addRenderableWidget(Button.builder(
-                        Component.literal("Назад"),
+                        Component.translatable("infection.gui.back"),
                         b -> this.minecraft.setScreen(parent))
                 .bounds(this.width / 2 - 50, this.height - 28, 100, 20)
                 .build());
@@ -101,7 +102,7 @@ public class MiniEventsScreen extends Screen {
         // Описание под кнопками
         int rowY = 60;
         for (MiniEventType type : MiniEventType.values()) {
-            gfx.drawString(this.font, type.description, panelX + 8, rowY + 32,
+            gfx.drawString(this.font, type.descriptionComponent().getString(), panelX + 8, rowY + 32,
                     0xFF888888, false);
             rowY += ROW_H;
         }
@@ -114,9 +115,9 @@ public class MiniEventsScreen extends Screen {
         String smokeHideKey = liveKey(com.infection.client.KeyBindings.EVENT_SMOKE_HIDE);
         String smokeShowKey = liveKey(com.infection.client.KeyBindings.EVENT_SMOKE_SHOW);
 
-        String hint1 = "Jumpscare: клик → силуэт → «Запуск» (" + launchKey + ") или «Отмена» (" + cancelKey + ").";
-        String hint2 = "Приступ: точечный — выбираешь игроков и сразу запускаешь.";
-        String hint3 = "Дым: " + smokeHideKey + " — исчезнуть, " + smokeShowKey + " — появиться (модель чёрная).";
+        String hint1 = Component.translatable("infection.events.hint_jumpscare", launchKey, cancelKey).getString();
+        String hint2 = Component.translatable("infection.events.hint_hallucination").getString();
+        String hint3 = Component.translatable("infection.events.hint_smoke", smokeHideKey, smokeShowKey).getString();
         gfx.drawString(this.font, hint1, panelX, this.height - 72, 0xFF999999, false);
         gfx.drawString(this.font, hint2, panelX, this.height - 60, 0xFF999999, false);
         gfx.drawString(this.font, hint3, panelX, this.height - 48, 0xFF999999, false);

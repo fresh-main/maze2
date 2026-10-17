@@ -1,0 +1,17 @@
+{
+  "mazemap.tooltip.infinite": "Unlimited map",
+  "mazemap.tooltip.no_ink_cost": "Does not consume ink",
+  "mazemap.tooltip.durability": "Durability: %s / %s",
+  "mazemap.tooltip.broken": "Map is damaged",
+  "mazemap.screen.title": "Maze Map",
+  "mazemap.message.transfer_cancelled": "Fragment transfer cancelled",
+  "mazemap.item.infinite_map": "Infinite Maze Map",
+  "mazemap.command.infinite_map_received": "You received an infinite map.",
+  "mazemap.command.map_reset": "Map reset.",
+  "mazemap.command.no_map": "You do not have a map.",
+  "mazemap.message.player_not_found": "Player not found.",
+  "mazemap.message.fragments_sent": "Sent %s fragments to %s",
+  "mazemap.message.fragments_received": "Received %s fragments from %s",
+  "mazemap.hud.transfer_hint": " — transfer map fragment",
+  "mazemap.screen.hint": "Left-click + drag · move | Wheel · zoom | Right-click · mark | ESC · close"
+}

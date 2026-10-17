@@ -41,7 +41,7 @@ public record C2SMiniEventActionPacket(int action, int typeOrdinal) {
             ServerPlayer sender = ctx.get().getSender();
             if (sender == null) return;
             if (!sender.hasPermissions(2)) {
-                sender.sendSystemMessage(Component.literal("Требуются права оператора"));
+                sender.sendSystemMessage(Component.translatable("infection.message.op_required"));
                 return;
             }
             switch (pkt.action) {

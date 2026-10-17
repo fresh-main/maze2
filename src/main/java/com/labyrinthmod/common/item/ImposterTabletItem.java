@@ -110,14 +110,14 @@ public class ImposterTabletItem extends Item {
                 .orElse(false);
 
         if (!isImposter) {
-            serverPlayer.sendSystemMessage(Component.literal("§cТолько предатели могут использовать этот предмет!"));
+            serverPlayer.sendSystemMessage(Component.translatable("labyrinthmod.imposter_tablet.only_imposter"));
             return InteractionResultHolder.fail(stack);
         }
 
         // Проверяем, есть ли уже активная атака
         if (isAttackActive()) {
             long remaining = (currentAttackEndTime - System.currentTimeMillis()) / 1000;
-            serverPlayer.sendSystemMessage(Component.literal("§cГриверы уже атакуют " + currentTargetName + "! Осталось " + remaining + " секунд."));
+            serverPlayer.sendSystemMessage(Component.translatable("labyrinthmod.imposter_tablet.active_attack", currentTargetName, remaining));
             return InteractionResultHolder.fail(stack);
         }
 
@@ -126,14 +126,14 @@ public class ImposterTabletItem extends Item {
         if (remainingCooldown > 0) {
             long minutes = remainingCooldown / 60000;
             long seconds = (remainingCooldown % 60000) / 1000;
-            serverPlayer.sendSystemMessage(Component.literal("§cДо следующей атаки: " + minutes + "м " + seconds + "с"));
+            serverPlayer.sendSystemMessage(Component.translatable("labyrinthmod.imposter_attack.cooldown", minutes, seconds));
             return InteractionResultHolder.fail(stack);
         }
 
         // Открываем GUI с выбором цели
         List<OpenImposterScreenPacket.PlayerInfo> onlinePlayers = OpenImposterScreenPacket.getOnlinePlayers(serverPlayer);
         if (onlinePlayers.isEmpty()) {
-            serverPlayer.sendSystemMessage(Component.literal("§cНет доступных целей!"));
+            serverPlayer.sendSystemMessage(Component.translatable("labyrinthmod.imposter_tablet.no_targets"));
             return InteractionResultHolder.fail(stack);
         }
 
@@ -146,11 +146,11 @@ public class ImposterTabletItem extends Item {
 
     @Override
     public void appendHoverText(@NotNull ItemStack stack, @Nullable Level level, @NotNull List<Component> tooltip, @NotNull TooltipFlag flag) {
-        tooltip.add(Component.literal("ПКМ - открыть меню выбора жертвы").withStyle(ChatFormatting.GRAY));
-        tooltip.add(Component.literal("Натравить гриверов на игрока").withStyle(ChatFormatting.DARK_GRAY));
+        tooltip.add(Component.translatable("labyrinthmod.imposter_tablet.tooltip.open").withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("labyrinthmod.imposter_tablet.tooltip.attack").withStyle(ChatFormatting.DARK_GRAY));
         tooltip.add(Component.literal(" ").withStyle(ChatFormatting.DARK_GRAY));
-        tooltip.add(Component.literal("§cКулдаун: 1 час").withStyle(ChatFormatting.RED));
-        tooltip.add(Component.literal("§cТолько один предатель может атаковать!").withStyle(ChatFormatting.RED));
+        tooltip.add(Component.translatable("labyrinthmod.imposter_tablet.tooltip.cooldown").withStyle(ChatFormatting.RED));
+        tooltip.add(Component.translatable("labyrinthmod.imposter_tablet.tooltip.single_attacker").withStyle(ChatFormatting.RED));
     }
     public static long getAttackEndTime() {
         return currentAttackEndTime;

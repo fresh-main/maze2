@@ -19,7 +19,7 @@ public class LabyrinthConfigScreen extends Screen {
     private EditBox undergroundDepthBox, mainMazeCellSizeBox, sectorCellSizeBox;
 
     public LabyrinthConfigScreen(Screen parent, LabyrinthConfig config) {
-        super(Component.literal("Настройка Лабиринта"));
+        super(Component.translatable("otbor.config.title"));
         this.parent = parent;
         this.config = config;
     }
@@ -46,9 +46,9 @@ public class LabyrinthConfigScreen extends Screen {
         mainMazeCellSizeBox = createBox(startX + gapX, startY + gapY * 2, boxW, String.valueOf(config.mainMazeCellSize));
         sectorCellSizeBox = createBox(startX + gapX * 2, startY + gapY * 2, boxW, String.valueOf(config.sectorCellSize));
 
-        addRenderableWidget(Button.builder(Component.literal("СОХРАНИТЬ И СОЗДАТЬ"), b -> saveAndOpen())
+        addRenderableWidget(Button.builder(Component.translatable("otbor.config.create"), b -> saveAndOpen())
                 .bounds(paperX + paperW - 200, paperY + this.height - 120, 180, 26).build());
-        addRenderableWidget(Button.builder(Component.literal("<- НАЗАД"), b -> minecraft.setScreen(parent))
+        addRenderableWidget(Button.builder(Component.translatable("otbor.common.back"), b -> minecraft.setScreen(parent))
                 .bounds(paperX + 20, paperY + this.height - 120, 100, 26).build());
     }
 
@@ -94,22 +94,23 @@ public class LabyrinthConfigScreen extends Screen {
         PaperRender.drawPin(gfx, paperW - 16, 12, true);
 
         Font font = this.font;
-        gfx.drawString(font, "НАСТРОЙКА ЛАБИРИНТА", paperW / 2 - font.width("НАСТРОЙКА ЛАБИРИНТА") / 2, 20, PaperRender.INK_DARK, false);
+        String title = Component.translatable("otbor.config.title").getString();
+        gfx.drawString(font, title, paperW / 2 - font.width(title) / 2, 20, PaperRender.INK_DARK, false);
 
         int startX = 40, startY = 80, gapX = 140, gapY = 30, labelColor = PaperRender.INK_SOFT;
-        gfx.drawString(font, "Радиус глейда:", startX, startY - 12, labelColor, false);
-        gfx.drawString(font, "Толщина осн.:", startX + gapX, startY - 12, labelColor, false);
-        gfx.drawString(font, "Толщина сектора:", startX + gapX * 2, startY - 12, labelColor, false);
-        gfx.drawString(font, "Толщина стен:", startX + gapX * 3, startY - 12, labelColor, false);
+        gfx.drawString(font, Component.translatable("otbor.config.glaed_radius"), startX, startY - 12, labelColor, false);
+        gfx.drawString(font, Component.translatable("otbor.config.base_thickness"), startX + gapX, startY - 12, labelColor, false);
+        gfx.drawString(font, Component.translatable("otbor.config.sector_thickness"), startX + gapX * 2, startY - 12, labelColor, false);
+        gfx.drawString(font, Component.translatable("otbor.config.wall_thickness"), startX + gapX * 3, startY - 12, labelColor, false);
 
-        gfx.drawString(font, "Y пола:", startX, startY + gapY - 12, labelColor, false);
-        gfx.drawString(font, "Высота осн.:", startX + gapX, startY + gapY - 12, labelColor, false);
-        gfx.drawString(font, "Высота сектора:", startX + gapX * 2, startY + gapY - 12, labelColor, false);
-        gfx.drawString(font, "Высота стены:", startX + gapX * 3, startY + gapY - 12, labelColor, false);
+        gfx.drawString(font, Component.translatable("otbor.config.floor_y"), startX, startY + gapY - 12, labelColor, false);
+        gfx.drawString(font, Component.translatable("otbor.config.base_height"), startX + gapX, startY + gapY - 12, labelColor, false);
+        gfx.drawString(font, Component.translatable("otbor.config.sector_height"), startX + gapX * 2, startY + gapY - 12, labelColor, false);
+        gfx.drawString(font, Component.translatable("otbor.config.wall_height"), startX + gapX * 3, startY + gapY - 12, labelColor, false);
 
-        gfx.drawString(font, "Глубина недр:", startX, startY + gapY * 2 - 12, labelColor, false);
-        gfx.drawString(font, "Ячейка осн.:", startX + gapX, startY + gapY * 2 - 12, labelColor, false);
-        gfx.drawString(font, "Ячейка сектора:", startX + gapX * 2, startY + gapY * 2 - 12, labelColor, false);
+        gfx.drawString(font, Component.translatable("otbor.config.underground_depth"), startX, startY + gapY * 2 - 12, labelColor, false);
+        gfx.drawString(font, Component.translatable("otbor.config.base_cell_size"), startX + gapX, startY + gapY * 2 - 12, labelColor, false);
+        gfx.drawString(font, Component.translatable("otbor.config.sector_cell_size"), startX + gapX * 2, startY + gapY * 2 - 12, labelColor, false);
 
         gfx.pose().popPose();
         super.render(gfx, mouseX, mouseY, partialTick);

@@ -31,7 +31,8 @@ public class SingleTargetSelectScreen extends Screen {
 
     public SingleTargetSelectScreen(Screen parent, MiniEventType eventType,
                                     List<S2CInfectionListPacket.Entry> entries) {
-        super(Component.literal(eventType.displayName.toUpperCase() + " · ВЫБОР ЦЕЛИ"));
+        super(Component.translatable("infection.target.title",
+                eventType.displayNameComponent()));
         this.parent = parent;
         this.eventType = eventType;
         this.entries = entries == null ? Collections.emptyList() : entries;
@@ -52,13 +53,12 @@ public class SingleTargetSelectScreen extends Screen {
             S2CInfectionListPacket.Entry e = entries.get(rowIdx);
             int rowY = LIST_TOP + i * ROW_H;
 
-            String label = e.name() + " (" + e.level() + "%) — запустить";
-            addRenderableWidget(Button.builder(Component.literal(label),
+            addRenderableWidget(Button.builder(Component.translatable("infection.target.launch", e.name(), e.level()),
                             b -> launch(e.id()))
                     .bounds(btnX, rowY, btnW, 20).build());
         }
 
-        addRenderableWidget(Button.builder(Component.literal("Назад"),
+        addRenderableWidget(Button.builder(Component.translatable("infection.gui.back"),
                         b -> this.minecraft.setScreen(parent))
                 .bounds(this.width / 2 - 50, this.height - 28, 100, 20).build());
     }
@@ -97,9 +97,8 @@ public class SingleTargetSelectScreen extends Screen {
         gfx.drawString(this.font, t, this.width / 2 - this.font.width(t) / 2, 18,
                 0xFFFFE0E0, false);
 
-        String hint = entries.isEmpty()
-                ? "Список игроков пуст. Сначала открой админ-меню (V), потом «Инвентики»."
-                : "Один клик по игроку — мгновенный запуск. Жертва получит эффект.";
+        String hint = Component.translatable(entries.isEmpty()
+                ? "infection.target.empty_hint" : "infection.target.hint").getString();
         gfx.drawString(this.font, hint, this.width / 2 - this.font.width(hint) / 2, 36,
                 0xFF999999, false);
 

@@ -42,18 +42,18 @@ public class PatrolStickItem extends Item {
         if (player.isShiftKeyDown()) {
             // Shift+ПКМ по блоку = установить spawn point
             manager.setSpawnPoint(pos);
-            player.sendSystemMessage(Component.literal("§6[Patrol] Точка спавна: " + pos.getX() + " " + pos.getY() + " " + pos.getZ()));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.patrol.spawn_point", pos.getX(), pos.getY(), pos.getZ()));
             return InteractionResult.SUCCESS;
         }
 
         // Простой ПКМ по блоку — toggle точки
         if (manager.hasPoint(pos)) {
             manager.removePatrolPoint(pos);
-            player.sendSystemMessage(Component.literal("§c[Patrol] Точка удалена: " + pos.getX() + " " + pos.getY() + " " + pos.getZ()));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.patrol.point_removed", pos.getX(), pos.getY(), pos.getZ()));
         } else {
             manager.addPatrolPoint(pos);
             int total = manager.getPatrolPoints().size();
-            player.sendSystemMessage(Component.literal("§a[Patrol] Точка добавлена #" + total + ": " + pos.getX() + " " + pos.getY() + " " + pos.getZ()));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.patrol.point_added", total, pos.getX(), pos.getY(), pos.getZ()));
         }
         return InteractionResult.SUCCESS;
     }
@@ -77,8 +77,8 @@ public class PatrolStickItem extends Item {
 
     @Override
     public void appendHoverText(@NotNull ItemStack stack, Level level, @NotNull List<Component> tooltip, @NotNull TooltipFlag flag) {
-        tooltip.add(Component.literal("ПКМ по блоку — добавить/убрать точку").withStyle(ChatFormatting.GRAY));
-        tooltip.add(Component.literal("Shift+ПКМ по блоку — задать spawn").withStyle(ChatFormatting.GRAY));
-        tooltip.add(Component.literal("ПКМ в воздух — админ-меню").withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("labyrinthmod.patrol.tooltip.toggle_point").withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("labyrinthmod.patrol.tooltip.spawn").withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("labyrinthmod.patrol.tooltip.admin").withStyle(ChatFormatting.GRAY));
     }
 }

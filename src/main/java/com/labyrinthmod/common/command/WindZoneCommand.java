@@ -67,8 +67,8 @@ public class WindZoneCommand {
                 pos, pos.offset(3, 3, 3), 5, 3);
         manager.addWindZone(testZone);
 
-        player.sendSystemMessage(Component.literal("§aТестовая зона создана вокруг вас! Поставьте блок и сломайте его."));
-        player.sendSystemMessage(Component.literal("§7Для удаления используйте §e/windzone remove test_" + player.getUUID().toString().substring(0, 8)));
+        player.sendSystemMessage(Component.translatable("labyrinthmod.windzone_command.test_created"));
+        player.sendSystemMessage(Component.translatable("labyrinthmod.windzone_command.test_remove", player.getUUID().toString().substring(0, 8)));
 
         return 1;
     }
@@ -79,7 +79,7 @@ public class WindZoneCommand {
 
         BlockPos pos = player.blockPosition();
         pos1Selections.put(player.getUUID(), pos);
-        player.sendSystemMessage(Component.literal("§aПозиция 1 установлена: " + pos.getX() + " " + pos.getY() + " " + pos.getZ()));
+        player.sendSystemMessage(Component.translatable("labyrinthmod.windzone_command.pos1_set", pos.getX(), pos.getY(), pos.getZ()));
         return 1;
     }
 
@@ -89,7 +89,7 @@ public class WindZoneCommand {
 
         BlockPos pos = player.blockPosition();
         pos2Selections.put(player.getUUID(), pos);
-        player.sendSystemMessage(Component.literal("§aПозиция 2 установлена: " + pos.getX() + " " + pos.getY() + " " + pos.getZ()));
+        player.sendSystemMessage(Component.translatable("labyrinthmod.windzone_command.pos2_set", pos.getX(), pos.getY(), pos.getZ()));
         return 1;
     }
 
@@ -105,7 +105,7 @@ public class WindZoneCommand {
         BlockPos pos2 = pos2Selections.get(player.getUUID());
 
         if (pos1 == null || pos2 == null) {
-            player.sendSystemMessage(Component.literal("§cСначала установите позиции 1 и 2 с помощью /windzone pos1 и /windzone pos2"));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.windzone_command.set_positions_first"));
             return 0;
         }
 
@@ -113,18 +113,17 @@ public class WindZoneCommand {
         if (manager == null) return 0;
 
         if (manager.getWindZone(name) != null) {
-            player.sendSystemMessage(Component.literal("§cЗона ветра с именем " + name + " уже существует!"));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.windzone_command.exists", name));
             return 0;
         }
 
         WindZone zone = new WindZone(name, pos1, pos2, strength, force);
         manager.addWindZone(zone);
 
-        player.sendSystemMessage(Component.literal("§aЗона ветра §e" + name + " §aсоздана!"));
-        player.sendSystemMessage(Component.literal("§7Сила ветра: " + strength + ", Сила отбрасывания: " + force));
-        player.sendSystemMessage(Component.literal("§7Размер: от " + zone.minX + "," + zone.minY + "," + zone.minZ +
-                " до " + zone.maxX + "," + zone.maxY + "," + zone.maxZ));
-        player.sendSystemMessage(Component.literal("§7Теперь при размещении/удалении блоков в этой зоне будет вырываться пыль!"));
+        player.sendSystemMessage(Component.translatable("labyrinthmod.windzone_command.created", name));
+        player.sendSystemMessage(Component.translatable("labyrinthmod.windzone_command.force", strength, force));
+        player.sendSystemMessage(Component.translatable("labyrinthmod.windzone_command.bounds", zone.minX, zone.minY, zone.minZ, zone.maxX, zone.maxY, zone.maxZ));
+        player.sendSystemMessage(Component.translatable("labyrinthmod.windzone_command.dust"));
 
         return 1;
     }
@@ -135,12 +134,12 @@ public class WindZoneCommand {
         if (manager == null) return 0;
 
         if (manager.getWindZone(name) == null) {
-            ctx.getSource().sendFailure(Component.literal("§cЗона ветра " + name + " не найдена!"));
+            ctx.getSource().sendFailure(Component.translatable("labyrinthmod.windzone_command.not_found", name));
             return 0;
         }
 
         manager.removeWindZone(name);
-        ctx.getSource().sendSuccess(() -> Component.literal("§aЗона ветра §e" + name + " §aудалена!"), true);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.windzone_command.removed", name), true);
         return 1;
     }
 
@@ -151,15 +150,13 @@ public class WindZoneCommand {
         var zones = manager.getAllWindZones();
 
         if (zones.isEmpty()) {
-            ctx.getSource().sendSuccess(() -> Component.literal("§eНет созданных зон ветра"), false);
+            ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.windzone_command.none"), false);
             return 1;
         }
 
-        ctx.getSource().sendSuccess(() -> Component.literal("§6=== Список зон ветра ==="), false);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.windzone_command.list_heading"), false);
         for (WindZone zone : zones) {
-            String status = zone.isActive() ? "§aВкл" : "§cВыкл";
-            ctx.getSource().sendSuccess(() -> Component.literal("§e- " + zone.name +
-                    " §7(Сила: " + zone.windStrength + ", Отбрасывание: " + zone.pushForce + ") " + status), false);
+            ctx.getSource().sendSuccess(() -> Component.translatable(zone.isActive() ? "labyrinthmod.windzone_command.list_item_active" : "labyrinthmod.windzone_command.list_item_inactive", zone.name, zone.windStrength, zone.pushForce), false);
         }
         return 1;
     }
@@ -169,7 +166,7 @@ public class WindZoneCommand {
         if (manager == null) return 0;
 
         manager.clearWindZones();
-        ctx.getSource().sendSuccess(() -> Component.literal("§aВсе зоны ветра удалены!"), true);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.windzone_command.cleared"), true);
         return 1;
     }
 
@@ -178,7 +175,7 @@ public class WindZoneCommand {
         if (manager == null) return 0;
 
         manager.setEnabled(enabled);
-        ctx.getSource().sendSuccess(() -> Component.literal("§aЗоны ветра " + (enabled ? "включены" : "выключены")), true);
+        ctx.getSource().sendSuccess(() -> Component.translatable(enabled ? "labyrinthmod.windzone_command.enabled" : "labyrinthmod.windzone_command.disabled"), true);
         return 1;
     }
 
@@ -187,7 +184,7 @@ public class WindZoneCommand {
         if (manager == null) return 0;
 
         manager.setEnabled(!manager.isEnabled());
-        ctx.getSource().sendSuccess(() -> Component.literal("§aЗоны ветра " + (manager.isEnabled() ? "включены" : "выключены")), true);
+        ctx.getSource().sendSuccess(() -> Component.translatable(manager.isEnabled() ? "labyrinthmod.windzone_command.enabled" : "labyrinthmod.windzone_command.disabled"), true);
         return 1;
     }
 
@@ -195,9 +192,9 @@ public class WindZoneCommand {
         WindZoneManager manager = WindZoneManager.get(ctx.getSource().getLevel());
         if (manager == null) return 0;
 
-        ctx.getSource().sendSuccess(() -> Component.literal("§6=== Статус зон ветра ==="), false);
-        ctx.getSource().sendSuccess(() -> Component.literal("§eСостояние: " + (manager.isEnabled() ? "§aВключены" : "§cВыключены")), false);
-        ctx.getSource().sendSuccess(() -> Component.literal("§eКоличество зон: §f" + manager.getAllWindZones().size()), false);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.windzone_command.status_heading"), false);
+        ctx.getSource().sendSuccess(() -> Component.translatable(manager.isEnabled() ? "labyrinthmod.windzone_command.status_enabled" : "labyrinthmod.windzone_command.status_disabled"), false);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.windzone_command.status_count", manager.getAllWindZones().size()), false);
         return 1;
     }
 }

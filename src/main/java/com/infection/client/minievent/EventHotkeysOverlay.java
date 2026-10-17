@@ -3,6 +3,7 @@ package com.infection.client.minievent;
 import com.infection.client.KeyBindings;
 import com.infection.event.MiniEventState;
 import com.infection.event.MiniEventType;
+import net.minecraft.network.chat.Component;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -46,7 +47,7 @@ public final class EventHotkeysOverlay implements IGuiOverlay {
         Font font = mc.font;
 
         // Высчитываем размер блока: заголовок + строки.
-        String header = "[" + s.type().displayName + "]";
+        String header = "[" + s.type().displayNameComponent().getString() + "]";
         int headerW = font.width(header);
 
         int rowH = 11;
@@ -89,17 +90,17 @@ public final class EventHotkeysOverlay implements IGuiOverlay {
         List<String[]> out = new ArrayList<>();
         switch (type) {
             case SMOKE -> {
-                out.add(new String[]{key(KeyBindings.EVENT_SMOKE_HIDE), "Исчезнуть в дыму"});
-                out.add(new String[]{key(KeyBindings.EVENT_SMOKE_SHOW), "Появиться из дыма"});
-                out.add(new String[]{key(KeyBindings.EVENT_CANCEL), "Выйти из ивента"});
+                out.add(new String[]{key(KeyBindings.EVENT_SMOKE_HIDE), Component.translatable("infection.event.hotkey.smoke_hide").getString()});
+                out.add(new String[]{key(KeyBindings.EVENT_SMOKE_SHOW), Component.translatable("infection.event.hotkey.smoke_show").getString()});
+                out.add(new String[]{key(KeyBindings.EVENT_CANCEL), Component.translatable("infection.event.hotkey.cancel").getString()});
             }
             case JUMPSCARE -> {
-                out.add(new String[]{key(KeyBindings.EVENT_LAUNCH), "Запустить"});
-                out.add(new String[]{key(KeyBindings.EVENT_CANCEL), "Отменить"});
+                out.add(new String[]{key(KeyBindings.EVENT_LAUNCH), Component.translatable("infection.event.hotkey.launch").getString()});
+                out.add(new String[]{key(KeyBindings.EVENT_CANCEL), Component.translatable("infection.event.hotkey.cancel").getString()});
             }
             // LOOMING / FLICKER / BLACK_RUSH / HALLUCINATION_SURGE — без PREPARING,
             // запускаются автоматически. Полезно показать только Cancel.
-            default -> out.add(new String[]{key(KeyBindings.EVENT_CANCEL), "Отменить"});
+            default -> out.add(new String[]{key(KeyBindings.EVENT_CANCEL), Component.translatable("infection.event.hotkey.cancel").getString()});
         }
         return out;
     }

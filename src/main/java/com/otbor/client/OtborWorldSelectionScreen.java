@@ -36,7 +36,7 @@ public class OtborWorldSelectionScreen extends Screen {
     private int itemH = 42;
 
     public OtborWorldSelectionScreen(Screen parent) {
-        super(Component.literal("ВЫБОР МИРА"));
+        super(Component.translatable("otbor.worlds.title"));
         this.parent = parent;
     }
 
@@ -59,13 +59,13 @@ public class OtborWorldSelectionScreen extends Screen {
         // Кнопка НАЗАД в стиле Paper
         addRenderableWidget(PaperWidgets.paperButton(
                 paperX + 20, paperTop + 8, 100, 26,
-                Component.literal(" <- НАЗАД "),
+                Component.translatable("otbor.common.back"),
                 b -> minecraft.setScreen(parent),
                 0L, PaperRender.INK_SOFT, -1.5f));
         // Кнопка СОЗДАТЬ МИР в стиле Paper
         addRenderableWidget(PaperWidgets.paperButton(
                 paperX + paperW - 140, paperTop + 8, 120, 26,
-                Component.literal( "+ СОЗДАТЬ МИР  "),
+                Component.translatable("otbor.worlds.create"),
                 b -> minecraft.setScreen(new LabyrinthCreateWorldScreen(this)), // <-- ОТКРЫВАЕМ НАШЕ МЕНЮ
                 0L, PaperRender.INK_RED, 1.5f));
     }
@@ -110,13 +110,13 @@ public class OtborWorldSelectionScreen extends Screen {
         Font font = this.font;
 
         // Уникальный кикер
-        String kicker = "ФАЙЛ №05 · РЕЕСТР МИРОВ · УРОВЕНЬ ДОСТУПА 3";
+        String kicker = Component.translatable("otbor.worlds.kicker").getString();
         int kw = font.width(kicker);
         gfx.drawString(font, kicker, paperW / 2 - kw / 2, 8,
                 PaperRender.withAlpha(PaperRender.INK_FADED, 0.9f), false);
 
         // Заголовок с глитч-эффектом
-        String title = "РЕЕСТР МИРОВ";
+        String title = Component.translatable("otbor.worlds.heading").getString();
         float titleScale = 2.2f;
         int titleW = (int) (font.width(title) * titleScale);
         int titleY = 24;
@@ -130,7 +130,7 @@ public class OtborWorldSelectionScreen extends Screen {
         gfx.pose().popPose();
 
         // Подзаголовок
-        String subtitle = "доступные локальные миры";
+        String subtitle = Component.translatable("otbor.worlds.subtitle").getString();
         int subW = font.width(subtitle);
         gfx.drawString(font, subtitle, paperW / 2 - subW / 2, titleY + 28,
                 PaperRender.INK_SOFT, false);
@@ -143,7 +143,7 @@ public class OtborWorldSelectionScreen extends Screen {
                 PaperRender.withAlpha(PaperRender.INK_SOFT, 0.6f));
 
         // Статистическая информация
-        String stats = "всего миров: " + worlds.size() + " · последний вход: " + getLastPlayedDate();
+        String stats = Component.translatable("otbor.worlds.stats", worlds.size(), getLastPlayedDate()).getString();
         gfx.drawString(font, stats, paperW / 2 - font.width(stats) / 2, lineY + 12,
                 PaperRender.INK_FADED, false);
 
@@ -194,7 +194,7 @@ public class OtborWorldSelectionScreen extends Screen {
 
             // Название мира
             String name = world.getLevelName();
-            if (name.isEmpty()) name = "Безымянный мир";
+            if (name.isEmpty()) name = Component.translatable("otbor.worlds.unnamed").getString();
             gfx.drawString(font, name, listAbsX + 36, itemY + 6, PaperRender.INK, false);
 
             // Дата последнего запуска
@@ -206,7 +206,7 @@ public class OtborWorldSelectionScreen extends Screen {
             gfx.drawString(font, version, listAbsX + 36, itemY + 32, PaperRender.withAlpha(PaperRender.INK_SOFT, 0.7f), false);
 
             if (world.isDisabled()) {
-                gfx.drawString(font, "⚠ НЕСОВМЕСТИМА", listAbsX + 180, itemY + 14, PaperRender.INK_RED, false);
+                gfx.drawString(font, Component.translatable("otbor.worlds.incompatible"), listAbsX + 180, itemY + 14, PaperRender.INK_RED, false);
             }
 
             // Кнопки действий
@@ -220,7 +220,7 @@ public class OtborWorldSelectionScreen extends Screen {
             boolean playHover = mouseX >= playBtnX && mouseX <= playBtnX + btnW
                     && mouseY >= btnY && mouseY <= btnY + btnH;
             drawStyledButton(gfx, font, playBtnX, btnY, btnW, btnH,
-                    world.isDisabled() ? "ЗАБЛОКИРОВАН" : "▶ ИГРАТЬ",
+                    Component.translatable(world.isDisabled() ? "otbor.worlds.locked" : "otbor.worlds.play").getString(),
                     playHover && !world.isDisabled(), playHover);
             if (playHover && isHovered && !world.isDisabled()) {
                 hoveredWorldIndex = i;
@@ -321,7 +321,7 @@ public class OtborWorldSelectionScreen extends Screen {
     }
 
     private String getLastPlayedDate() {
-        if (worlds.isEmpty()) return "никогда";
+        if (worlds.isEmpty()) return Component.translatable("otbor.worlds.never").getString();
         long lastPlayed = worlds.get(0).getLastPlayed();
         return new SimpleDateFormat("dd.MM.yyyy").format(new Date(lastPlayed));
     }
@@ -334,7 +334,7 @@ public class OtborWorldSelectionScreen extends Screen {
         gfx.pose().pushPose();
         gfx.pose().translate(paperX + 15, paperY + paperH - 28, 0);
         gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-4f));
-        PaperRender.drawScribble(gfx, font, "архив миров", 0, 0,
+        PaperRender.drawScribble(gfx, font, Component.translatable("otbor.worlds.archive").getString(), 0, 0,
                 PaperRender.withAlpha(PaperRender.INK_SOFT, 0.7f));
         gfx.pose().popPose();
 
@@ -343,7 +343,7 @@ public class OtborWorldSelectionScreen extends Screen {
             gfx.pose().pushPose();
             gfx.pose().translate(paperX + paperW - 55, paperY + 18, 0);
             gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(7f));
-            PaperRender.drawRectStamp(gfx, font, "ДОПУЩЕНО", 0, 0,
+            PaperRender.drawRectStamp(gfx, font, Component.translatable("otbor.worlds.allowed").getString(), 0, 0,
                     PaperRender.withAlpha(PaperRender.INK_RED, 0.75f));
             gfx.pose().popPose();
         }
@@ -352,7 +352,7 @@ public class OtborWorldSelectionScreen extends Screen {
         gfx.pose().pushPose();
         gfx.pose().translate(paperX + paperW - 90, paperY + paperH - 35, 0);
         gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(3f));
-        PaperRender.drawScribble(gfx, font, "лист № " + (Math.abs(rnd.nextInt()) % 999 + 100), 0, 0,
+        PaperRender.drawScribble(gfx, font, Component.translatable("otbor.worlds.page", Math.abs(rnd.nextInt()) % 999 + 100).getString(), 0, 0,
                 PaperRender.withAlpha(PaperRender.INK_FADED, 0.6f));
         gfx.pose().popPose();
     }

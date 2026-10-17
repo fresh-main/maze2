@@ -32,7 +32,7 @@ public class OtborShareToLanScreen extends Screen {
     private int portBoxX, portBoxY, portBoxW, portBoxH;
 
     public OtborShareToLanScreen(Screen parent) {
-        super(Component.literal("ОТКРЫТЬ ДЛЯ СЕТИ"));
+        super(Component.translatable("otbor.lan.title"));
         this.parent = parent;
         var server = Minecraft.getInstance().getSingleplayerServer();
         this.gameMode = server != null ? server.getDefaultGameType() : GameType.SURVIVAL;
@@ -61,7 +61,7 @@ public class OtborShareToLanScreen extends Screen {
         portBoxX = paperX + paperW / 2 - portBoxW / 2;
         portBoxY = optY + 115;
 
-        portBox = new EditBox(this.font, portBoxX, portBoxY, portBoxW, portBoxH, Component.literal("порт"));
+        portBox = new EditBox(this.font, portBoxX, portBoxY, portBoxW, portBoxH, Component.translatable("otbor.lan.port"));
         portBox.setBordered(false);
         portBox.setTextColor(PaperRender.INK);
         portBox.setMaxLength(5);
@@ -78,13 +78,13 @@ public class OtborShareToLanScreen extends Screen {
 
         addRenderableWidget(PaperWidgets.paperButton(
                 btnsStart, btnsY, btnW, btnH,
-                Component.literal("▶ ОТКРЫТЬ СЕТЬ"),
+                Component.translatable("otbor.lan.open"),
                 b -> openToLan(),
                 0L, PaperRender.INK_RED, null));
 
         addRenderableWidget(PaperWidgets.paperButton(
                 btnsStart + btnW + gap, btnsY, btnW, btnH,
-                Component.literal("✖ ОТМЕНА"),
+                Component.translatable("otbor.common.cancel"),
                 b -> minecraft.setScreen(parent),
                 0L, PaperRender.INK_SOFT, null));
     }
@@ -180,12 +180,12 @@ public class OtborShareToLanScreen extends Screen {
 
         Font font = this.font;
 
-        String kicker = "ФАЙЛ №06 · ПРОТОКОЛ СЕТЕВОГО ДОСТУПА";
+        String kicker = Component.translatable("otbor.lan.kicker").getString();
         int kw = font.width(kicker);
         gfx.drawString(font, kicker, paperW / 2 - kw / 2, 12,
                 PaperRender.withAlpha(PaperRender.INK_FADED, 0.9f), false);
 
-        String title = "ОТКРЫТЬ ДЛЯ СЕТИ";
+        String title = Component.translatable("otbor.lan.title").getString();
         float ts = 2.0f;
         int tw = (int) (font.width(title) * ts);
         gfx.pose().pushPose();
@@ -202,9 +202,9 @@ public class OtborShareToLanScreen extends Screen {
         gfx.pose().pushPose();
         gfx.pose().translate(paperW - 130, paperH - 90, 0);
         gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-4f));
-        PaperRender.drawScribble(gfx, font, "внимание:", 0, 0, PaperRender.withAlpha(PaperRender.INK_RED, 0.6f));
-        PaperRender.drawScribble(gfx, font, "любой в сети", 0, 10, PaperRender.withAlpha(PaperRender.INK_RED, 0.6f));
-        PaperRender.drawScribble(gfx, font, "сможет войти.", 0, 20, PaperRender.withAlpha(PaperRender.INK_RED, 0.6f));
+        PaperRender.drawScribble(gfx, font, Component.translatable("otbor.lan.warning.1").getString(), 0, 0, PaperRender.withAlpha(PaperRender.INK_RED, 0.6f));
+        PaperRender.drawScribble(gfx, font, Component.translatable("otbor.lan.warning.2").getString(), 0, 10, PaperRender.withAlpha(PaperRender.INK_RED, 0.6f));
+        PaperRender.drawScribble(gfx, font, Component.translatable("otbor.lan.warning.3").getString(), 0, 20, PaperRender.withAlpha(PaperRender.INK_RED, 0.6f));
         gfx.pose().popPose();
 
         // ★ ДЕКОР: Штамп "СЕТЕВОЙ УЗЕЛ" ★
@@ -212,21 +212,21 @@ public class OtborShareToLanScreen extends Screen {
         gfx.pose().pushPose();
         gfx.pose().translate(60, paperH - 45, 0);
         gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-8f));
-        PaperRender.drawRoundStamp(gfx, font, 0, 0, 24, "СЕТЕВОЙ", "УЗЕЛ",
+        PaperRender.drawRoundStamp(gfx, font, 0, 0, 24, Component.translatable("otbor.lan.stamp.1").getString(), Component.translatable("otbor.lan.stamp.2").getString(),
                 PaperRender.withAlpha(PaperRender.INK_RED, 0.3f + 0.2f * pulse));
         gfx.pose().popPose();
 
         gfx.pose().popPose(); // ★ Закрываем общий pushPose бумаги ★
 
         // 2. Рисуем интерактивные опции БЕЗ поворота (отцентрованы)
-        gfx.drawString(font, "РЕЖИМ ВЗАИМОДЕЙСТВИЯ:", optX, optY, PaperRender.INK_DARK, false);
+        gfx.drawString(font, Component.translatable("otbor.lan.gamemode"), optX, optY, PaperRender.INK_DARK, false);
         drawCycleOption(gfx, font, optX, optY + 14, getGameModeName(), mouseX, mouseY);
 
-        gfx.drawString(font, "ДОПУСК КОМАНД:", optX, optY + 55, PaperRender.INK_DARK, false);
-        drawCycleOption(gfx, font, optX, optY + 69, allowCheats ? "РАЗРЕШЕНО" : "ЗАПРЕЩЕНО", mouseX, mouseY);
+        gfx.drawString(font, Component.translatable("otbor.lan.cheats"), optX, optY + 55, PaperRender.INK_DARK, false);
+        drawCycleOption(gfx, font, optX, optY + 69, Component.translatable(allowCheats ? "otbor.lan.enabled" : "otbor.lan.disabled").getString(), mouseX, mouseY);
 
         // 3. Рисуем поле ввода порта
-        gfx.drawString(font, "НОМЕР ПОРТА (1024-65535):", portBoxX, portBoxY - 12, PaperRender.INK_FADED, false);
+        gfx.drawString(font, Component.translatable("otbor.lan.port_range"), portBoxX, portBoxY - 12, PaperRender.INK_FADED, false);
 
         // Рамка для поля ввода (стилизованная под рукописный бланк)
         gfx.fill(portBoxX, portBoxY + portBoxH, portBoxX + portBoxW, portBoxY + portBoxH + 1, PaperRender.INK);
@@ -288,9 +288,9 @@ public class OtborShareToLanScreen extends Screen {
     }
 
     private String getGameModeName() {
-        if (gameMode == GameType.SURVIVAL) return "ВЫЖИВАНИЕ";
-        if (gameMode == GameType.CREATIVE) return "ТВОРЧЕСТВО";
-        return "ПРИКЛЮЧЕНИЕ";
+        if (gameMode == GameType.SURVIVAL) return Component.translatable("otbor.lan.survival").getString();
+        if (gameMode == GameType.CREATIVE) return Component.translatable("otbor.lan.creative").getString();
+        return Component.translatable("otbor.lan.adventure").getString();
     }
 
     private boolean isInRect(double mx, double my, int x, int y, int w, int h) {

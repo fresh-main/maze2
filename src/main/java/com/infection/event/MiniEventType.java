@@ -1,5 +1,7 @@
 package com.infection.event;
 
+import net.minecraft.network.chat.Component;
+
 /** Каталог инвентиков. Расширяется по мере добавления новых событий. */
 public enum MiniEventType {
 
@@ -39,6 +41,14 @@ public enum MiniEventType {
         this.displayName = displayName;
         this.description = description;
         this.hasSilhouette = hasSilhouette;
+    }
+
+    public Component displayNameComponent() {
+        return Component.translatable("infection.event." + name().toLowerCase() + ".name");
+    }
+
+    public Component descriptionComponent() {
+        return Component.translatable("infection.event." + name().toLowerCase() + ".description");
     }
 
     public static MiniEventType byOrdinal(int o) {

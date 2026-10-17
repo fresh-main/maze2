@@ -25,7 +25,7 @@ public class PersonalNoteScreen extends Screen {
     private List<String> wrappedLines = List.of();
 
     public PersonalNoteScreen(UUID ownerId) {
-        super(Component.literal("Записка"));
+        super(Component.translatable("infection.gui.note"));
         this.ownerId = ownerId;
     }
 
@@ -34,7 +34,7 @@ public class PersonalNoteScreen extends Screen {
         super.init();
         rebuildText();
 
-        addRenderableWidget(Button.builder(Component.literal("Закрыть"),
+        addRenderableWidget(Button.builder(Component.translatable("infection.gui.close"),
                         b -> onClose())
                 .bounds(this.width / 2 - 50, (this.height + PAPER_H) / 2 + 8, 100, 20)
                 .build());
@@ -43,7 +43,7 @@ public class PersonalNoteScreen extends Screen {
     private void rebuildText() {
         String raw = ClientInfectionCache.getNoteText(ownerId);
         if (raw == null || raw.isEmpty()) {
-            raw = "Сегодня всё нормально.\nГолова ясная, руки слушаются.";
+            raw = Component.translatable("infection.note.default_body").getString();
         }
         int maxW = PAPER_W - PAGE_PAD * 2;
         List<String> out = new ArrayList<>();
@@ -86,7 +86,7 @@ public class PersonalNoteScreen extends Screen {
         gfx.fill(paperX + PAPER_W - 1, paperY, paperX + PAPER_W, paperY + PAPER_H, 0xFF6B5842);
 
         // заголовок
-        String title = "Записка";
+        String title = Component.translatable("infection.gui.note").getString();
         int tw = this.font.width(title);
         gfx.drawString(this.font, title, paperX + (PAPER_W - tw) / 2, paperY + 8, 0xFF2A1810, false);
         // линия под заголовком

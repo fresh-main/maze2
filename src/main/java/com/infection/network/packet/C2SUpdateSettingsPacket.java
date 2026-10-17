@@ -24,11 +24,11 @@ public record C2SUpdateSettingsPacket(InfectionSettings settings) {
             ServerPlayer sender = ctx.get().getSender();
             if (sender == null) return;
             if (!sender.hasPermissions(2)) {
-                sender.sendSystemMessage(Component.literal("Требуются права оператора"));
+                sender.sendSystemMessage(Component.translatable("infection.message.op_required"));
                 return;
             }
             InfectionSavedData.get(sender.server).replace(pkt.settings, sender.server);
-            sender.sendSystemMessage(Component.literal("Настройки заражения обновлены"));
+            sender.sendSystemMessage(Component.translatable("infection.message.settings_updated"));
         });
         ctx.get().setPacketHandled(true);
     }

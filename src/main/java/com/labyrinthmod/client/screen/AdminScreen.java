@@ -70,7 +70,7 @@ public class AdminScreen extends Screen {
     private java.util.List<OpenAdminMenuPacket.MovingSurfaceSnapshot> movingSurfaces = java.util.Collections.emptyList();
 
     public AdminScreen(OpenAdminMenuPacket data) {
-        super(Component.literal("Labyrinth Admin Menu"));
+        super(Component.translatable("labyrinthmod.admin.title"));
         applyData(data);
     }
 
@@ -180,7 +180,7 @@ public class AdminScreen extends Screen {
         if (p.points != null) this.points = p.points;
         if (p.spawnPoint != null) this.spawnPoint = p.spawnPoint;
         if (startStopButton != null) {
-            startStopButton.setMessage(Component.literal(patrolActive ? "Остановить патруль" : "Запустить патруль"));
+            startStopButton.setMessage(Component.translatable(patrolActive ? "labyrinthmod.admin.stop_patrol" : "labyrinthmod.admin.start_patrol"));
         }
 
         // Попытка рефлексивно прочитать movingSurfaces из SyncAdminDataPacket (если сервер его посылает).
@@ -244,20 +244,20 @@ public class AdminScreen extends Screen {
 
         // Пресеты времени
         int presetW = (rightW - margin - 10) / 3;
-        addRenderableWidget(Button.builder(Component.literal("День"), b -> emergenceField.setValue("1000"))
+        addRenderableWidget(Button.builder(Component.translatable("labyrinthmod.admin.day"), b -> emergenceField.setValue("1000"))
                 .bounds(rightX, y, presetW, 18).build());
-        addRenderableWidget(Button.builder(Component.literal("Ночь"), b -> emergenceField.setValue("13000"))
+        addRenderableWidget(Button.builder(Component.translatable("labyrinthmod.admin.night"), b -> emergenceField.setValue("13000"))
                 .bounds(rightX + presetW + 5, y, presetW, 18).build());
-        addRenderableWidget(Button.builder(Component.literal("Полночь"), b -> emergenceField.setValue("18000"))
+        addRenderableWidget(Button.builder(Component.translatable("labyrinthmod.admin.midnight"), b -> emergenceField.setValue("18000"))
                 .bounds(rightX + (presetW + 5) * 2, y, presetW, 18).build());
         y += 23;
 
         timeBasedCheckbox = new Checkbox(rightX, y, rightW - margin, 20,
-                Component.literal("Выход по времени"), timeBasedEnabled);
+                Component.translatable("labyrinthmod.admin.time_based"), timeBasedEnabled);
         addRenderableWidget(timeBasedCheckbox);
         y += 25;
 
-        addRenderableWidget(Button.builder(Component.literal("Применить настройки"),
+        addRenderableWidget(Button.builder(Component.translatable("labyrinthmod.admin.apply_settings"),
                         b -> applySettings())
                 .bounds(rightX, y, rightW - margin, 20).build());
         y += 25;
@@ -266,7 +266,7 @@ public class AdminScreen extends Screen {
 
         // Управление патрулём
         startStopButton = Button.builder(
-                        Component.literal(patrolActive ? "Остановить патруль" : "Запустить патруль"),
+                        Component.translatable(patrolActive ? "labyrinthmod.admin.stop_patrol" : "labyrinthmod.admin.start_patrol"),
                         b -> {
                             // Локально переключаем состояние сразу — иначе двойной клик до прихода
                             // sync'а пошлёт ту же команду повторно. Сервер всё равно вернёт корректный
@@ -276,8 +276,8 @@ public class AdminScreen extends Screen {
                                     : AdminActionPacket.Action.START_PATROL;
                             NetworkHandler.CHANNEL.sendToServer(new AdminActionPacket(act));
                             patrolActive = !patrolActive;
-                            startStopButton.setMessage(Component.literal(
-                                    patrolActive ? "Остановить патруль" : "Запустить патруль"));
+                            startStopButton.setMessage(Component.translatable(
+                                    patrolActive ? "labyrinthmod.admin.stop_patrol" : "labyrinthmod.admin.start_patrol"));
                         })
                 .bounds(rightX, y, rightW - margin, 22).build();
         addRenderableWidget(startStopButton);
@@ -287,9 +287,9 @@ public class AdminScreen extends Screen {
         int spacingW = 60;
         spacingField = new EditBox(this.font, rightX, y, spacingW, 20, Component.literal(""));
         spacingField.setValue("8");
-        spacingField.setHint(Component.literal("шаг"));
+        spacingField.setHint(Component.translatable("labyrinthmod.admin.spacing"));
         addRenderableWidget(spacingField);
-        addRenderableWidget(Button.builder(Component.literal("Расчитать точки"),
+        addRenderableWidget(Button.builder(Component.translatable("labyrinthmod.admin.recalculate_points"),
                         b -> {
                             int sp;
                             try { sp = Integer.parseInt(spacingField.getValue()); } catch (Exception e) { sp = 8; }
@@ -300,7 +300,7 @@ public class AdminScreen extends Screen {
                 .bounds(rightX + spacingW + 5, y, rightW - margin - spacingW - 5, 20).build());
         y += 25;
 
-        addRenderableWidget(Button.builder(Component.literal("Очистить точки"),
+        addRenderableWidget(Button.builder(Component.translatable("labyrinthmod.admin.clear_points"),
                         b -> NetworkHandler.CHANNEL.sendToServer(new AdminActionPacket(AdminActionPacket.Action.CLEAR_POINTS)))
                 .bounds(rightX, y, rightW - margin, 20).build());
         y += 25;
@@ -309,16 +309,16 @@ public class AdminScreen extends Screen {
         y += 5;
         mapNameField = new EditBox(this.font, rightX, y, rightW - margin, 20, Component.literal(""));
         mapNameField.setValue("default");
-        mapNameField.setHint(Component.literal("имя карты"));
+        mapNameField.setHint(Component.translatable("labyrinthmod.admin.map_name"));
         addRenderableWidget(mapNameField);
         y += 25;
 
         int halfW = (rightW - margin - 5) / 2;
-        addRenderableWidget(Button.builder(Component.literal("Экспорт"),
+        addRenderableWidget(Button.builder(Component.translatable("labyrinthmod.admin.export"),
                         b -> NetworkHandler.CHANNEL.sendToServer(new AdminActionPacket(
                                 AdminActionPacket.Action.EXPORT_MAP, mapNameField.getValue())))
                 .bounds(rightX, y, halfW, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("Импорт"),
+        addRenderableWidget(Button.builder(Component.translatable("labyrinthmod.admin.import"),
                         b -> NetworkHandler.CHANNEL.sendToServer(new AdminActionPacket(
                                 AdminActionPacket.Action.IMPORT_MAP, mapNameField.getValue())))
                 .bounds(rightX + halfW + 5, y, halfW, 20).build());
@@ -326,7 +326,7 @@ public class AdminScreen extends Screen {
 
         // ========== Кнопки действий слева под списком ==========
         int leftButtonsY = this.height - 65;
-        addRenderableWidget(Button.builder(Component.literal("Телепорт к гриверу"),
+        addRenderableWidget(Button.builder(Component.translatable("labyrinthmod.admin.teleport_griver"),
                         b -> {
                             if (selectedGriverEntityId >= 0) {
                                 NetworkHandler.CHANNEL.sendToServer(new AdminActionPacket(
@@ -335,7 +335,7 @@ public class AdminScreen extends Screen {
                         })
                 .bounds(margin, leftButtonsY, listW, 20).build());
         leftButtonsY += 22;
-        addRenderableWidget(Button.builder(Component.literal("Убить гривера"),
+        addRenderableWidget(Button.builder(Component.translatable("labyrinthmod.admin.kill_griver"),
                         b -> {
                             if (selectedGriverEntityId >= 0) {
                                 NetworkHandler.CHANNEL.sendToServer(new AdminActionPacket(
@@ -353,8 +353,8 @@ public class AdminScreen extends Screen {
         try { cd = Integer.parseInt(cooldownField.getValue()); } catch (Exception e) { cd = revisitCooldown; }
         try { em = Long.parseLong(emergenceField.getValue()); } catch (Exception e) { em = emergenceTime; }
 
-        Minecraft.getInstance().player.sendSystemMessage(Component.literal(
-                "§7[Patrol] Отправка: min=" + md + " max=" + maxd + " cd=" + cd + " em=" + em));
+        Minecraft.getInstance().player.sendSystemMessage(Component.translatable(
+                "labyrinthmod.admin.settings_sending", md, maxd, cd, em));
 
         NetworkHandler.CHANNEL.sendToServer(new UpdateSettingsPacket(md, maxd, cd, em, timeBasedCheckbox.selected()));
     }
@@ -386,9 +386,10 @@ public class AdminScreen extends Screen {
         this.renderBackground(gfx);
 
         // Заголовок
-        gfx.drawString(this.font, "§6§lLabyrinth Admin", 10, 10, 0xFFFFFF);
-        gfx.drawString(this.font, "Патруль: " + (patrolActive ? "§aАКТИВЕН" : "§cОСТАНОВЛЕН")
-                + " §7| Точек: §f" + (points != null ? points.size() : 0), 10, 24, 0xFFFFFF);
+        gfx.drawString(this.font, Component.translatable("labyrinthmod.admin.title"), 10, 10, 0xFFFFFF);
+        gfx.drawString(this.font, Component.translatable("labyrinthmod.admin.patrol_status",
+                Component.translatable(patrolActive ? "labyrinthmod.admin.active" : "labyrinthmod.admin.stopped"),
+                points != null ? points.size() : 0), 10, 24, 0xFFFFFF);
 
         // Список гриверов
         renderGriverList(gfx, mouseX, mouseY, 10, 40, 140);
@@ -398,17 +399,17 @@ public class AdminScreen extends Screen {
 
         // Подписи к полям настроек
         int rightX = this.width - 200;
-        gfx.drawString(this.font, "Мин. дистанция (блоки):", rightX, 30, 0xAAAAAA);
-        gfx.drawString(this.font, "Радиус цели (блоки):", rightX, 55, 0xAAAAAA);
-        gfx.drawString(this.font, "Cooldown посещений:", rightX, 80, 0xAAAAAA);
-        gfx.drawString(this.font, "Время выхода (0-24000):", rightX, 105, 0xAAAAAA);
+        gfx.drawString(this.font, Component.translatable("labyrinthmod.admin.min_distance"), rightX, 30, 0xAAAAAA);
+        gfx.drawString(this.font, Component.translatable("labyrinthmod.admin.target_radius"), rightX, 55, 0xAAAAAA);
+        gfx.drawString(this.font, Component.translatable("labyrinthmod.admin.revisit_cooldown"), rightX, 80, 0xAAAAAA);
+        gfx.drawString(this.font, Component.translatable("labyrinthmod.admin.emergence_time"), rightX, 105, 0xAAAAAA);
 
         super.render(gfx, mouseX, mouseY, partial);
     }
 
     private void renderGriverList(GuiGraphics gfx, int mx, int my, int x, int y, int w) {
         gfx.fill(x, y, x + w, y + 220, 0x80000000);
-        gfx.drawString(this.font, "Гриверы: " + grivers.size(), x + 3, y + 3, 0xFFFF55);
+        gfx.drawString(this.font, Component.translatable("labyrinthmod.admin.grivers", grivers.size()), x + 3, y + 3, 0xFFFF55);
 
         int itemY = y + 15;
         for (int i = 0; i < grivers.size() && i < 15; i++) {
@@ -548,9 +549,9 @@ public class AdminScreen extends Screen {
 
         gfx.disableScissor();
 
-        gfx.drawString(this.font, "Scale: " + String.format("%.2f", mapScale), mapX + 4, mapY + 4, 0xAAAAAA);
-        gfx.drawString(this.font, "Центр: " + (int) mapCenterX + "," + (int) mapCenterZ, mapX + 4, mapY + 14, 0xAAAAAA);
-        gfx.drawString(this.font, "Колёсико: зум, ПКМ: drag", mapX + 4, mapY + mapH - 12, 0x808080);
+        gfx.drawString(this.font, Component.translatable("labyrinthmod.admin.map_scale", String.format("%.2f", mapScale)), mapX + 4, mapY + 4, 0xAAAAAA);
+        gfx.drawString(this.font, Component.translatable("labyrinthmod.admin.map_center", (int) mapCenterX, (int) mapCenterZ), mapX + 4, mapY + 14, 0xAAAAAA);
+        gfx.drawString(this.font, Component.translatable("labyrinthmod.admin.map_controls"), mapX + 4, mapY + mapH - 12, 0x808080);
     }
 
     private void drawRectOutline(GuiGraphics gfx, int x1, int z1, int x2, int z2, int color) {

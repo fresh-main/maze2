@@ -6,6 +6,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.network.chat.Component;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -107,29 +108,29 @@ public class FirstAidPaperStyleHandler {
         left.sort(Comparator.comparingInt(AbstractWidget::getY));
         right.sort(Comparator.comparingInt(AbstractWidget::getY));
 
-        String[] leftNames = {"Голова", "Левая рука", "Левая нога", "Левая ступня"};
-        String[] rightNames = {"Тело", "Правая рука", "Правая нога", "Правая ступня"};
+        String[] leftNames = {"labyrinthmod.first_aid.body.head", "labyrinthmod.first_aid.body.left_arm", "labyrinthmod.first_aid.body.left_leg", "labyrinthmod.first_aid.body.left_foot"};
+        String[] rightNames = {"labyrinthmod.first_aid.body.torso", "labyrinthmod.first_aid.body.right_arm", "labyrinthmod.first_aid.body.right_leg", "labyrinthmod.first_aid.body.right_foot"};
 
         for (int i = 0; i < left.size() && i < leftNames.length; i++) {
             if (left.get(i).isMouseOver(mx, my)) {
-                applyHeal("§aБинт применён: §6" + leftNames[i]);
+                applyHeal(Component.translatable("labyrinthmod.first_aid.bandage_applied", Component.translatable(leftNames[i])));
                 return;
             }
         }
         for (int i = 0; i < right.size() && i < rightNames.length; i++) {
             if (right.get(i).isMouseOver(mx, my)) {
-                applyHeal("§aБинт применён: §6" + rightNames[i]);
+                applyHeal(Component.translatable("labyrinthmod.first_aid.bandage_applied", Component.translatable(rightNames[i])));
                 return;
             }
         }
     }
 
-    private static void applyHeal(String message) {
+    private static void applyHeal(Component message) {
         Minecraft mc = Minecraft.getInstance();
         Player player = mc.player;
         if (player != null && ImmortalityWhitelist.isWhitelisted(player)) {
             player.setHealth(Math.min(player.getMaxHealth(), player.getHealth() + 2f));
-            player.sendSystemMessage(net.minecraft.network.chat.Component.literal(message));
+            player.sendSystemMessage(message);
         }
     }
 }

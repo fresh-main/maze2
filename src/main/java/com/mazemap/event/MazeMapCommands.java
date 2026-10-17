@@ -38,12 +38,12 @@ public final class MazeMapCommands {
         ServerPlayer player = ctx.getSource().getPlayerOrException();
         ItemStack mapStack = new ItemStack(ModItems.PERSONAL_MAP.get());
         MapDurabilityHandler.setInfinite(mapStack, true);
-        mapStack.setHoverName(Component.literal("§6Бесконечная личная карта"));
+        mapStack.setHoverName(Component.translatable("mazemap.item.infinite_map"));
 
         if (!player.getInventory().add(mapStack)) {
             player.drop(mapStack, false);
         }
-        player.sendSystemMessage(Component.literal("§aВы получили бесконечную карту."));
+        player.sendSystemMessage(Component.translatable("mazemap.command.infinite_map_received"));
         return 1;
     }
 
@@ -58,9 +58,9 @@ public final class MazeMapCommands {
                     PacketDistributor.PLAYER.with(() -> player),
                     new S2CClearMapPacket());
 
-            player.displayClientMessage(Component.literal("§aКарта в предмете сброшена."), true);
+            player.displayClientMessage(Component.translatable("mazemap.command.map_reset"), true);
         } else {
-            player.displayClientMessage(Component.literal("§cУ вас нет карты в инвентаре."), true);
+            player.displayClientMessage(Component.translatable("mazemap.command.no_map"), true);
         }
         return 1;
     }

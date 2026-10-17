@@ -1,0 +1,17 @@
+{
+  "mazemap.tooltip.infinite": "Неограниченная карта",
+  "mazemap.tooltip.no_ink_cost": "Не расходует чернила",
+  "mazemap.tooltip.durability": "Прочность: %s / %s",
+  "mazemap.tooltip.broken": "Карта повреждена",
+  "mazemap.screen.title": "Карта лабиринта",
+  "mazemap.message.transfer_cancelled": "Передача фрагментов отменена",
+  "mazemap.item.infinite_map": "Бесконечная карта лабиринта",
+  "mazemap.command.infinite_map_received": "Вы получили бесконечную карту.",
+  "mazemap.command.map_reset": "Карта сброшена.",
+  "mazemap.command.no_map": "У вас нет карты.",
+  "mazemap.message.player_not_found": "Игрок не найден.",
+  "mazemap.message.fragments_sent": "Передано фрагментов: %s игроку %s",
+  "mazemap.message.fragments_received": "Получено фрагментов: %s от игрока %s",
+  "mazemap.hud.transfer_hint": " — передать фрагмент карты",
+  "mazemap.screen.hint": "ЛКМ + перетаскивание · двигать | Колесо · масштаб | ПКМ · метка | ESC · закрыть"
+}

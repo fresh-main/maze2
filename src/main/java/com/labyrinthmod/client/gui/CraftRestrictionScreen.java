@@ -23,7 +23,7 @@ public class CraftRestrictionScreen extends AbstractContainerScreen<CraftRestric
     private final Set<String> checkedFactions = new HashSet<>();
 
     public CraftRestrictionScreen(CraftRestrictionMenu menu, Inventory inv, Component title) {
-        super(menu, inv, Component.literal("Управление крафтом"));
+        super(menu, inv, Component.translatable("labyrinthmod.craft_restrictions.title"));
         // ★ УВЕЛИЧЕННЫЕ РАЗМЕРЫ ★
         this.imageWidth = 340;
         this.imageHeight = 250;
@@ -43,23 +43,23 @@ public class CraftRestrictionScreen extends AbstractContainerScreen<CraftRestric
         int y = this.topPos;
 
         // Кнопка "Сохранить" (Увеличена по ширине и высоте)
-        this.addRenderableWidget(Button.builder(Component.literal("Сохранить"), (btn) -> {
+        this.addRenderableWidget(Button.builder(Component.translatable("gui.done"), (btn) -> {
             ItemStack stack = this.menu.getSlot(0).getItem();
             if (!stack.isEmpty()) {
                 ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(stack.getItem());
                 NetworkHandler.CHANNEL.sendToServer(new C2SSaveCraftRestrictionsPacket(itemId, new HashSet<>(checkedFactions)));
-                this.minecraft.player.sendSystemMessage(Component.literal("§aНастройки крафта сохранены!"));
+                this.minecraft.player.sendSystemMessage(Component.translatable("labyrinthmod.craft_restrictions.saved"));
             }
         }).bounds(x + 20, y + 85, 100, 24).build());
 
         // Кнопка "Сбросить"
-        this.addRenderableWidget(Button.builder(Component.literal("Сбросить"), (btn) -> {
+        this.addRenderableWidget(Button.builder(Component.translatable("labyrinthmod.craft_restrictions.reset"), (btn) -> {
             ItemStack stack = this.menu.getSlot(0).getItem();
             if (!stack.isEmpty()) {
                 checkedFactions.clear();
                 ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(stack.getItem());
                 NetworkHandler.CHANNEL.sendToServer(new C2SSaveCraftRestrictionsPacket(itemId, new HashSet<>()));
-                this.minecraft.player.sendSystemMessage(Component.literal("§eЗапреты сброшены!"));
+                this.minecraft.player.sendSystemMessage(Component.translatable("labyrinthmod.craft_restrictions.cleared"));
             }
         }).bounds(x + 20, y + 115, 100, 24).build());
     }
@@ -93,7 +93,7 @@ public class CraftRestrictionScreen extends AbstractContainerScreen<CraftRestric
         int y = this.topPos;
 
         // Заголовок для списка фракций (СПРАВА)
-        gfx.drawString(this.font, "Запрет крафта для фракций:", x + 160, y + 20, 0x404040, false);
+        gfx.drawString(this.font, Component.translatable("labyrinthmod.craft_restrictions.heading"), x + 160, y + 20, 0x404040, false);
 
         // Рисуем галочки (Чекбоксы) справа с увеличенным шагом
         for (int row = 0; row < Math.min(VISIBLE_ROWS, FACTIONS.length - scrollOffset); row++) {

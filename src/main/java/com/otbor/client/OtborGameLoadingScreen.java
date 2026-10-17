@@ -22,8 +22,8 @@ public class OtborGameLoadingScreen extends Screen {
 
     private long startTime = -1L;
     private float progress = 0f;
-    private String currentStage = "ИНИЦИАЛИЗАЦИЯ";
-    private String subStage = "загрузка модулей...";
+    private String currentStage = "";
+    private String subStage = "";
 
     // Анимационные переменные
     private float scanlineOffset = 0f;
@@ -38,18 +38,11 @@ public class OtborGameLoadingScreen extends Screen {
     // Эффекты
     private final Random random = new Random();
     private final String[] tips = {
-            "О.Т.Б.О.Р — Отдел Технического Безопасного Обеспечения Работы",
-            "Лабиринт живёт своей жизнью",
-            "Стены могут двигаться",
-            "Ты не первый. Ты не последний.",
-            "Доверяй только документам",
-            "Каждый гривер когда-то был человеком",
-            "Некоторые двери лучше не открывать",
-            "Если слышишь шаги за спиной — не оборачивайся",
-            "Бегущий не имеет имени",
-            "Архивная запись №47: доверия нет"
+            "otbor.loading.tip.1", "otbor.loading.tip.2", "otbor.loading.tip.3", "otbor.loading.tip.4",
+            "otbor.loading.tip.5", "otbor.loading.tip.6", "otbor.loading.tip.7", "otbor.loading.tip.8",
+            "otbor.loading.tip.9", "otbor.loading.tip.10"
     };
-    private String currentTip = tips[0];
+    private String currentTip = Component.translatable(tips[0]).getString();
     private long tipChangeTime = 0L;
 
     // Для анимации штампа
@@ -69,7 +62,7 @@ public class OtborGameLoadingScreen extends Screen {
     private static final int BAR_H = 12;
 
     public OtborGameLoadingScreen() {
-        super(Component.literal("ЗАГРУЗКА О.Т.Б.О.Р"));
+        super(Component.translatable("otbor.loading.title"));
     }
 
     @Override
@@ -89,22 +82,14 @@ public class OtborGameLoadingScreen extends Screen {
     }
 
     private void simulateGameLoad() throws InterruptedException {
-        String[] stages = {
-                "ЗАГРУЗКА ЯДРА", "ИНИЦИАЛИЗАЦИЯ РЕСУРСОВ", "ПРОВЕРКА ЦЕЛОСТНОСТИ",
-                "ЗАГРУЗКА ЗВУКОВ", "КОМПИЛЯЦИЯ ШЕЙДЕРОВ", "ПОДКЛЮЧЕНИЕ МОДУЛЕЙ",
-                "ФИНАЛИЗАЦИЯ", "ЗАПУСК"
-        };
-        String[] subStages = {
-                "загрузка системных файлов...", "подготовка ассетов...", "сканирование данных...",
-                "инициализация аудиоподсистемы...", "компиляция графических эффектов...",
-                "активация дополнительных модулей...", "финальная проверка...", "открытие портала..."
-        };
+        String[] stages = {"otbor.loading.stage.1", "otbor.loading.stage.2", "otbor.loading.stage.3", "otbor.loading.stage.4", "otbor.loading.stage.5", "otbor.loading.stage.6", "otbor.loading.stage.7", "otbor.loading.stage.8"};
+        String[] subStages = {"otbor.loading.substage.1", "otbor.loading.substage.2", "otbor.loading.substage.3", "otbor.loading.substage.4", "otbor.loading.substage.5", "otbor.loading.substage.6", "otbor.loading.substage.7", "otbor.loading.substage.8"};
 
         for (int i = 0; i <= 100; i++) {
             progress = i / 100f;
             int stageIndex = Math.min(stages.length - 1, i * stages.length / 100);
-            currentStage = stages[stageIndex];
-            subStage = subStages[stageIndex];
+            currentStage = Component.translatable(stages[stageIndex]).getString();
+            subStage = Component.translatable(subStages[stageIndex]).getString();
             Thread.sleep(20 + random.nextInt(15));
         }
     }
@@ -135,7 +120,7 @@ public class OtborGameLoadingScreen extends Screen {
 
         // Смена подсказок
         if (now >= tipChangeTime) {
-            currentTip = tips[random.nextInt(tips.length)];
+            currentTip = Component.translatable(tips[random.nextInt(tips.length)]).getString();
             tipChangeTime = now + 5000 + random.nextInt(3000);
         }
 
@@ -188,7 +173,7 @@ public class OtborGameLoadingScreen extends Screen {
                 PaperRender.withAlpha(PaperRender.INK_FADED, 0.9f), false);
 
         // Заголовок с глитч-эффектом
-        String title = "ЗАГРУЗКА";
+        String title = Component.translatable("otbor.loading.loading_stamp").getString();
         float titleScale = 2.8f;
         int titleW = (int) (font.width(title) * titleScale);
         int titleY = 28;
@@ -313,10 +298,11 @@ public class OtborGameLoadingScreen extends Screen {
             gfx.pose().pushPose();
             gfx.pose().translate(paperW - 180, 110, 0);
             gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-8f));
-            gfx.drawString(font, "СТАРЫЙ МИР УДАЛЁН", 0, 0,
+            String deletedWorld = Component.translatable("otbor.loading.deleted_world").getString();
+            gfx.drawString(font, deletedWorld, 0, 0,
                     PaperRender.withAlpha(PaperRender.INK_RED, 0.4f), false);
             // Зачёркивание
-            gfx.fill(0, 6, font.width("СТАРЫЙ МИР УДАЛЁН"), 8,
+            gfx.fill(0, 6, font.width(deletedWorld), 8,
                     PaperRender.withAlpha(PaperRender.INK_RED, 0.4f));
             gfx.pose().popPose();
         }
@@ -328,7 +314,7 @@ public class OtborGameLoadingScreen extends Screen {
         gfx.pose().translate(paperW - 65, paperH - 45, 0);
         gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-10f));
         gfx.pose().scale(stampScale, stampScale, 1f);
-        PaperRender.drawRectStamp(gfx, font, "ЗАГРУЗКА", 0, 0,
+        PaperRender.drawRectStamp(gfx, font, Component.translatable("otbor.loading.loading_stamp").getString(), 0, 0,
                 (stampAlpha << 24) | (PaperRender.INK_RED & 0x00FFFFFF));
         gfx.pose().popPose();
 
@@ -338,7 +324,7 @@ public class OtborGameLoadingScreen extends Screen {
             gfx.pose().translate(25, paperH - 28, 0);
             gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-5f));
             int alpha = (int) (0xAA * Math.min(1f, (elapsed - 800) / 600f));
-            PaperRender.drawRoundStamp(gfx, font, 0, 0, 24, "О.Т.Б.О.Р", "УЧТЕНО",
+            PaperRender.drawRoundStamp(gfx, font, 0, 0, 24, "О.Т.Б.О.Р", Component.translatable("otbor.loading.accounted_stamp").getString(),
                     (alpha << 24) | (PaperRender.INK_RED & 0x00FFFFFF));
             gfx.pose().popPose();
         }
@@ -352,7 +338,7 @@ public class OtborGameLoadingScreen extends Screen {
         gfx.pose().pushPose();
         gfx.pose().translate(paperW - 110, 18, 0);
         gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(5f));
-        gfx.drawString(font, "СОВ. СЕКРЕТНО", 0, 0,
+        gfx.drawString(font, Component.translatable("otbor.loading.top_secret"), 0, 0,
                 PaperRender.withAlpha(PaperRender.INK_RED, 0.7f), false);
         gfx.pose().popPose();
 

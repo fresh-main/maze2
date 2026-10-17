@@ -107,8 +107,7 @@ public final class MiniEventController {
                 null, null, 0f, 0f, false));
         broadcast(admin);
         // Без хардкода клавиш — HUD-оверлей покажет актуальные биндинги.
-        admin.displayClientMessage(Component.literal(
-                "Инвентик: " + type.displayName + " готов — см. подсказку клавиш справа."), true);
+        admin.displayClientMessage(Component.translatable("infection.event.ready", type.displayNameComponent()), true);
     }
 
     /** Запуск таргет-инвентика (LOOMING / FLICKER_PRESENCE) сразу в ACTIVE. */
@@ -120,8 +119,7 @@ public final class MiniEventController {
             case LOOMING -> startLooming(admin, target);
             case FLICKER_PRESENCE -> startFlicker(admin, target);
             case BLACK_RUSH -> startBlackRush(admin, target);
-            default -> admin.displayClientMessage(Component.literal(
-                    "Этот инвентик не таргет-режим."), true);
+            default -> admin.displayClientMessage(Component.translatable("infection.event.not_target_mode"), true);
         }
     }
 
@@ -139,8 +137,7 @@ public final class MiniEventController {
     public static void smokeHide(ServerPlayer admin) {
         if (!admin.hasPermissions(2)) return;
         if (!isSmokeActiveFor(admin)) {
-            admin.displayClientMessage(Component.literal(
-                    "SMOKE не активен. Открой меню инвентиков и выбери «Дым»."), true);
+            admin.displayClientMessage(Component.translatable("infection.event.smoke_not_active"), true);
             return;
         }
         ServerLevel level = admin.serverLevel();
@@ -151,21 +148,20 @@ public final class MiniEventController {
         admin.removeEffect(MobEffects.INVISIBILITY);
         admin.addEffect(new MobEffectInstance(MobEffects.INVISIBILITY,
                 MobEffectInstance.INFINITE_DURATION, 0, false, false, true));
-        admin.displayClientMessage(Component.literal("Исчез в дыму"), true);
+        admin.displayClientMessage(Component.translatable("infection.event.smoke_hidden"), true);
     }
 
     /** T-хоткей: сделать админа ВИДИМЫМ как чёрный силуэт + дым. Работает только если SMOKE активен. */
     public static void smokeShow(ServerPlayer admin) {
         if (!admin.hasPermissions(2)) return;
         if (!isSmokeActiveFor(admin)) {
-            admin.displayClientMessage(Component.literal(
-                    "SMOKE не активен. Открой меню инвентиков и выбери «Дым»."), true);
+            admin.displayClientMessage(Component.translatable("infection.event.smoke_not_active"), true);
             return;
         }
         ServerLevel level = admin.serverLevel();
         spawnSmokePuff(level, admin);
         admin.removeEffect(MobEffects.INVISIBILITY);
-        admin.displayClientMessage(Component.literal("Появился из дыма"), true);
+        admin.displayClientMessage(Component.translatable("infection.event.smoke_shown"), true);
     }
 
     private static boolean isSmokeActiveFor(ServerPlayer admin) {
@@ -184,15 +180,13 @@ public final class MiniEventController {
                 && existing.state == MiniEventState.ACTIVE) {
             // Не пишем хардкод R/T/B — они могут быть переназначены. HUD-оверлей
             // покажет актуальные клавиши.
-            admin.displayClientMessage(Component.literal(
-                    "SMOKE уже активен."), true);
+            admin.displayClientMessage(Component.translatable("infection.event.smoke_already_active"), true);
             return;
         }
         ServerLevel level = admin.serverLevel();
         ensureSmokeActive(admin, level);
         spawnSmokePuff(level, admin);
-        admin.displayClientMessage(Component.literal(
-                "SMOKE активирован — см. подсказку клавиш справа."), true);
+        admin.displayClientMessage(Component.translatable("infection.event.smoke_activated"), true);
     }
 
     private static void ensureSmokeActive(ServerPlayer admin, ServerLevel level) {
@@ -247,21 +241,19 @@ public final class MiniEventController {
         if (!admin.hasPermissions(2)) return false;
         Session s = SESSIONS.get(admin.getUUID());
         if (s == null || s.state != MiniEventState.PREPARING) {
-            admin.displayClientMessage(Component.literal("Нет подготовленного инвентика."), true);
+            admin.displayClientMessage(Component.translatable("infection.event.none_prepared"), true);
             return false;
         }
 
         switch (s.type) {
             case JUMPSCARE -> {
                 if (!triggerJumpscare(admin, s)) {
-                    admin.displayClientMessage(Component.literal(
-                            "Нет целей в радиусе " + (int) RADIUS_BLOCKS + " блоков."), true);
+                    admin.displayClientMessage(Component.translatable("infection.event.no_targets_radius", (int) RADIUS_BLOCKS), true);
                     return false;
                 }
             }
             default -> {
-                admin.displayClientMessage(Component.literal(
-                        "Этот инвентик не запускается хоткеем."), true);
+                admin.displayClientMessage(Component.translatable("infection.event.not_hotkey"), true);
                 return false;
             }
         }
@@ -307,12 +299,12 @@ public final class MiniEventController {
             // SMOKE бродкастили всем уровню — clear тоже всем.
             broadcastClearToAll(admin);
             spawnSmokePuff(admin.serverLevel(), admin);
-            admin.displayClientMessage(Component.literal("Дым рассеялся."), true);
+            admin.displayClientMessage(Component.translatable("infection.event.smoke_cleared"), true);
             return;
         }
 
         broadcastClear(admin);
-        admin.displayClientMessage(Component.literal("Инвентик отменён."), true);
+        admin.displayClientMessage(Component.translatable("infection.event.cancelled"), true);
     }
 
     /** Защита от множественного вызова tick() за один серверный тик: LevelTickEvent
@@ -496,8 +488,7 @@ public final class MiniEventController {
         Network.CHANNEL.send(PacketDistributor.PLAYER.with(() -> target),
                 new S2CForceHallucinationPacket(false, LOOMING_PHRASES, LOOMING_DURATION_TICKS));
 
-        admin.displayClientMessage(Component.literal(
-                "Гриф нависает над " + target.getGameProfile().getName()), true);
+        admin.displayClientMessage(Component.translatable("infection.event.looming_target", target.getGameProfile().getName()), true);
     }
 
     // ============== FLICKER_PRESENCE ==============
@@ -524,8 +515,7 @@ public final class MiniEventController {
 
         sendStateToTarget(admin, target);
 
-        admin.displayClientMessage(Component.literal(
-                "Мерцающий силуэт вокруг " + target.getGameProfile().getName()), true);
+        admin.displayClientMessage(Component.translatable("infection.event.flicker_target", target.getGameProfile().getName()), true);
     }
 
     // ============== BLACK_RUSH ==============
@@ -598,8 +588,7 @@ public final class MiniEventController {
                 behind.x, behind.y + 1.0, behind.z,
                 10, 0.3, 0.5, 0.3, 0.02);
 
-        admin.displayClientMessage(Component.literal(
-                "Бросок на " + target.getGameProfile().getName()), true);
+        admin.displayClientMessage(Component.translatable("infection.event.rush_target", target.getGameProfile().getName()), true);
     }
 
     /** Per-tick логика BLACK_RUSH: поворот жертвы, отскок, рывок. */

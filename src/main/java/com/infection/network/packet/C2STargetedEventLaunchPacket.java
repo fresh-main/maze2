@@ -31,12 +31,12 @@ public record C2STargetedEventLaunchPacket(int eventTypeOrdinal, UUID targetUUID
             ServerPlayer sender = ctx.get().getSender();
             if (sender == null) return;
             if (!sender.hasPermissions(2)) {
-                sender.sendSystemMessage(Component.literal("Требуются права оператора"));
+                sender.sendSystemMessage(Component.translatable("infection.message.op_required"));
                 return;
             }
             ServerPlayer target = sender.server.getPlayerList().getPlayer(pkt.targetUUID);
             if (target == null) {
-                sender.displayClientMessage(Component.literal("Цель не найдена."), true);
+                sender.displayClientMessage(Component.translatable("infection.message.target_not_found"), true);
                 return;
             }
             MiniEventController.launchTargeted(sender, MiniEventType.byOrdinal(pkt.eventTypeOrdinal), target);

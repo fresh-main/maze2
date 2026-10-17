@@ -39,7 +39,7 @@ public class PersonalMapScreen extends Screen {
     private long openTimeMs = 0L;
 
     public PersonalMapScreen() {
-        super(Component.literal("Личная карта"));
+        super(Component.translatable("mazemap.screen.title"));
     }
 
     @Override
@@ -111,10 +111,10 @@ public class PersonalMapScreen extends Screen {
         if (p > 0.95f) { gfx.disableScissor(); }
 
         gfx.pose().popPose();
-        String hint = "ЛКМ+Тянуть · двигать  |  Колесо · зум  |  ПКМ · метка  |  ESC · закрыть";
+        String hint = Component.translatable("mazemap.screen.hint").getString();
         PaperRender.drawInkText(gfx, this.font, hint,
                 this.width / 2 - this.font.width(hint) / 2, py + ph + 12, PaperRender.PAPER_LIGHT);
-        PaperRender.drawRectStamp(gfx, this.font, "КАРТА ЛАБИРИНТА",
+        PaperRender.drawRectStamp(gfx, this.font, Component.translatable("mazemap.screen.title").getString(),
                 px + pw - 64, py + ph - 17, PaperRender.INK_RED);
 
         super.render(gfx, mouseX, mouseY, partialTicks);

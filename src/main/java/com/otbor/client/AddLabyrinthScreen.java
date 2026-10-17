@@ -22,7 +22,7 @@ public class AddLabyrinthScreen extends Screen {
     private long openedAt = -1L;
 
     public AddLabyrinthScreen(Screen parent, Consumer<EnterMazeScreen.ServerEntry> onSave) {
-        super(Component.literal("ДОБАВИТЬ ЛАБИРИНТ"));
+        super(Component.translatable("otbor.add_server.title"));
         this.parent = parent;
         this.onSave = onSave;
     }
@@ -39,16 +39,16 @@ public class AddLabyrinthScreen extends Screen {
 
         nameBox = new EditBox(this.font,
                 paperX + 24, paperY + 90, paperW - 48, 18,
-                Component.literal("имя"));
+                Component.translatable("otbor.add_server.name"));
         nameBox.setBordered(false);
         nameBox.setTextColor(PaperRender.INK);
         nameBox.setMaxLength(40);
-        nameBox.setValue("Новый лабиринт");
+        nameBox.setValue(Component.translatable("otbor.add_server.default_name").getString());
         addRenderableWidget(nameBox);
 
         ipBox = new EditBox(this.font,
                 paperX + 24, paperY + 138, paperW - 48, 18,
-                Component.literal("ip"));
+                Component.translatable("otbor.add_server.address"));
         ipBox.setBordered(false);
         ipBox.setTextColor(PaperRender.INK);
         ipBox.setMaxLength(80);
@@ -63,13 +63,13 @@ public class AddLabyrinthScreen extends Screen {
 
         addRenderableWidget(PaperWidgets.paperButton(
                 btnsStart, btnsY, btnW, btnH,
-                Component.literal("ДОБАВИТЬ"),
+                Component.translatable("otbor.add_server.add"),
                 b -> trySave(),
                 0L, PaperRender.INK_RED, null));
 
         addRenderableWidget(PaperWidgets.paperButton(
                 btnsStart + btnW + gap, btnsY, btnW, btnH,
-                Component.literal("ОТМЕНА"),
+                Component.translatable("otbor.common.cancel"),
                 b -> minecraft.setScreen(parent),
                 0L, PaperRender.INK_SOFT, null));
     }
@@ -78,10 +78,10 @@ public class AddLabyrinthScreen extends Screen {
         String name = nameBox.getValue().trim();
         String ip = ipBox.getValue().trim();
 
-        if (name.isEmpty()) name = "Лабиринт";
+        if (name.isEmpty()) name = Component.translatable("otbor.add_server.fallback_name").getString();
         if (ip.isEmpty()) return;
 
-        EnterMazeScreen.ServerEntry entry = new EnterMazeScreen.ServerEntry(name, ip, "Пользовательский узел");
+        EnterMazeScreen.ServerEntry entry = new EnterMazeScreen.ServerEntry(name, ip, Component.translatable("otbor.add_server.custom_node").getString());
 
         if (onSave != null) {
             onSave.accept(entry);
@@ -115,12 +115,12 @@ public class AddLabyrinthScreen extends Screen {
 
         Font font = this.font;
 
-        String kicker = "ФАЙЛ №02 · РЕГИСТРАЦИЯ НОВОГО УЗЛА";
+        String kicker = Component.translatable("otbor.add_server.kicker").getString();
         int kw = font.width(kicker);
         gfx.drawString(font, kicker, paperW / 2 - kw / 2, 10,
                 PaperRender.withAlpha(PaperRender.INK_FADED, 0.9f), false);
 
-        String title = "НОВЫЙ ЛАБИРИНТ";
+        String title = Component.translatable("otbor.add_server.heading").getString();
         float ts = 2.0f;
         int tw = (int) (font.width(title) * ts);
         gfx.pose().pushPose();
@@ -133,13 +133,13 @@ public class AddLabyrinthScreen extends Screen {
         PaperRender.drawHandDivider(gfx, paperW / 2 - 110, lineY, 220,
                 PaperRender.withAlpha(PaperRender.INK_SOFT, 0.7f));
 
-        gfx.drawString(font, "имя лабиринта:", 24, 76, PaperRender.INK_SOFT, false);
-        gfx.drawString(font, "адрес (IP:порт):", 24, 124, PaperRender.INK_SOFT, false);
+        gfx.drawString(font, Component.translatable("otbor.add_server.name_label"), 24, 76, PaperRender.INK_SOFT, false);
+        gfx.drawString(font, Component.translatable("otbor.add_server.address_label"), 24, 124, PaperRender.INK_SOFT, false);
 
         gfx.fill(24, 90 + 16, paperW - 24, 90 + 17, PaperRender.INK);
         gfx.fill(24, 138 + 16, paperW - 24, 138 + 17, PaperRender.INK);
 
-        gfx.drawString(font, "пример: 127.0.0.1:25565", 24, 138 + 22,
+        gfx.drawString(font, Component.translatable("otbor.add_server.example"), 24, 138 + 22,
                 PaperRender.INK_FADED, false);
 
         gfx.pose().popPose();

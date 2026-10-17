@@ -45,7 +45,7 @@ public class HallucinationConfigScreen extends Screen {
     private int scroll = 0;
 
     public HallucinationConfigScreen(Screen parent, List<S2CInfectionListPacket.Entry> entries) {
-        super(Component.literal("ПРИСТУП · ТОЧЕЧНЫЙ ЗАПУСК"));
+        super(Component.translatable("infection.hallucination.title"));
         this.parent = parent;
         this.entries = entries == null ? Collections.emptyList() : entries;
     }
@@ -80,13 +80,13 @@ public class HallucinationConfigScreen extends Screen {
         }
 
         // Кнопки группового выбора
-        addRenderableWidget(Button.builder(Component.literal("Все"),
+        addRenderableWidget(Button.builder(Component.translatable("infection.hallucination.select_all"),
                         b -> { selected.clear(); for (var e : entries) selected.add(e.id()); rebuildWidgets(); })
                 .bounds(leftX, listBottom + 4, 70, 18).build());
-        addRenderableWidget(Button.builder(Component.literal("Никого"),
+        addRenderableWidget(Button.builder(Component.translatable("infection.hallucination.select_none"),
                         b -> { selected.clear(); rebuildWidgets(); })
                 .bounds(leftX + 76, listBottom + 4, 70, 18).build());
-        addRenderableWidget(Button.builder(Component.literal("Инверт."),
+        addRenderableWidget(Button.builder(Component.translatable("infection.hallucination.invert"),
                         b -> {
                             Set<UUID> inv = new HashSet<>();
                             for (var e : entries) if (!selected.contains(e.id())) inv.add(e.id());
@@ -98,22 +98,22 @@ public class HallucinationConfigScreen extends Screen {
         int rightX = this.width / 2 + 12;
         int phrasesH = listBottom - LIST_TOP - 28;
         phrasesBox = new MultiLineEditBox(this.font, rightX, LIST_TOP, PHRASE_COL_W, phrasesH,
-                Component.literal("Свои фразы (по одной на строку)"),
-                Component.literal("Свои фразы (по одной на строку)"));
+                Component.translatable("infection.hallucination.custom_phrases"),
+                Component.translatable("infection.hallucination.custom_phrases"));
         phrasesBox.setCharacterLimit(4000);
         addRenderableWidget(phrasesBox);
 
         useDefaultsBox = new Checkbox(rightX, LIST_TOP + phrasesH + 4, PHRASE_COL_W, 18,
-                Component.literal("Использовать стандартные фразы тоже"),
+                Component.translatable("infection.hallucination.use_defaults"),
                 true);
         addRenderableWidget(useDefaultsBox);
 
         // ===== Низ: запуск + отмена =====
         int btnY = this.height - 28;
-        addRenderableWidget(Button.builder(Component.literal("Запустить приступ"),
+        addRenderableWidget(Button.builder(Component.translatable("infection.hallucination.launch"),
                         b -> launch())
                 .bounds(this.width / 2 - 152, btnY, 140, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("Отмена"),
+        addRenderableWidget(Button.builder(Component.translatable("infection.gui.cancel"),
                         b -> this.minecraft.setScreen(parent))
                 .bounds(this.width / 2 + 12, btnY, 140, 20).build());
     }
@@ -172,18 +172,17 @@ public class HallucinationConfigScreen extends Screen {
         gfx.drawString(this.font, t, this.width / 2 - this.font.width(t) / 2, 18, 0xFFFFE0E0, false);
 
         // Подсказка
-        String hint = entries.isEmpty()
-                ? "Список игроков пуст. Открой админ-меню (V) → «Инвентики» — список придёт с сервера."
-                : "Отметь цели слева. Свои фразы — справа. Точечно, без радиуса.";
+        String hint = Component.translatable(entries.isEmpty()
+                ? "infection.hallucination.empty_hint" : "infection.hallucination.hint").getString();
         gfx.drawString(this.font, hint, this.width / 2 - this.font.width(hint) / 2, 32,
                 0xFF999999, false);
 
         // Заголовки колонок
         int leftX = this.width / 2 - PLAYER_COL_W - 12;
         int rightX = this.width / 2 + 12;
-        gfx.drawString(this.font, "ЦЕЛИ (" + selected.size() + "/" + entries.size() + ")",
+        gfx.drawString(this.font, Component.translatable("infection.hallucination.targets", selected.size(), entries.size()).getString(),
                 leftX, LIST_TOP - 12, 0xFFB0B0B0, false);
-        gfx.drawString(this.font, "ФРАЗЫ", rightX, LIST_TOP - 12, 0xFFB0B0B0, false);
+        gfx.drawString(this.font, Component.translatable("infection.hallucination.phrases").getString(), rightX, LIST_TOP - 12, 0xFFB0B0B0, false);
 
         super.render(gfx, mouseX, mouseY, partialTick);
     }

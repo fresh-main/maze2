@@ -11,6 +11,7 @@ import net.minecraft.client.gui.screens.LevelLoadingScreen;
 import net.minecraft.client.gui.screens.ProgressScreen;
 import net.minecraft.client.gui.screens.ReceivingLevelScreen;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 
 import java.lang.reflect.Field;
@@ -321,9 +322,10 @@ public final class LoadingScreenStyling {
             gfx.pose().pushPose();
             gfx.pose().translate(px + paperW - 170, py + 140, 0);
             gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-6f));
-            gfx.drawString(font, "ПРЕДЫДУЩИЙ ВХОД", 0, 0,
+            String previousEntry = Component.translatable("otbor.loading.previous_entry").getString();
+            gfx.drawString(font, previousEntry, 0, 0,
                     PaperRender.withAlpha(PaperRender.INK_RED, 0.35f), false);
-            gfx.fill(0, 6, font.width("ПРЕДЫДУЩИЙ ВХОД"), 8,
+            gfx.fill(0, 6, font.width(previousEntry), 8,
                     PaperRender.withAlpha(PaperRender.INK_RED, 0.35f));
             gfx.pose().popPose();
         }
@@ -334,7 +336,7 @@ public final class LoadingScreenStyling {
         gfx.pose().translate(px + paperW - 55, py + paperH - 38, 0);
         gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-9f));
         gfx.pose().scale(stampScale, stampScale, 1f);
-        PaperRender.drawRectStamp(gfx, font, "ЗАГРУЗКА", 0, 0,
+        PaperRender.drawRectStamp(gfx, font, Component.translatable("otbor.loading.loading_stamp").getString(), 0, 0,
                 (stampAlpha << 24) | (PaperRender.INK_RED & 0x00FFFFFF));
         gfx.pose().popPose();
 
@@ -343,7 +345,7 @@ public final class LoadingScreenStyling {
             gfx.pose().translate(px + 20, py + paperH - 26, 0);
             gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-4f));
             int alpha = (int) (0xAA * Math.min(1f, (elapsed - 800) / 600f));
-            PaperRender.drawRoundStamp(gfx, font, 0, 0, 22, "О.Т.Б.О.Р", "УЧТЕНО",
+            PaperRender.drawRoundStamp(gfx, font, 0, 0, 22, "О.Т.Б.О.Р", Component.translatable("otbor.loading.accounted_stamp").getString(),
                     (alpha << 24) | (PaperRender.INK_RED & 0x00FFFFFF));
             gfx.pose().popPose();
         }
@@ -357,14 +359,14 @@ public final class LoadingScreenStyling {
         gfx.pose().pushPose();
         gfx.pose().translate(px + paperW - 100, py + 18, 0);
         gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(4f));
-        gfx.drawString(font, "СОВ. СЕКРЕТНО", 0, 0,
+        gfx.drawString(font, Component.translatable("otbor.loading.top_secret"), 0, 0,
                 PaperRender.withAlpha(PaperRender.INK_RED, 0.7f), false);
         gfx.pose().popPose();
 
         gfx.pose().pushPose();
         gfx.pose().translate(px + 15, py + paperH - 18, 0);
         gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-3f));
-        gfx.drawString(font, "лист № " + ((firstRenderTime / 1000) % 999 + 100), 0, 0,
+        gfx.drawString(font, Component.translatable("otbor.loading.page_number", ((firstRenderTime / 1000) % 999 + 100)), 0, 0,
                 PaperRender.withAlpha(PaperRender.INK_FADED, 0.5f));
         gfx.pose().popPose();
     }
@@ -373,27 +375,18 @@ public final class LoadingScreenStyling {
 
 
     private static String titleFor(Screen screen) {
-        if (screen instanceof ConnectScreen) return "ПОДКЛЮЧЕНИЕ";
-        if (screen instanceof ReceivingLevelScreen) return "ВХОД В СТ-ЗОНУ";
-        if (screen instanceof LevelLoadingScreen) return "ЗАГРУЗКА МИРА";
-        if (screen instanceof ProgressScreen) return "ЗАГРУЗКА";
-        return "СОХРАНЕНИЕ";
+        if (screen instanceof ConnectScreen) return Component.translatable("otbor.loading.screen.connecting").getString();
+        if (screen instanceof ReceivingLevelScreen) return Component.translatable("otbor.loading.screen.entering").getString();
+        if (screen instanceof LevelLoadingScreen) return Component.translatable("otbor.loading.screen.world").getString();
+        if (screen instanceof ProgressScreen) return Component.translatable("otbor.loading.screen.loading").getString();
+        return Component.translatable("otbor.loading.screen.saving").getString();
     }
 
 
     private static void drawTip(GuiGraphics gfx, Font font, int px, int py, int paperW, int paperH, long elapsed) {
-        String[] tips = {
-                "Стены могут двигаться",
-                "Ты не первый. Ты не последний.",
-                "Доверяй только документам",
-                "Некоторые двери лучше не открывать",
-                "О.Т.Б.О.Р наблюдает",
-                "Бегущий не имеет имени",
-                "Если слышишь шаги — не оборачивайся",
-                "Гриверы когда-то были людьми"
-        };
+        String[] tips = {"otbor.loading.tip.3", "otbor.loading.tip.4", "otbor.loading.tip.5", "otbor.loading.tip.7", "otbor.loading.screen.tip.observe", "otbor.loading.tip.9", "otbor.loading.screen.tip.steps", "otbor.loading.tip.6"};
         int tipIndex = (int) ((elapsed / 4500) % tips.length);
-        String tip = tips[tipIndex];
+        String tip = Component.translatable(tips[tipIndex]).getString();
 
         int tipY = py + paperH - 52;
         PaperRender.drawHandDivider(gfx, px + 20, tipY - 6, paperW - 40,

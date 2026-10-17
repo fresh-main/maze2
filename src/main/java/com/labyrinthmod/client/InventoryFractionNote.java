@@ -8,6 +8,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ContainerScreenEvent;
@@ -67,7 +68,7 @@ public class InventoryFractionNote {
 
         // ===== Заголовок: булавка слева, кикер справа от неё =====
         // Булавка нарисована drawPaper в (x+12, y+6).
-        String kicker = "ЛИЧНОЕ ДЕЛО";
+        String kicker = Component.translatable("labyrinthmod.fraction_note.file").getString();
         gfx.drawString(font, kicker, x + 24, y + 5, INK_FADED, false);
 
         // Тонкая линия под заголовком
@@ -75,7 +76,7 @@ public class InventoryFractionNote {
                 (0x80 << 24) | (INK_FADED & 0xFFFFFF));
 
         // ===== ИГРОК =====
-        gfx.drawString(font, "ИГРОК", x + PAD, y + 22, INK_FADED, false);
+        gfx.drawString(font, Component.translatable("labyrinthmod.fraction_note.player"), x + PAD, y + 22, INK_FADED, false);
         String name = player.getGameProfile().getName();
         if (font.width(name) > NOTE_W - PAD * 2) {
             name = font.plainSubstrByWidth(name, NOTE_W - PAD * 2 - 6) + "…";
@@ -87,8 +88,8 @@ public class InventoryFractionNote {
                 (0x60 << 24) | (INK_FADED & 0xFFFFFF));
 
         // ===== РОЛЬ =====
-        gfx.drawString(font, "РОЛЬ", x + PAD, y + 48, INK_FADED, false);
-        String roleName = displayFraction == FractionType.NONE ? "не назначена" : displayFraction.displayName;
+        gfx.drawString(font, Component.translatable("labyrinthmod.fraction_note.role"), x + PAD, y + 48, INK_FADED, false);
+        String roleName = displayFraction == FractionType.NONE ? Component.translatable("labyrinthmod.fraction_note.unassigned").getString() : fractionName(displayFraction);
         int roleColor = displayFraction == FractionType.NONE
                 ? INK_FADED
                 : (0xFF000000 | (displayFraction.color & 0xFFFFFF));
@@ -99,9 +100,9 @@ public class InventoryFractionNote {
         FractionType maskF = hasMask ? FractionType.fromName(mask) : null;
         int descTop;
         if (hasMask && maskF != null && maskF != FractionType.NONE) {
-            gfx.drawString(font, "МАСКА", x + PAD, y + 70, INK_FADED, false);
+            gfx.drawString(font, Component.translatable("labyrinthmod.fraction_note.mask"), x + PAD, y + 70, INK_FADED, false);
             int mc2 = 0xFF000000 | (maskF.color & 0xFFFFFF);
-            gfx.drawString(font, maskF.displayName, x + PAD, y + 80, mc2, false);
+            gfx.drawString(font, fractionNameComponent(maskF), x + PAD, y + 80, mc2, false);
             descTop = y + 92;
         } else {
             descTop = y + 74;
@@ -136,6 +137,14 @@ public class InventoryFractionNote {
             gfx.fill(sx + sw - 1, sy, sx + sw, sy + sh, stampColor);
             gfx.drawString(font, stamp, sx + 4, sy + 2, stampColor, false);
         }
+    }
+
+    private static String fractionName(FractionType fraction) {
+        return fractionNameComponent(fraction).getString();
+    }
+
+    private static Component fractionNameComponent(FractionType fraction) {
+        return Component.translatable("labyrinthmod.fraction." + fraction.name().toLowerCase(java.util.Locale.ROOT));
     }
 
     /** Лёгкая волнистая линия — рукописный разделитель. */

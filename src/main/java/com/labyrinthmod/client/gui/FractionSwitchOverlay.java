@@ -52,7 +52,7 @@ public class FractionSwitchOverlay {
         }
 
         // Подсказка снизу
-        Component instruction = Component.literal("Отпустите F3 для применения");
+        Component instruction = Component.translatable("labyrinthmod.fraction_switch.release_hint");
         int instructionWidth = mc.font.width(instruction);
         guiGraphics.drawString(mc.font, instruction, (screenWidth - instructionWidth) / 2, startY + slotSize + 12, 0xFFFFFF, true);
     };

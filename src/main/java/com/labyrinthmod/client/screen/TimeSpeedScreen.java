@@ -16,7 +16,7 @@ public class TimeSpeedScreen extends Screen {
     private boolean isEnabled;
 
     public TimeSpeedScreen() {
-        super(Component.literal("Управление скоростью времени"));
+        super(Component.translatable("labyrinthmod.time_speed.title"));
         // Получаем текущие значения при открытии
         this.currentSpeed = TimeSpeedHandler.getTimeSpeed();
         this.isEnabled = TimeSpeedHandler.isEnabled();
@@ -47,11 +47,11 @@ public class TimeSpeedScreen extends Screen {
 
         // Кнопка включения/выключения
         toggleButton = Button.builder(
-                Component.literal(isEnabled ? "§aВКЛ" : "§cВЫКЛ"),
+                Component.translatable(isEnabled ? "options.on" : "options.off"),
                 btn -> {
                     isEnabled = !isEnabled;
                     TimeSpeedHandler.setEnabled(isEnabled);
-                    btn.setMessage(Component.literal(isEnabled ? "§aВКЛ" : "§cВЫКЛ"));
+                    btn.setMessage(Component.translatable(isEnabled ? "options.on" : "options.off"));
                     // Отправляем на сервер
                     NetworkHandler.CHANNEL.sendToServer(new TimeSpeedPacket(currentSpeed, isEnabled));
                 }
@@ -60,7 +60,7 @@ public class TimeSpeedScreen extends Screen {
 
         // Кнопка закрытия
         Button closeButton = Button.builder(
-                Component.literal("Закрыть"),
+                Component.translatable("gui.close"),
                 btn -> this.onClose()
         ).bounds(centerX - 50, centerY + 50, 100, 20).build();
         this.addRenderableWidget(closeButton);
@@ -78,18 +78,18 @@ public class TimeSpeedScreen extends Screen {
         guiGraphics.drawCenteredString(this.font, this.title, centerX, 30, 0xFFFFFF);
 
         // Описание
-        guiGraphics.drawCenteredString(this.font, "0.1 = очень медленно", centerX, 70, 0xAAAAAA);
-        guiGraphics.drawCenteredString(this.font, "1.0 = нормальная скорость", centerX, 80, 0xAAAAAA);
-        guiGraphics.drawCenteredString(this.font, "5.0 = в 5 раз быстрее", centerX, 90, 0xAAAAAA);
-        guiGraphics.drawCenteredString(this.font, "10.0 = в 10 раз быстрее", centerX, 100, 0xAAAAAA);
+        guiGraphics.drawCenteredString(this.font, Component.translatable("labyrinthmod.time_speed.hint.1"), centerX, 70, 0xAAAAAA);
+        guiGraphics.drawCenteredString(this.font, Component.translatable("labyrinthmod.time_speed.hint.2"), centerX, 80, 0xAAAAAA);
+        guiGraphics.drawCenteredString(this.font, Component.translatable("labyrinthmod.time_speed.hint.3"), centerX, 90, 0xAAAAAA);
+        guiGraphics.drawCenteredString(this.font, Component.translatable("labyrinthmod.time_speed.hint.4"), centerX, 100, 0xAAAAAA);
 
         // Текущее значение (зелёным цветом)
         guiGraphics.drawCenteredString(this.font,
-                String.format("Текущая скорость: %.1f x", currentSpeed),
+                Component.translatable("labyrinthmod.time_speed.current_value", String.format(java.util.Locale.ROOT, "%.1f", currentSpeed)),
                 centerX, centerY - 60, 0x00FF00);
 
         // Статус
-        String statusText = isEnabled ? "§a[АКТИВНО]" : "§c[ВЫКЛЮЧЕНО]";
+        String statusText = Component.translatable(isEnabled ? "labyrinthmod.time_speed.active" : "labyrinthmod.time_speed.disabled").getString();
         guiGraphics.drawCenteredString(this.font,
                 statusText,
                 centerX, centerY - 45, 0xFFFFFF);

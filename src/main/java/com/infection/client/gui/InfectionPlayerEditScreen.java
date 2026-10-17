@@ -43,7 +43,7 @@ public class InfectionPlayerEditScreen extends Screen {
     private EditBox intervalSecondsBox;
 
     public InfectionPlayerEditScreen(Screen parent, S2CInfectionListPacket.Entry e) {
-        super(Component.literal(e.name() + " · НАСТРОЙКИ ЗАРАЖЕНИЯ"));
+        super(Component.translatable("infection.gui.player_settings", e.name()));
         this.parent = parent;
         this.targetId = e.id();
         this.targetName = e.name();
@@ -65,50 +65,50 @@ public class InfectionPlayerEditScreen extends Screen {
         int y = 56;
 
         levelBox = new EditBox(this.font, fieldX, y + 2, fieldW, 18,
-                Component.literal("Уровень"));
+                Component.translatable("infection.gui.level"));
         levelBox.setMaxLength(3);
         levelBox.setValue(initialLevel());
         addRenderableWidget(levelBox);
         y += ROW_H;
 
         multiplierBox = new EditBox(this.font, fieldX, y + 2, fieldW, 18,
-                Component.literal("Множитель"));
+                Component.translatable("infection.gui.multiplier"));
         multiplierBox.setMaxLength(5);
         multiplierBox.setValue(initialMultiplier());
         addRenderableWidget(multiplierBox);
         y += ROW_H;
 
         intervalSecondsBox = new EditBox(this.font, fieldX, y + 2, fieldW, 18,
-                Component.literal("Интервал"));
+                Component.translatable("infection.gui.interval"));
         intervalSecondsBox.setMaxLength(7);
         intervalSecondsBox.setValue(initialIntervalSeconds());
         addRenderableWidget(intervalSecondsBox);
         y += ROW_H;
 
         // Кнопка «Применить» (для трёх полей — единое сохранение)
-        addRenderableWidget(Button.builder(Component.literal("Применить значения"),
+        addRenderableWidget(Button.builder(Component.translatable("infection.gui.apply_values"),
                         b -> applyFields())
                 .bounds(panelX, y + 6, PANEL_W, 20).build());
         y += 32;
 
         // Быстрые действия — два ряда по две кнопки
         int btnW = (PANEL_W - 8) / 2;
-        addRenderableWidget(Button.builder(Component.literal("Полное заражение"),
+        addRenderableWidget(Button.builder(Component.translatable("infection.gui.full_infection"),
                         b -> sendAction(C2SInfectionActionPacket.ACTION_FULL, 0))
                 .bounds(panelX, y, btnW, 22).build());
-        addRenderableWidget(Button.builder(Component.literal("Запустить рост"),
+        addRenderableWidget(Button.builder(Component.translatable("infection.gui.start_growth"),
                         b -> sendAction(C2SInfectionActionPacket.ACTION_START, 0))
                 .bounds(panelX + btnW + 8, y, btnW, 22).build());
         y += 28;
-        addRenderableWidget(Button.builder(Component.literal("Остановить"),
+        addRenderableWidget(Button.builder(Component.translatable("infection.gui.stop"),
                         b -> sendAction(C2SInfectionActionPacket.ACTION_STOP, 0))
                 .bounds(panelX, y, btnW, 22).build());
-        addRenderableWidget(Button.builder(Component.literal("Вылечить"),
+        addRenderableWidget(Button.builder(Component.translatable("infection.gui.cure"),
                         b -> sendAction(C2SInfectionActionPacket.ACTION_CURE, 0))
                 .bounds(panelX + btnW + 8, y, btnW, 22).build());
 
         // Назад
-        addRenderableWidget(Button.builder(Component.literal("Назад"),
+        addRenderableWidget(Button.builder(Component.translatable("infection.gui.back"),
                         b -> this.minecraft.setScreen(parent))
                 .bounds(this.width / 2 - 50, this.height - 28, 100, 20).build());
     }
@@ -173,13 +173,13 @@ public class InfectionPlayerEditScreen extends Screen {
 
         // Метки рядом с полями (вычисляем те же координаты что в init)
         int y = 56;
-        gfx.drawString(this.font, "Уровень заражения (0..100)",
+        gfx.drawString(this.font, Component.translatable("infection.gui.infection_level").getString(),
                 panelX, y + 6, 0xFFB0B0B0, false);
         y += ROW_H;
-        gfx.drawString(this.font, "Множитель скорости (% от базовой; 0 = стоп)",
+        gfx.drawString(this.font, Component.translatable("infection.gui.growth_multiplier").getString(),
                 panelX, y + 6, 0xFFB0B0B0, false);
         y += ROW_H;
-        gfx.drawString(this.font, "Интервал +1% (сек; 0 = из настроек)",
+        gfx.drawString(this.font, Component.translatable("infection.gui.growth_interval").getString(),
                 panelX, y + 6, 0xFFB0B0B0, false);
 
         super.render(gfx, mouseX, mouseY, partialTick);
@@ -187,7 +187,7 @@ public class InfectionPlayerEditScreen extends Screen {
         // Подсказка снизу
         int hintY = this.height - 50;
         gfx.drawString(this.font,
-                "100% × 60 сек = +1% каждую минуту. 1000% × 60 сек = +1% за 6 сек.",
+                Component.translatable("infection.gui.growth_hint").getString(),
                 panelX, hintY, 0xFF777777, false);
     }
 

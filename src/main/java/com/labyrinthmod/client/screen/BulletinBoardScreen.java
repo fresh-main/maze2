@@ -37,7 +37,7 @@ public class BulletinBoardScreen extends AbstractContainerScreen<BulletinBoardMe
     private int hoveredCardIndex = -1;
 
     public BulletinBoardScreen(BulletinBoardMenu menu, Inventory playerInventory, Component title) {
-        super(menu, playerInventory, Component.literal("Доска объявлений"));
+        super(menu, playerInventory, Component.translatable("labyrinthmod.bulletin_board.title"));
         this.imageWidth = GUI_WIDTH;
         this.imageHeight = GUI_HEIGHT;
     }

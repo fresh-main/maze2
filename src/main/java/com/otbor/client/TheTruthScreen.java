@@ -34,40 +34,6 @@ public class TheTruthScreen extends Screen {
             "DENISPLAY36",
             "ТУРИСТИШЬ!"
     };
-    private static final String[] REAL_ROLES = {
-            "Начальник, автор задумки ивента, сценарист, планировщик",
-            "Начальство, главный строитель, потратила 20к на киндеры",
-            "Строитель, сценарист, автор идеи, моделлер, координация, лоровед",
-            "Прораб, главный строитель, тот кто вёл всех к стенам",
-            "Строитель, чертил чертежи и выставлял нулевой сектор и секции",
-            "Мододел, создатель гриверов",
-            "Строитель помощник-Джамшут, строил и обустраивал локации",
-            "Просто строил лианы",
-            "Строил лианы и кусты",
-            "Строитель",
-            "Билдер, тестировщик",
-            "Украшал лабиринт, больницу и расставлял кусты",
-            "Делал лабиринт, лианы, потом декорил",
-            "Человек которому стало скучно — пошёл строить эту дичь",
-            "Кодер (сделал интерфейс)"
-    };
-    private static final String[] REAL_COMMENTS = {
-            "Уволил всех в разгар работы.",
-            "Мне снилось как я строила лабиринт. У меня травма.",
-            "Мы устали, помогите...",
-            "Я задолбался, подайте на выздоровление зелёными!!!",
-            "Я — Разумное Растение, инженер которое очень сильно устало",
-            "Мой первый проект как мододела.",
-            "Я не знал на что подписывался... (я рад). Согласен с Йонкофом на счёт ядерки",
-            "Позвали строить лианы (против моей воли)",
-            "Внёс свой малый вклад в создание проекта",
-            "Пришёл чтобы осветили мой скин",
-            "(Почти) всегда делал то что говорили начальники. Остался с (почти) целой психикой после стройки",
-            "Дед",
-            "Я делал то что говорили; после ивента мы запустим Хиросиму на этот лабиринт.",
-            "Меня жёстко нагибали (строить). p.s. Жду ядерки после всего этого)",
-            "Физик, купил клаву за 70к, кто я?"
-    };
     private static final ResourceLocation[] REAL_PHOTOS = {
             ResourceLocation.fromNamespaceAndPath("otbor", "textures/dev_photos/ness.png"),
             ResourceLocation.fromNamespaceAndPath("otbor", "textures/dev_photos/mirfa.png"),
@@ -133,7 +99,7 @@ public class TheTruthScreen extends Screen {
     private boolean[] cardWasInView;
 
     public TheTruthScreen(Screen parent) {
-        super(Component.literal("УЗНАТЬ ПРАВДУ"));
+        super(Component.translatable("otbor.truth.title"));
         this.parent = parent;
     }
 
@@ -143,7 +109,7 @@ public class TheTruthScreen extends Screen {
 
         addRenderableWidget(PaperWidgets.paperButton(
                 30, 30, 100, 22,
-                Component.literal("<- НАЗАД"),
+                Component.translatable("otbor.common.back"),
                 b -> this.minecraft.setScreen(parent),
                 0L, PaperRender.INK_SOFT, null));
 
@@ -183,11 +149,11 @@ public class TheTruthScreen extends Screen {
         PaperRender.drawBoardBackground(gfx, this.width, this.height);
 
         Font font = this.font;
-        String kicker = "ФАЙЛ №02 · ДОСЬЕ · О.Т.Б.О.Р · УРОВЕНЬ 4";
+        String kicker = Component.translatable("otbor.truth.kicker").getString();
         int kw = font.width(kicker);
         gfx.drawString(font, kicker, this.width / 2 - kw / 2, 34, 0xFFB8A581, false);
 
-        String title = "УЗНАТЬ ПРАВДУ";
+        String title = Component.translatable("otbor.truth.title").getString();
         float ts = 2.2f;
         int tw = (int) (font.width(title) * ts);
         gfx.pose().pushPose();
@@ -202,7 +168,7 @@ public class TheTruthScreen extends Screen {
 
         renderScrollbar(gfx);
 
-        String quote = "ищи их. помни их. не доверяй.";
+        String quote = Component.translatable("otbor.truth.quote").getString();
         float qs = 1.4f;
         int qw = (int) (font.width(quote) * qs);
         gfx.pose().pushPose();
@@ -360,7 +326,7 @@ public class TheTruthScreen extends Screen {
         // строка 1: ОБЪЕКТ № — появляется первой (всегда)
         if (p >= 0.42f) {
             float r = clamp01((p - 0.42f) / 0.05f);
-            String obj = "ОБЪЕКТ №" + String.format("%03d", idx + 1);
+            String obj = Component.translatable("otbor.truth.object", String.format("%03d", idx + 1)).getString();
             gfx.drawString(font, obj, tx, 22,
                     PaperRender.withAlpha(PaperRender.INK_FADED, r), false);
         }
@@ -368,7 +334,7 @@ public class TheTruthScreen extends Screen {
         if (p >= 0.47f) {
             float r = clamp01((p - 0.47f) / 0.05f);
             float ns = 1.3f;
-            String name = isReal ? REAL_NAMES[idx] : "БЕГУЩИЙ?";
+            String name = isReal ? REAL_NAMES[idx] : Component.translatable("otbor.truth.runner_name").getString();
             // ужимаем масштаб, если имя не вмещается
             float fitScale = ns;
             int nameW = (int) (font.width(name) * ns);
@@ -390,7 +356,7 @@ public class TheTruthScreen extends Screen {
         int roleY1 = 32 + (int) (9 * 1.3f) + 14;
         int roleY2 = roleY1 + 10;
         if (isReal) {
-            String[] wrapped = wrapTwoLines(font, REAL_ROLES[idx], textW);
+            String[] wrapped = wrapTwoLines(font, Component.translatable("otbor.truth.role." + idx).getString(), textW);
             if (p >= 0.56f) {
                 float r = clamp01((p - 0.56f) / 0.06f);
                 gfx.drawString(font, wrapped[0], tx, roleY1,
@@ -424,7 +390,7 @@ public class TheTruthScreen extends Screen {
             }
         }
         if (isReal) {
-            String[] wrapped = wrapTwoLines(font, REAL_COMMENTS[idx], w - 20);
+            String[] wrapped = wrapTwoLines(font, Component.translatable("otbor.truth.comment." + idx).getString(), w - 20);
             if (p >= 0.68f) {
                 float r = clamp01((p - 0.68f) / 0.06f);
                 gfx.drawString(font, wrapped[0], 10, noteY,
@@ -450,7 +416,7 @@ public class TheTruthScreen extends Screen {
         if (p >= 0.78f) {
             float r = clamp01((p - 0.78f) / 0.12f);
             // у настоящих — «ВКЛАД» (уровень роли), у архивных заглушек — «ОПАСНОСТЬ»
-            String prefix = isReal ? "ВКЛАД: " : "ОПАСНОСТЬ: ";
+            String prefix = Component.translatable(isReal ? "otbor.truth.contribution" : "otbor.truth.danger").getString();
             int cellsLitTotal = (int) Math.ceil(5 * r);
             StringBuilder dg = new StringBuilder(prefix);
             for (int i = 0; i < 5; i++) {
@@ -473,7 +439,7 @@ public class TheTruthScreen extends Screen {
             gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-12f));
             gfx.pose().scale(stampScale, stampScale, 1f);
             int stampColor = (stampAlpha << 24) | (PaperRender.INK_RED & 0x00FFFFFF);
-            String stampLabel = isReal ? "АГЕНТ" : "ПРОВЕРЕНО";
+            String stampLabel = Component.translatable(isReal ? "otbor.truth.agent" : "otbor.truth.verified").getString();
             PaperRender.drawRectStamp(gfx, font, stampLabel, 0, 0, stampColor);
             gfx.pose().popPose();
         }
@@ -550,16 +516,16 @@ public class TheTruthScreen extends Screen {
         PaperRender.drawPaper(gfx, 0, 0, w, h, 1.0f, PaperRender.PAPER_LIGHT);
         PaperRender.drawPin(gfx, w / 2, 4, false);
 
-        gfx.drawString(font, "ПЕРЕХВАЧЕННЫЙ ФАЙЛ · ДАТА СТЁРТА", 14, 10,
+        gfx.drawString(font, Component.translatable("otbor.truth.file_stamp"), 14, 10,
                 PaperRender.INK_FADED, false);
 
-        gfx.drawString(font, "ты спрашивал КТО построил лабиринт.", 14, 22,
+        gfx.drawString(font, Component.translatable("otbor.truth.intro.1"), 14, 22,
                 PaperRender.INK, false);
-        gfx.drawString(font, "вот список. запомни лица.", 14, 33,
+        gfx.drawString(font, Component.translatable("otbor.truth.intro.2"), 14, 33,
                 PaperRender.INK, false);
 
-        String warn = "если встретишь -";
-        String warn2 = "не верь ни одному слову.";
+        String warn = Component.translatable("otbor.truth.warning.1").getString();
+        String warn2 = Component.translatable("otbor.truth.warning.2").getString();
         gfx.drawString(font, warn, 14, 44, PaperRender.INK, false);
         gfx.drawString(font, warn2, 14 + font.width(warn) + 4, 44,
                 PaperRender.INK_RED, true);
@@ -569,7 +535,7 @@ public class TheTruthScreen extends Screen {
         gfx.pose().pushPose();
         gfx.pose().translate(x + w - 30, y + h - 6, 0);
         gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-4.0f));
-        PaperRender.drawRectStamp(gfx, font, "СЕКРЕТНО", 0, 0, PaperRender.INK_RED);
+        PaperRender.drawRectStamp(gfx, font, Component.translatable("otbor.truth.secret").getString(), 0, 0, PaperRender.INK_RED);
         gfx.pose().popPose();
     }
 

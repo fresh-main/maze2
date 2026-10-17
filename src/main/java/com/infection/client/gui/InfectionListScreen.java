@@ -49,7 +49,7 @@ public class InfectionListScreen extends Screen {
 
             // Кнопка точного редактора — открывает экран с полями уровня/множителя/интервала
             // и быстрыми действиями (Полное заражение, Запустить рост, Стоп, Вылечить).
-            addRenderableWidget(Button.builder(Component.literal("Настроить"),
+            addRenderableWidget(Button.builder(Component.translatable("infection.gui.configure"),
                             b -> this.minecraft.setScreen(new InfectionPlayerEditScreen(this, e)))
                     .bounds(panelX + PANEL_W - 240, rowY + 2, 76, 20).build());
 
@@ -62,11 +62,11 @@ public class InfectionListScreen extends Screen {
                     .bounds(panelX + PANEL_W - 80, rowY + 2, 76, 20).build());
         }
 
-        addRenderableWidget(Button.builder(Component.literal("Настройки"),
+        addRenderableWidget(Button.builder(Component.translatable("infection.gui.settings"),
                         b -> this.minecraft.setScreen(new InfectionSettingsScreen(this)))
                 .bounds(this.width / 2 - 260, this.height - 28, 100, 20).build());
 
-        addRenderableWidget(Button.builder(Component.literal("Инвентики"),
+        addRenderableWidget(Button.builder(Component.translatable("infection.gui.events"),
                         b -> this.minecraft.setScreen(new MiniEventsScreen(this, entries)))
                 .bounds(this.width / 2 - 156, this.height - 28, 100, 20).build());
 
@@ -145,7 +145,8 @@ public class InfectionListScreen extends Screen {
             // Процент + название стадии
             String pct = e.level() + "%";
             gfx.drawString(this.font, pct, panelX + 6 + barW + 10, rowY + 14, barColor, false);
-            gfx.drawString(this.font, stage.name(), panelX + 6 + barW + 50, rowY + 14, 0xFF888888, false);
+            gfx.drawString(this.font, Component.translatable("infection.stage." + stage.name().toLowerCase()).getString(),
+                    panelX + 6 + barW + 50, rowY + 14, 0xFF888888, false);
         }
 
         super.render(gfx, mouseX, mouseY, partialTick);

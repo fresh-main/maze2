@@ -29,7 +29,7 @@ public class OtborInstructionScreen extends Screen {
     private static final int TAB_SOUND    = 3;
     private static final int TAB_RESOURCES = 4; // НОВАЯ ВКЛАДКА
 
-    private static final String[] TAB_LABELS = { "ПРАВИЛА ИГРЫ ", "ГРАФИКА ", "УПРАВЛЕНИЕ ", "ЗВУК ", "РЕСУРСЫ " };
+    private static final String[] TAB_LABELS = { "otbor.instructions.tab.gameplay", "otbor.instructions.tab.graphics", "otbor.instructions.tab.controls", "otbor.instructions.tab.sound", "otbor.instructions.tab.resources" };
 
     private final Screen parent;
     private int tab = TAB_GAMEPLAY;
@@ -76,7 +76,7 @@ public class OtborInstructionScreen extends Screen {
     private static final net.minecraft.resources.ResourceLocation DEFAULT_PACK_ICON = net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("minecraft", "textures/misc/unknown_pack.png");
 
     public OtborInstructionScreen(Screen parent) {
-        super(Component.literal("ИНСТРУКЦИЯ О.Т.Б.О.Р "));
+        super(Component.translatable("otbor.instructions.title"));
         this.parent = parent;
         forceGuiScale();
     }
@@ -173,7 +173,7 @@ public class OtborInstructionScreen extends Screen {
 
         addRenderableWidget(PaperWidgets.paperButton(
                 30, 30, 100, 22,
-                Component.literal(" <- НАЗАД "),
+                Component.translatable("otbor.common.back"),
                 b -> this.minecraft.setScreen(parent),
                 0L, PaperRender.INK_SOFT, null));
 
@@ -189,7 +189,7 @@ public class OtborInstructionScreen extends Screen {
             addRenderableWidget(PaperWidgets.paperButton(
                     startX + i * (tabW + gap), tabY,
                     tabW, 26,
-                    Component.literal(TAB_LABELS[i]),
+                    Component.translatable(TAB_LABELS[i]),
                     b -> startTabTransition(t),
                     0L, accent, null));
         }
@@ -322,7 +322,7 @@ public class OtborInstructionScreen extends Screen {
 
         addRenderableWidget(PaperWidgets.paperButton(
                 inX, sy, inW, 20,
-                Component.literal("→ ПРОДВИНУТЫЕ НАСТРОЙКИ ← "),
+                Component.translatable("otbor.instructions.advanced"),
                 b -> {
                     if (com.otbor.client.EmbeddiumOptionsScreen.isEmbeddiumAvailable()) {
                         Minecraft.getInstance().setScreen(new com.otbor.client.EmbeddiumOptionsScreen(this));
@@ -373,7 +373,7 @@ public class OtborInstructionScreen extends Screen {
 
         addRenderableWidget(PaperWidgets.paperButton(
                 inX + inW / 2 - 100, sy, 200, 24,
-                Component.literal("-> ПЕРЕНАЗНАЧИТЬ КЛАВИШИ  <-"),
+                Component.translatable("otbor.instructions.remap"),
                 b -> openKeyBindsScreen(this),
                 0L, PaperRender.INK_RED, null));
     }
@@ -407,11 +407,11 @@ public class OtborInstructionScreen extends Screen {
         int btnW = (inW - 16) / 3;
 
         addRenderableWidget(PaperWidgets.paperButton(inX, btnY, btnW, 20,
-                Component.literal("ОБНОВИТЬ"),
+                Component.translatable("otbor.instructions.refresh"),
                 b -> { refreshPackLists(); rebuildUi(); }, 0L, PaperRender.INK_SOFT, null));
 
         addRenderableWidget(PaperWidgets.paperButton(inX + btnW + 8, btnY, btnW, 20,
-                Component.literal("ПАПКА"),
+                Component.translatable("otbor.instructions.folder"),
                 b -> {
                     try {
                         java.nio.file.Path packDir = Minecraft.getInstance().getResourcePackDirectory();
@@ -420,7 +420,7 @@ public class OtborInstructionScreen extends Screen {
                 }, 0L, PaperRender.INK_SOFT, null));
 
         addRenderableWidget(PaperWidgets.paperButton(inX + (btnW + 8) * 2, btnY, btnW, 20,
-                Component.literal("ПРИМЕНИТЬ"),
+                Component.translatable("otbor.instructions.apply"),
                 b -> applyResourcePacks(), 0L, PaperRender.INK_RED, null));
     }
     private void drawSmallButton(GuiGraphics gfx, int x, int y, int w, int h, String text, int mouseX, int mouseY) {
@@ -445,7 +445,7 @@ public class OtborInstructionScreen extends Screen {
         resEntries.clear();
         net.minecraft.server.packs.repository.PackRepository repo = Minecraft.getInstance().getResourcePackRepository();
 
-        resEntries.add("АКТИВНЫЕ РЕСУРС-ПАКИ");
+        resEntries.add(Component.translatable("otbor.instructions.active_packs").getString());
         for (int i = 0; i < selectedPackIds.size(); i++) {
             String id = selectedPackIds.get(i);
             net.minecraft.server.packs.repository.Pack pack = repo.getPack(id);
@@ -462,7 +462,7 @@ public class OtborInstructionScreen extends Screen {
             resEntries.add(row);
         }
 
-        resEntries.add("ДОСТУПНЫЕ РЕСУРС-ПАКИ");
+        resEntries.add(Component.translatable("otbor.instructions.available_packs").getString());
         for (int i = 0; i < unselectedPackIds.size(); i++) {
             String id = unselectedPackIds.get(i);
             net.minecraft.server.packs.repository.Pack pack = repo.getPack(id);
@@ -565,11 +565,11 @@ public class OtborInstructionScreen extends Screen {
         PaperRender.drawBoardBackground(gfx, this.width, this.height);
 
         Font font = this.font;
-        String kicker = "ФАЙЛ №03 · РУКОВОДСТВО БЕГУЩЕГО ";
+        String kicker = Component.translatable("otbor.instructions.kicker").getString();
         int kw = font.width(kicker);
         gfx.drawString(font, kicker, this.width / 2 - kw / 2, 34, 0xFFB8A581, false);
 
-        String title = "ИНСТРУКЦИЯ О.Т.Б.О.Р ";
+        String title = Component.translatable("otbor.instructions.title").getString();
         float ts = 2.0f;
         int tw = (int) (font.width(title) * ts);
         gfx.pose().pushPose();
@@ -842,19 +842,19 @@ public class OtborInstructionScreen extends Screen {
 
         Font font = this.font;
         String head = switch (tab) {
-            case TAB_GAMEPLAY -> "§1 · ОСНОВНЫЕ ";
-            case TAB_GRAPHICS -> "§2 · ГРАФИКА ";
-            case TAB_CONTROLS -> "§3 · КЛАВИШИ ";
-            case TAB_SOUND    -> "§4 · МИКШЕР ";
-            case TAB_RESOURCES -> "§5 · РЕСУРСЫ ";
+            case TAB_GAMEPLAY -> Component.translatable("otbor.instructions.heading.gameplay").getString();
+            case TAB_GRAPHICS -> Component.translatable("otbor.instructions.heading.graphics").getString();
+            case TAB_CONTROLS -> Component.translatable("otbor.instructions.heading.controls").getString();
+            case TAB_SOUND    -> Component.translatable("otbor.instructions.heading.sound").getString();
+            case TAB_RESOURCES -> Component.translatable("otbor.instructions.heading.resources").getString();
             default            -> " ";
         };
         String headTitle = switch (tab) {
-            case TAB_GAMEPLAY -> "правила игры ";
-            case TAB_GRAPHICS -> "графика ";
-            case TAB_CONTROLS -> "управление ";
-            case TAB_SOUND    -> "звук ";
-            case TAB_RESOURCES -> "ресурсы ";
+            case TAB_GAMEPLAY -> Component.translatable("otbor.instructions.tab.gameplay").getString();
+            case TAB_GRAPHICS -> Component.translatable("otbor.instructions.tab.graphics").getString();
+            case TAB_CONTROLS -> Component.translatable("otbor.instructions.tab.controls").getString();
+            case TAB_SOUND    -> Component.translatable("otbor.instructions.tab.sound").getString();
+            case TAB_RESOURCES -> Component.translatable("otbor.instructions.tab.resources").getString();
             default            -> " ";
         };
         gfx.drawString(font, head, 20, 14, PaperRender.INK_FADED, false);

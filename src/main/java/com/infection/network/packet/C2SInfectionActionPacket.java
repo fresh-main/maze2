@@ -48,7 +48,7 @@ public record C2SInfectionActionPacket(UUID target, int action, int value) {
             ServerPlayer sender = ctx.get().getSender();
             if (sender == null) return;
             if (!sender.hasPermissions(2)) {
-                sender.sendSystemMessage(Component.literal("Требуются права оператора"));
+                sender.sendSystemMessage(Component.translatable("infection.message.op_required"));
                 return;
             }
             ServerPlayer target = sender.server.getPlayerList().getPlayer(pkt.target);

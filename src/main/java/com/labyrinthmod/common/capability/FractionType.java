@@ -1,5 +1,6 @@
 package com.labyrinthmod.common.capability;
 
+import net.minecraft.network.chat.Component;
 import java.util.Random;
 
 public enum FractionType {
@@ -28,6 +29,10 @@ public enum FractionType {
         this.color = color;
         this.id = id;
         this.maskFraction = maskFraction;
+    }
+
+    public Component displayNameComponent() {
+        return Component.translatable("labyrinthmod.fraction." + name().toLowerCase(java.util.Locale.ROOT));
     }
 
     public String getMaskFraction() {

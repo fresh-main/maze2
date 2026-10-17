@@ -100,7 +100,7 @@ public abstract class InventoryScreenMixin extends AbstractContainerScreen<Inven
         // 4. Кикер и заголовок — typewriter
         float kickProg = PaperContainerRender.phase(t, 0.20f, 0.42f);
         if (kickProg > 0f) {
-            String kick = "ЭКИПИРОВКА · БЕГУЩИЙ";
+            String kick = Component.translatable("labyrinthmod.inventory.runner_heading").getString();
             int kw = font.width(kick);
             PaperContainerRender.typewriter(gfx, font, kick,
                     x + SCREEN_W / 2 - kw / 2, y - 12,
@@ -117,7 +117,7 @@ public abstract class InventoryScreenMixin extends AbstractContainerScreen<Inven
         // 6. Подпись «БЕГУЩИЙ №47» — typewriter
         float noProg = PaperContainerRender.phase(t, 0.38f, 0.58f);
         if (noProg > 0f) {
-            String no = "БЕГУЩИЙ №47";
+            String no = Component.translatable("labyrinthmod.inventory.runner_number").getString();
             int nw = font.width(no);
             PaperContainerRender.typewriter(gfx, font, no,
                     x + AVATAR_FRAME_X + AVATAR_FRAME_W / 2 - nw / 2,
@@ -128,7 +128,7 @@ public abstract class InventoryScreenMixin extends AbstractContainerScreen<Inven
         // 7. Подзаголовок «ХОТБАР» — typewriter
         float hbProg = PaperContainerRender.phase(t, 0.48f, 0.68f);
         if (hbProg > 0f) {
-            String hb = "ХОТБАР · ЧТО В РУКАХ";
+            String hb = Component.translatable("labyrinthmod.inventory.hotbar_heading").getString();
             int hbw = font.width(hb);
             PaperContainerRender.typewriter(gfx, font, hb,
                     x + SCREEN_W / 2 - hbw / 2,

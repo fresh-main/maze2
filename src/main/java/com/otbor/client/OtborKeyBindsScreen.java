@@ -32,7 +32,7 @@ public class OtborKeyBindsScreen extends Screen {
     private float scaleMultiplier = 1.0f;
 
     public OtborKeyBindsScreen(Screen parent) {
-        super(Component.literal("НАЗНАЧЕНИЕ КЛАВИШ "));
+        super(Component.translatable("otbor.keybinds.title"));
         this.parent = parent;
         this.options = Minecraft.getInstance().options;
     }
@@ -77,21 +77,21 @@ public class OtborKeyBindsScreen extends Screen {
         addRenderableWidget(PaperWidgets.paperButton(
                 (int)(30 * scaleMultiplier), (int)(30 * scaleMultiplier),
                 (int)(100 * scaleMultiplier), (int)(22 * scaleMultiplier),
-                Component.literal(" <- НАЗАД "),
+                Component.translatable("otbor.common.back"),
                 b -> this.minecraft.setScreen(parent),
                 0L, PaperRender.INK_SOFT, null));
 
         addRenderableWidget(PaperWidgets.paperButton(
                 this.width / 2 - (int)(210 * scaleMultiplier), this.height - (int)(34 * scaleMultiplier),
                 (int)(200 * scaleMultiplier), (int)(24 * scaleMultiplier),
-                Component.literal("СБРОСИТЬ ВСЕ "),
+                Component.translatable("otbor.keybinds.reset_all"),
                 b -> { for (KeyMapping k : options.keyMappings) k.setKey(k.getDefaultKey()); KeyMapping.resetMapping(); },
                 0L, PaperRender.INK_SOFT, null));
 
         addRenderableWidget(PaperWidgets.paperButton(
                 this.width / 2 + (int)(10 * scaleMultiplier), this.height - (int)(34 * scaleMultiplier),
                 (int)(200 * scaleMultiplier), (int)(24 * scaleMultiplier),
-                Component.literal("ГОТОВО "),
+                Component.translatable("otbor.keybinds.done"),
                 b -> this.minecraft.setScreen(parent),
                 0L, PaperRender.INK_RED, null));
     }
@@ -169,11 +169,11 @@ public class OtborKeyBindsScreen extends Screen {
         PaperRender.drawBoardBackground(gfx, this.width, this.height);
 
         Font font = this.font;
-        String kicker = "ФАЙЛ №04 · СХЕМА УПРАВЛЕНИЯ ";
+        String kicker = Component.translatable("otbor.keybinds.kicker").getString();
         int kw = font.width(kicker);
         gfx.drawString(font, kicker, this.width / 2 - kw / 2, (int)(34 * scaleMultiplier), 0xFFB8A581, false);
 
-        String title = "НАЗНАЧЕНИЕ КЛАВИШ ";
+        String title = Component.translatable("otbor.keybinds.title").getString();
         float ts = 2.0f * scaleMultiplier;
         int tw = (int) (font.width(title) * ts);
         gfx.pose().pushPose();
@@ -223,7 +223,7 @@ public class OtborKeyBindsScreen extends Screen {
 
             boolean rHover = mouseX >= resetX && mouseX <= resetX + resetW
                     && mouseY >= rowY + (int)(2 * scaleMultiplier) && mouseY <= rowY + (int)(2 * scaleMultiplier) + btnH;
-            drawKeyButton(gfx, font, resetX, rowY + (int)(2 * scaleMultiplier), resetW, btnH, "сброс ", false, rHover);
+            drawKeyButton(gfx, font, resetX, rowY + (int)(2 * scaleMultiplier), resetW, btnH, Component.translatable("otbor.keybinds.reset").getString(), false, rHover);
         }
 
         if (rowCount > visibleRows()) {

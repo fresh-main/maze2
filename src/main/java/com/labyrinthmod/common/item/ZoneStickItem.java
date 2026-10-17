@@ -43,7 +43,7 @@ public class ZoneStickItem extends Item {
             // Shift+ПКМ: удалить зону в этом месте
             m.removeExclusionZoneAt(pos);
             pendingFirstCorner.remove(player.getUUID());
-            player.sendSystemMessage(Component.literal("§c[Zone] Зона в этой позиции удалена").withStyle(ChatFormatting.RED));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.zone.removed").withStyle(ChatFormatting.RED));
             return InteractionResult.SUCCESS;
         }
 
@@ -51,22 +51,21 @@ public class ZoneStickItem extends Item {
         BlockPos first = pendingFirstCorner.get(player.getUUID());
         if (first == null) {
             pendingFirstCorner.put(player.getUUID(), pos);
-            player.sendSystemMessage(Component.literal("§6[Zone] Угол 1: " + pos.getX() + " " + pos.getY() + " " + pos.getZ()));
-            player.sendSystemMessage(Component.literal("§7Кликните 2й угол для создания зоны"));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.zone.first_corner", pos.getX(), pos.getY(), pos.getZ()));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.zone.select_second_corner"));
         } else {
             m.addExclusionZone(first, pos);
             pendingFirstCorner.remove(player.getUUID());
-            player.sendSystemMessage(Component.literal("§a[Zone] Зона создана: "
-                    + first.getX() + "," + first.getY() + "," + first.getZ() + " → "
-                    + pos.getX() + "," + pos.getY() + "," + pos.getZ()));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.zone.created",
+                    first.getX(), first.getY(), first.getZ(), pos.getX(), pos.getY(), pos.getZ()));
         }
         return InteractionResult.SUCCESS;
     }
 
     @Override
     public void appendHoverText(@NotNull ItemStack stack, Level level, @NotNull List<Component> tooltip, @NotNull TooltipFlag flag) {
-        tooltip.add(Component.literal("ПКМ 2 блока — создать зону исключения").withStyle(ChatFormatting.GRAY));
-        tooltip.add(Component.literal("Shift+ПКМ — удалить зону в позиции").withStyle(ChatFormatting.GRAY));
-        tooltip.add(Component.literal("Внутри зоны точки не генерируются").withStyle(ChatFormatting.DARK_GRAY));
+        tooltip.add(Component.translatable("labyrinthmod.zone.tooltip.create").withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("labyrinthmod.zone.tooltip.remove").withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("labyrinthmod.zone.tooltip.no_points").withStyle(ChatFormatting.DARK_GRAY));
     }
 }

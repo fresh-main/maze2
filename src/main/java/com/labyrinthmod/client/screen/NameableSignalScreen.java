@@ -15,9 +15,9 @@ public class NameableSignalScreen extends Screen {
     private String currentName;
 
     public NameableSignalScreen(BlockPos blockPos, String currentName) {
-        super(Component.literal("Настройка блока"));
+        super(Component.translatable("labyrinthmod.signal.title"));
         this.blockPos = blockPos;
-        this.currentName = currentName.equals("Без имени") ? "" : currentName;
+        this.currentName = currentName.equals(Component.translatable("labyrinthmod.signal.unnamed").getString()) ? "" : currentName;
     }
 
     @Override
@@ -27,7 +27,7 @@ public class NameableSignalScreen extends Screen {
         int x = (this.width - paperW) / 2;
         int y = (this.height - paperH) / 2;
 
-        nameEditBox = new EditBox(this.font, x + 20, y + 50, 210, 20, Component.literal("Name"));
+        nameEditBox = new EditBox(this.font, x + 20, y + 50, 210, 20, Component.translatable("labyrinthmod.signal.name_placeholder"));
         nameEditBox.setValue(this.currentName);
         nameEditBox.setMaxLength(64);
         nameEditBox.setTextColor(0xFF111111);
@@ -37,7 +37,7 @@ public class NameableSignalScreen extends Screen {
 
         PaperButton saveButton = new PaperButton(
                 x + 20, y + 90, 100, 24,
-                Component.literal("Сохранить"),
+                Component.translatable("gui.done"),
                 btn -> {
                     NetworkHandler.CHANNEL.sendToServer(new UpdateBlockNamePacket(blockPos, nameEditBox.getValue().trim()));
                     this.onClose();
@@ -47,7 +47,7 @@ public class NameableSignalScreen extends Screen {
 
         PaperButton cancelButton = new PaperButton(
                 x + 130, y + 90, 100, 24,
-                Component.literal("Отмена"),
+                Component.translatable("gui.cancel"),
                 btn -> this.onClose()
         );
         this.addRenderableWidget(cancelButton);
@@ -71,7 +71,7 @@ public class NameableSignalScreen extends Screen {
         guiGraphics.fill(x, y, x + 2, y + paperH, borderColor);
         guiGraphics.fill(x + paperW - 2, y, x + paperW, y + paperH, borderColor);
 
-        guiGraphics.drawString(this.font, "Введите имя блока:", x + 20, y + 20, 0xFF111111, false);
+        guiGraphics.drawString(this.font, Component.translatable("labyrinthmod.signal.prompt"), x + 20, y + 20, 0xFF111111, false);
 
         super.render(guiGraphics, mouseX, mouseY, partialTick);
     }

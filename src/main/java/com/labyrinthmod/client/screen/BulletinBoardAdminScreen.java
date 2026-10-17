@@ -27,7 +27,7 @@ public class BulletinBoardAdminScreen extends Screen {
     private static final int SCREEN_HEIGHT = 300;
 
     public BulletinBoardAdminScreen(BulletinBoardBlockEntity blockEntity) {
-        super(Component.literal("Создание ежедневного задания"));
+        super(Component.translatable("labyrinthmod.quest_admin.title"));
         this.blockEntity = blockEntity;
     }
 
@@ -39,31 +39,31 @@ public class BulletinBoardAdminScreen extends Screen {
 
         int currentY = y + 20;
 
-        titleInput = new EditBox(this.font, x + 10, currentY, 380, 20, Component.literal("Название"));
-        titleInput.setHint(Component.literal("Название задания"));
+        titleInput = new EditBox(this.font, x + 10, currentY, 380, 20, Component.translatable("labyrinthmod.quest_admin.name"));
+        titleInput.setHint(Component.translatable("labyrinthmod.quest_admin.name_hint"));
         this.addWidget(titleInput);
         currentY += 25;
 
-        descriptionInput = new EditBox(this.font, x + 10, currentY, 380, 20, Component.literal("Описание"));
-        descriptionInput.setHint(Component.literal("Описание задания"));
+        descriptionInput = new EditBox(this.font, x + 10, currentY, 380, 20, Component.translatable("labyrinthmod.quest_admin.description"));
+        descriptionInput.setHint(Component.translatable("labyrinthmod.quest_admin.description_hint"));
         this.addWidget(descriptionInput);
         currentY += 25;
 
-        authorInput = new EditBox(this.font, x + 10, currentY, 380, 20, Component.literal("Автор"));
-        authorInput.setHint(Component.literal("Автор задания"));
+        authorInput = new EditBox(this.font, x + 10, currentY, 380, 20, Component.translatable("labyrinthmod.quest_admin.author"));
+        authorInput.setHint(Component.translatable("labyrinthmod.quest_admin.author_hint"));
         this.addWidget(authorInput);
         currentY += 25;
 
-        requiredItemInput = new EditBox(this.font, x + 10, currentY, 250, 20, Component.literal("Предмет"));
+        requiredItemInput = new EditBox(this.font, x + 10, currentY, 250, 20, Component.translatable("labyrinthmod.quest_admin.item"));
         requiredItemInput.setHint(Component.literal("minecraft:diamond"));
         this.addWidget(requiredItemInput);
 
-        requiredCountInput = new EditBox(this.font, x + 270, currentY, 120, 20, Component.literal("Кол-во"));
+        requiredCountInput = new EditBox(this.font, x + 270, currentY, 120, 20, Component.translatable("labyrinthmod.quest_admin.count"));
         requiredCountInput.setHint(Component.literal("1"));
         this.addWidget(requiredCountInput);
         currentY += 25;
 
-        this.addRenderableWidget(Button.builder(Component.literal("Добавить предмет в список"), btn -> {
+        this.addRenderableWidget(Button.builder(Component.translatable("labyrinthmod.quest_admin.add_item"), btn -> {
             String itemId = requiredItemInput.getValue().trim();
             String countStr = requiredCountInput.getValue().trim();
             if (!itemId.isEmpty()) {
@@ -76,18 +76,18 @@ public class BulletinBoardAdminScreen extends Screen {
         }).bounds(x + 10, currentY, 380, 20).build());
         currentY += 25;
 
-        this.addRenderableWidget(Button.builder(Component.literal("Сохранить задание в конфиг"), btn -> saveQuest())
+        this.addRenderableWidget(Button.builder(Component.translatable("labyrinthmod.quest_admin.save"), btn -> saveQuest())
                 .bounds(x + 10, currentY, 380, 20).build());
         currentY += 25;
 
-        this.addRenderableWidget(Button.builder(Component.literal("Назад"), btn -> this.onClose())
+        this.addRenderableWidget(Button.builder(Component.translatable("gui.back"), btn -> this.onClose())
                 .bounds(x + 10, currentY, 380, 20).build());
     }
 
     private void saveQuest() {
-        String title = titleInput.getValue().isEmpty() ? "Новое задание" : titleInput.getValue();
-        String description = descriptionInput.getValue().isEmpty() ? "Описание" : descriptionInput.getValue();
-        String author = authorInput.getValue().isEmpty() ? "Админ" : authorInput.getValue();
+        String title = titleInput.getValue().isEmpty() ? Component.translatable("labyrinthmod.quest_admin.default_title").getString() : titleInput.getValue();
+        String description = descriptionInput.getValue().isEmpty() ? Component.translatable("labyrinthmod.quest_admin.default_description").getString() : descriptionInput.getValue();
+        String author = authorInput.getValue().isEmpty() ? Component.translatable("labyrinthmod.quest_admin.default_author").getString() : authorInput.getValue();
 
         // Отправляем пакет на сервер для сохранения в JSON
         NetworkHandler.CHANNEL.sendToServer(new SaveQuestToJsonPacket(title, description, author, requiredItems));
@@ -104,13 +104,13 @@ public class BulletinBoardAdminScreen extends Screen {
         guiGraphics.fill(x, y, x + SCREEN_WIDTH, y + SCREEN_HEIGHT, 0xCC000000);
         guiGraphics.renderOutline(x, y, SCREEN_WIDTH, SCREEN_HEIGHT, 0xFF555555);
 
-        String title = "Создание ежедневного задания";
+        String title = Component.translatable("labyrinthmod.quest_admin.title").getString();
         guiGraphics.drawString(this.font, title, x + (SCREEN_WIDTH - this.font.width(title)) / 2, y + 5, 0xFFFFFF, true);
 
         // Отображение добавленных предметов
         if (!requiredItems.isEmpty()) {
             int reqY = y + 160;
-            guiGraphics.drawString(this.font, "Требуется:", x + 10, reqY, 0xFFD700);
+            guiGraphics.drawString(this.font, Component.translatable("labyrinthmod.quest_admin.required"), x + 10, reqY, 0xFFD700);
             reqY += 12;
             for (int i = 0; i < requiredItems.size() && i < 4; i++) {
                 SaveQuestToJsonPacket.RequiredItemData item = requiredItems.get(i);

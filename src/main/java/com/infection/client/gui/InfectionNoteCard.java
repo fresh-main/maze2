@@ -4,6 +4,8 @@ import com.infection.client.ClientInfectionCache;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.Component;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -51,7 +53,7 @@ public final class InfectionNoteCard {
 
         String autoRaw = ClientInfectionCache.getNoteText(mc.player.getUUID());
         if (autoRaw == null || autoRaw.isEmpty()) {
-            autoRaw = "Самочувствие хорошее.\nБольше нечего сказать...";
+            autoRaw = Component.translatable("infection.note.default_body").getString();
         }
         String customRaw = ClientInfectionCache.getCustomNoteText(mc.player.getUUID());
 
@@ -88,7 +90,7 @@ public final class InfectionNoteCard {
 
         String autoRaw = ClientInfectionCache.getNoteText(id);
         if (autoRaw == null || autoRaw.isEmpty()) {
-            autoRaw = "Самочувствие хорошее.\nБольше нечего сказать...";
+            autoRaw = Component.translatable("infection.note.default_body").getString();
         }
         String customRaw = ClientInfectionCache.getCustomNoteText(id);
         boolean hasCustom = customRaw != null && !customRaw.isEmpty();
@@ -128,13 +130,13 @@ public final class InfectionNoteCard {
         // === 4. Заголовок «ЗАПИСКА» — typewriter (0.22..0.42) ===
         float headerProg = phase(t, 0.22f, 0.42f);
         if (headerProg > 0f) {
-            typewriter(gfx, font, "ЗАПИСКА", cardX + 22, cardY + 4, INK_RED, headerProg);
+            typewriter(gfx, font, Component.translatable("infection.note.card_title").getString(), cardX + 22, cardY + 4, INK_RED, headerProg);
         }
 
         // === 5. Подзаголовок — typewriter (0.34..0.54) ===
         float subProg = phase(t, 0.34f, 0.54f);
         if (subProg > 0f) {
-            typewriter(gfx, font, "ЛИЧНЫЙ ДНЕВНИК", cardX + 22, cardY + 14, INK_FADED, subProg);
+            typewriter(gfx, font, Component.translatable("infection.note.card_subtitle").getString(), cardX + 22, cardY + 14, INK_FADED, subProg);
         }
 
         // === 6. Линия-разделитель — выезжает слева (0.40..0.58) ===

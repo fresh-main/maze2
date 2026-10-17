@@ -13,10 +13,10 @@ import org.jetbrains.annotations.NotNull;
 public class LabyrinthVerificationScreen extends Screen {
     private final Screen parent;
     private boolean fileExists = false;
-    private String statusMessage = "Проверка ресурсов...";
+    private Component statusMessage = Component.translatable("otbor.verify.checking");
 
     public LabyrinthVerificationScreen(Screen parent) {
-        super(Component.literal("ДИАГНОСТИКА ЛАБИРИНТА"));
+        super(Component.translatable("otbor.verify.title"));
         this.parent = parent;
     }
 
@@ -31,12 +31,12 @@ public class LabyrinthVerificationScreen extends Screen {
         int centerY = this.height / 2;
 
         // Кнопка "Назад"
-        this.addRenderableWidget(Button.builder(Component.literal("← Назад в меню выбора мира"), b -> {
+        this.addRenderableWidget(Button.builder(Component.translatable("otbor.verify.back"), b -> {
             this.minecraft.setScreen(parent);
         }).bounds(centerX - buttonWidth / 2, centerY + 80, buttonWidth, buttonHeight).build());
 
         // Кнопка "Открыть стандартное создание мира"
-        this.addRenderableWidget(Button.builder(Component.literal("Открыть стандартное меню создания мира"), b -> {
+        this.addRenderableWidget(Button.builder(Component.translatable("otbor.verify.create_world"), b -> {
             CreateWorldScreen.openFresh(this.minecraft, this);
         }).bounds(centerX - buttonWidth / 2, centerY + 110, buttonWidth, buttonHeight).build());
     }
@@ -50,23 +50,14 @@ public class LabyrinthVerificationScreen extends Screen {
 
                 if (resource.isPresent()) {
                     this.fileExists = true;
-                    this.statusMessage = "✅ УСПЕХ: Файл 'labyrinth.json' НАЙДЕН в ресурсах игры!\n\n" +
-                            "Это означает, что DataGen сработал, и build.gradle настроен верно.\n" +
-                            "Генератор ТОЧНО зарегистрирован.\n\n" +
-                            "Если вы не видите его в списке, проблема на 100% в одном из двух:\n" +
-                            "1. Вы ищете не то название. Ищите в списке строчку:\n   'worldType.labyrinthmod.labyrinth'\n" +
-                            "2. Вы смотрите не на той вкладке. При создании мира нужно перейти на вкладку 'Мир' (World).";
+                    this.statusMessage = Component.translatable("otbor.verify.found");
                 } else {
                     this.fileExists = false;
-                    this.statusMessage = "❌ ОШИБКА: Файл 'labyrinth.json' НЕ НАЙДЕН.\n\n" +
-                            "Игра не видит сгенерированный файл. Убедитесь, что вы:\n" +
-                            "1. Удалили ручной (сломанный) файл из src/main/resources/data/...\n" +
-                            "2. Запустили задачу Gradle 'runData'\n" +
-                            "3. Выполнили 'gradlew clean' перед запуском клиента.";
+                    this.statusMessage = Component.translatable("otbor.verify.missing");
                 }
             } catch (Exception e) {
                 this.fileExists = false;
-                this.statusMessage = "❌ ОШИБКА при проверке: " + e.getMessage();
+                this.statusMessage = Component.translatable("otbor.verify.error", e.getMessage());
             }
         }
     }
@@ -82,7 +73,7 @@ public class LabyrinthVerificationScreen extends Screen {
         gfx.drawCenteredString(font, this.title, centerX, centerY - 90, 0xFFFFFF);
 
         // Разбиваем сообщение на строки для удобного чтения
-        String[] lines = this.statusMessage.split("\n");
+        String[] lines = this.statusMessage.getString().split("\n");
         int yOffset = centerY - 60;
         for (String line : lines) {
             int color = 0xFFFFFF;

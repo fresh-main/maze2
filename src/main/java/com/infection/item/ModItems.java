@@ -27,7 +27,7 @@ public final class ModItems {
 
     public static final RegistryObject<CreativeModeTab> TAB =
             TABS.register("main", () -> CreativeModeTab.builder()
-                    .title(Component.literal("Infection"))
+                    .title(Component.translatable("itemGroup.infection.main"))
                     .icon(() -> ANTIDOTE_SYRINGE.get().getDefaultInstance())
                     .displayItems((params, out) -> {
                         out.accept(ANTIDOTE_SYRINGE.get());

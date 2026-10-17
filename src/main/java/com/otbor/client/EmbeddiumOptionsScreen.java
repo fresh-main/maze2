@@ -35,12 +35,12 @@ public class EmbeddiumOptionsScreen extends Screen {
     private static final int TAB_NOTIFICATIONS = 4;
 
     private static final String[] TAB_LABELS = {
-            "ОБЩЕЕ ", "КАЧЕСТВО ", "СКОРОСТЬ ", "РАСШИРЕННЫЕ ", "УВЕДОМЛЕНИЯ "
+            "otbor.embeddium.tab.general", "otbor.embeddium.tab.quality", "otbor.embeddium.tab.performance", "otbor.embeddium.tab.advanced", "otbor.embeddium.tab.notifications"
     };
     private static final String[] TAB_SUBTITLES = {
-            "базовые параметры ", "визуальное оформление ",
-            "оптимизация рендера ", "тонкая настройка ",
-            "сообщения и подсказки "
+            "otbor.embeddium.subtitle.general", "otbor.embeddium.subtitle.quality",
+            "otbor.embeddium.subtitle.performance", "otbor.embeddium.subtitle.advanced",
+            "otbor.embeddium.subtitle.notifications"
     };
 
     private int tab = TAB_GENERAL;
@@ -75,7 +75,7 @@ public class EmbeddiumOptionsScreen extends Screen {
     private static boolean available = false;
 
     public EmbeddiumOptionsScreen(Screen parent) {
-        super(Component.literal("ПРОДВИНУТЫЕ НАСТРОЙКИ "));
+        super(Component.translatable("otbor.embeddium.title"));
         this.parent = parent;
         initReflection();
     }
@@ -357,16 +357,16 @@ public class EmbeddiumOptionsScreen extends Screen {
 
         switch (t) {
             case TAB_GENERAL -> {
-                list.add(new HeaderEntry("ДИСПЛЕЙ "));
+                list.add(new HeaderEntry(Component.translatable("otbor.embeddium.header.display").getString()));
                 list.add(new VanillaBoolEntry("ПОЛНОЭКРАННЫЙ ", () -> o.fullscreen().get(), v -> o.fullscreen().set(v), "Переключает игру в полноэкранный режим.\nПовышает FPS и снижает задержку ввода. "));
                 list.add(new VanillaIntEntry("МАСШТАБ GUI ", 0, 6, () -> o.guiScale().get(), v -> o.guiScale().set(v), v -> v == 0 ? "АВТО " : v + "x ", "Размер элементов интерфейса.\n0 = автоматически (максимальный размер).\nМеньший масштаб = больше информации на экране. "));
                 list.add(new VanillaIntEntry("ЯРКОСТЬ ", 0, 100, () -> (int)(o.gamma().get() * 100), v -> o.gamma().set(v / 100.0), v -> v + "% ", "Регулирует яркость игры.\n0% = стандартная яркость.\n100% = максимальная (гамма).\nПолезно для игры в тёмных пещерах. "));
 
-                list.add(new HeaderEntry("КАДРЫ "));
+                list.add(new HeaderEntry(Component.translatable("otbor.embeddium.header.frames").getString()));
                 list.add(new VanillaIntEntry("МАКС. FPS ", 10, 260, () -> o.framerateLimit().get(), v -> o.framerateLimit().set(v), v -> v >= 260 ? "МАКС " : v + " к/с ", "Ограничивает максимальное количество кадров в секунду.\nВысокие значения = плавнее игра, но больше нагрузка.\n260+ = без ограничений. "));
                 list.add(new VanillaBoolEntry("VSYNC ", () -> o.enableVsync().get(), v -> o.enableVsync().set(v), "Вертикальная синхронизация.\nСинхронизирует FPS с частотой монитора.\nУбирает разрывы кадров, но может добавить микро-задержку. "));
 
-                list.add(new HeaderEntry("ИНТЕРФЕЙС "));
+                list.add(new HeaderEntry(Component.translatable("otbor.embeddium.header.interface").getString()));
                 list.add(new VanillaBoolEntry("ПОКАЧИВАНИЕ ", () -> o.bobView().get(), v -> o.bobView().set(v), "Покачивание камеры при ходьбе.\nВКЛ = создаёт эффект шагов персонажа.\nВЫКЛ = камера неподвижна (меньше укачивания). "));
                 list.add(new VanillaEnumEntry("ИНДИКАТОР АТАКИ ", new String[]{"ВЫКЛ ", "ПРИЦЕЛ ", "ПАНЕЛЬ "}, () -> o.attackIndicator().get().ordinal(), i -> o.attackIndicator().set(AttackIndicatorStatus.values()[Math.min(2, i)]), "Показывает индикатор кулдауна атаки.\nВЫКЛ = без индикатора.\nПРИЦЕЛ = в центре перекрестия.\nПАНЕЛЬ = отдельная полоска снизу. "));
                 list.add(new VanillaBoolEntry("ИНДИКАТОР СОХРАНЕНИЯ ", () -> o.showAutosaveIndicator().get(), v -> o.showAutosaveIndicator().set(v), "Показывает уведомление при автосохранении мира.\nПолезно для понимания, когда игра сохраняет данные. "));
@@ -397,18 +397,18 @@ public class EmbeddiumOptionsScreen extends Screen {
                 }
             }
             case TAB_PERFORMANCE -> {
-                list.add(new HeaderEntry("ЧАНКИ "));
+                list.add(new HeaderEntry(Component.translatable("otbor.embeddium.header.chunks").getString()));
                 if (performanceObj != null) {
                     addIfPresent(list, performanceObj, "chunkBuilderThreads", () -> new IntEntry(performanceObj, "chunkBuilderThreads", "ПОТОКИ ЧАНКОВ ", 0, 8, v -> v == 0 ? "АВТО " : v + " ", "Количество потоков для построения чанков.\n0 = автоматически (по количеству ядер CPU).\n1-8 = фиксированное число.\nБольше потоков = быстрее загрузка, но выше нагрузка на CPU. "));
                     addIfPresent(list, performanceObj, "alwaysDeferChunkUpdates", () -> new BoolEntry(performanceObj, "alwaysDeferChunkUpdates", "ОТКЛАДЫВАТЬ ОБНОВЛЕНИЯ ", true, "Всегда откладывать обновление чанков.\nВКЛ = чанки обновляются постепенно (плавнее).\nВЫКЛ = мгновенные обновления (может вызывать лаги). "));
                     addIfPresent(list, performanceObj, "useChunkFreeList", () -> new BoolEntry(performanceObj, "useChunkFreeList", "ПЕРЕИСПОЛЬЗОВАНИЕ ПАМЯТИ ", true, "Использовать список свободных чанков.\nВКЛ = переиспользование памяти (быстрее, меньше лагов).\nВЫКЛ = стандартное выделение памяти. "));
 
-                    list.add(new HeaderEntry("ОТСЕЧЕНИЕ "));
+                    list.add(new HeaderEntry(Component.translatable("otbor.embeddium.header.culling").getString()));
                     addIfPresent(list, performanceObj, "useBlockFaceCulling", () -> new BoolEntry(performanceObj, "useBlockFaceCulling", "ОТСЕЧЕНИЕ ГРАНЕЙ ", true, "Отсечение невидимых граней блоков.\nВКЛ = не рендерит грани, закрытые другими блоками.\nЗначительно повышает FPS (до 20-30%). "));
                     addIfPresent(list, performanceObj, "useEntityCulling", () -> new BoolEntry(performanceObj, "useEntityCulling", "ОТСЕЧЕНИЕ СУЩНОСТЕЙ ", true, "Отсечение невидимых сущностей.\nВКЛ = не рендерит мобов за стенами.\nПовышает FPS при большом количестве мобов. "));
                     addIfPresent(list, performanceObj, "useFogOcclusion", () -> new BoolEntry(performanceObj, "useFogOcclusion", "ОТСЕЧЕНИЕ ТУМАНОМ ", true, "Отсечение объектов в тумане.\nВКЛ = не рендерит то, что скрыто туманом.\nНебольшой прирост FPS. "));
 
-                    list.add(new HeaderEntry("РЕНДЕР "));
+                    list.add(new HeaderEntry(Component.translatable("otbor.embeddium.header.rendering").getString()));
                     addIfPresent(list, performanceObj, "animateOnlyVisibleTextures", () -> new BoolEntry(performanceObj, "animateOnlyVisibleTextures", "АНИМАЦИЯ ТОЛЬКО ВИДИМЫХ ", true, "Анимировать только видимые текстуры.\nВКЛ = анимирует воду/лаву только если они видны.\nЭкономит ресурсы GPU. "));
                     addIfPresent(list, performanceObj, "useCompactVertexFormat", () -> new BoolEntry(performanceObj, "useCompactVertexFormat", "КОМПАКТНЫЙ ФОРМАТ ", true, "Компактный формат вершин.\nВКЛ = уменьшает размер данных для GPU.\nПовышает производительность рендера. "));
                     addIfPresent(list, performanceObj, "useTranslucentFaceSorting", () -> new BoolEntry(performanceObj, "useTranslucentFaceSorting", "СОРТИРОВКА ПРОЗРАЧНЫХ ", true, "Сортировка полупрозрачных граней.\nВКЛ = правильное отображение прозрачных блоков.\nВЫКЛ = быстрее, но возможны артефакты. "));
@@ -416,7 +416,7 @@ public class EmbeddiumOptionsScreen extends Screen {
                     addIfPresent(list, performanceObj, "precompileShaders", () -> new BoolEntry(performanceObj, "precompileShaders", "ПРЕДВАРИТЕЛЬНАЯ КОМПИЛЯЦИЯ ", false, "Предварительная компиляция шейдеров.\nВКЛ = компилирует шейдеры заранее (меньше лагов при загрузке).\nМожет увеличить время загрузки мира. "));
                     addIfPresent(list, performanceObj, "smoothFps", () -> new BoolEntry(performanceObj, "smoothFps", "ПЛАВНЫЙ FPS ", false, "Плавный FPS (Smooth FPS).\nВКЛ = сглаживает колебания FPS.\nМожет снизить нагрузку на CPU. "));
 
-                    list.add(new HeaderEntry("ПАМЯТЬ "));
+                    list.add(new HeaderEntry(Component.translatable("otbor.embeddium.header.memory").getString()));
                     addIfPresent(list, performanceObj, "allowDirectMemoryAccess", () -> new BoolEntry(performanceObj, "allowDirectMemoryAccess", "ПРЯМОЙ ДОСТУП К ПАМЯТИ ", true, "Прямой доступ к памяти (DMA).\nВКЛ = быстрее работа с памятью.\nВЫКЛ = безопаснее, но медленнее. "));
                 }
             }
@@ -426,20 +426,20 @@ public class EmbeddiumOptionsScreen extends Screen {
                     addIfPresent(list, advancedObj, "cpuRenderAheadLimit", () -> new IntEntry(advancedObj, "cpuRenderAheadLimit", "ЗАПАС КАДРОВ CPU ", 1, 9, v -> v + " к/с ", "Запас кадров CPU.\n1-9 = сколько кадров CPU готовит заранее.\nВысокие значения = плавнее, но больше задержка ввода.\nНизкие значения = меньше задержка, но возможны микролаги. "));
                     addIfPresent(list, advancedObj, "useAdvancedStagingBuffers", () -> new BoolEntry(advancedObj, "useAdvancedStagingBuffers", "ПРОДВИНУТЫЕ БУФЕРЫ ", true, "Продвинутые staging-буферы.\nВКЛ = улучшенная работа с памятью.\nПовышает производительность на некоторых системах. "));
 
-                    list.add(new HeaderEntry("СОВМЕСТИМОСТЬ "));
+                    list.add(new HeaderEntry(Component.translatable("otbor.embeddium.header.compatibility").getString()));
                     addIfPresent(list, advancedObj, "disableIncompatibleModWarnings", () -> new BoolEntry(advancedObj, "disableIncompatibleModWarnings", "ОТКЛЮЧИТЬ ПРЕДУПРЕЖДЕНИЯ ", false, "Отключить предупреждения о несовместимости.\nВКЛ = не показывает предупреждения о конфликтах модов.\nНе рекомендуется! "));
                     addIfPresent(list, advancedObj, "disableDriverBlacklist", () -> new BoolEntry(advancedObj, "disableDriverBlacklist", "ОТКЛЮЧИТЬ ЧЁРНЫЙ СПИСОК ", false, "Отключить чёрный список драйверов.\nВКЛ = позволяет запускать с устаревшими драйверами.\nМожет вызвать нестабильность! "));
 
                     // НОВАЯ НАСТРОЙКА: GL Context NoError
                     addIfPresent(list, advancedObj, "useNoErrorGLContext", () -> new BoolEntry(advancedObj, "useNoErrorGLContext", "БЕЗ ОШИБОК GL КОНТЕКСТ ", true, "Использовать GL контекст без ошибок (NoError).\nВКЛ = отключает проверки ошибок OpenGL на уровне драйвера.\nЗначительно повышает производительность.\nВЫКЛ = стандартные проверки (безопаснее, но медленнее). "));
 
-                    list.add(new HeaderEntry("ОТЛАДКА "));
+                    list.add(new HeaderEntry(Component.translatable("otbor.embeddium.header.debug").getString()));
                     addIfPresent(list, advancedObj, "useGLDebug", () -> new BoolEntry(advancedObj, "useGLDebug", "GL DEBUG ", false, "Отладочный контекст OpenGL.\nВКЛ = выводит подробную информацию об ошибках GL.\nТолько для разработки! Сильно снижает FPS. "));
                     addIfPresent(list, advancedObj, "checkGLErrors", () -> new BoolEntry(advancedObj, "checkGLErrors", "ПРОВЕРКА ОШИБОК GL ", false, "Проверка ошибок OpenGL.\nВКЛ = проверяет каждую операцию GL на ошибки.\nТолько для отладки! Сильно снижает производительность. "));
                 }
             }
             case TAB_NOTIFICATIONS -> {
-                list.add(new HeaderEntry("ДОНАТЫ "));
+                list.add(new HeaderEntry(Component.translatable("otbor.embeddium.header.donations").getString()));
                 if (notificationsObj != null) {
                     addIfPresent(list, notificationsObj, "forceDisableDonationPrompts", () -> new BoolEntry(notificationsObj, "forceDisableDonationPrompts", "ОТКЛЮЧИТЬ ДОНАТЫ ", false, "Полностью отключить просьбы о пожертвованиях.\nВКЛ = никогда не показывать уведомления.\nВЫКЛ = показывать время от времени. "));
                     addIfPresent(list, notificationsObj, "hasClearedDonationButton", () -> new BoolEntry(notificationsObj, "hasClearedDonationButton", "СКРЫТЬ КНОПКУ ДОНАТОВ ", false, "Скрыть кнопку пожертвований.\nВКЛ = кнопка не отображается.\nВЫКЛ = кнопка видна в меню. "));
@@ -468,7 +468,7 @@ public class EmbeddiumOptionsScreen extends Screen {
         this.clearWidgets();
 
         if (!available) {
-            addRenderableWidget(PaperWidgets.paperButton(this.width / 2 - 150, this.height / 2, 300, 30, Component.literal("EMBEDDIUM НЕ НАЙДЕН "), b -> this.minecraft.setScreen(parent), 0L, PaperRender.INK_RED, null));
+            addRenderableWidget(PaperWidgets.paperButton(this.width / 2 - 150, this.height / 2, 300, 30, Component.translatable("otbor.embeddium.missing"), b -> this.minecraft.setScreen(parent), 0L, PaperRender.INK_RED, null));
             return;
         }
 
@@ -490,7 +490,7 @@ public class EmbeddiumOptionsScreen extends Screen {
             final int t = i;
             int accent = this.tab == t ? PaperRender.INK_RED : PaperRender.INK_SOFT;
             int ty = this.cardY + i * (TAB_H + TAB_GAP);
-            addRenderableWidget(PaperWidgets.paperButton(tabsX, ty, TABS_W, TAB_H, Component.literal(TAB_LABELS[i]), b -> {
+            addRenderableWidget(PaperWidgets.paperButton(tabsX, ty, TABS_W, TAB_H, Component.translatable(TAB_LABELS[i]), b -> {
                 if (this.tab != t) { this.tab = t; this.scrollOffset = 0f; rebuildUi(); }
             }, 0L, accent, null));
         }
@@ -504,11 +504,11 @@ public class EmbeddiumOptionsScreen extends Screen {
         int buttonsX = cardX + (CARD_W - totalBtnW) / 2; // Центрируем относительно карточки
         int buttonsY = this.cardY + actualCardH + 15; // Отступ 15 пикселей снизу от карточки
 
-        addRenderableWidget(PaperWidgets.paperButton(buttonsX, buttonsY, btnW, BTN_H, Component.literal(" <- НАЗАД "), b -> { saveOptions(); this.minecraft.setScreen(parent); }, 0L, PaperRender.INK_SOFT, null));
-        addRenderableWidget(PaperWidgets.paperButton(buttonsX + btnW + BTN_GAP, buttonsY, btnW, BTN_H, Component.literal("СБРОС "), b -> { resetOptions(); rebuildUi(); }, 0L, PaperRender.INK_FADED, null));
+        addRenderableWidget(PaperWidgets.paperButton(buttonsX, buttonsY, btnW, BTN_H, Component.translatable("otbor.embeddium.back"), b -> { saveOptions(); this.minecraft.setScreen(parent); }, 0L, PaperRender.INK_SOFT, null));
+        addRenderableWidget(PaperWidgets.paperButton(buttonsX + btnW + BTN_GAP, buttonsY, btnW, BTN_H, Component.translatable("otbor.embeddium.reset"), b -> { resetOptions(); rebuildUi(); }, 0L, PaperRender.INK_FADED, null));
 
         // НОВАЯ КНОПКА: ПЕРЕХОД В ШЕЙДЕРЫ
-        addRenderableWidget(PaperWidgets.paperButton(buttonsX + (btnW + BTN_GAP) * 2, buttonsY, btnW, BTN_H, Component.literal("ШЕЙДЕРЫ  "), b -> {
+        addRenderableWidget(PaperWidgets.paperButton(buttonsX + (btnW + BTN_GAP) * 2, buttonsY, btnW, BTN_H, Component.translatable("otbor.embeddium.shaders"), b -> {
             try {
                 // Открываем ОРИГИНАЛЬНОЕ меню шейдеров Iris/Oculus через рефлексию
                 // Используем ПРАВИЛЬНЫЙ путь net.irisshaders.iris
@@ -523,7 +523,7 @@ public class EmbeddiumOptionsScreen extends Screen {
             }
         }, 0L, PaperRender.INK, null));
 
-        addRenderableWidget(PaperWidgets.paperButton(buttonsX + (btnW + BTN_GAP) * 3, buttonsY, btnW, BTN_H, Component.literal("СОХРАНИТЬ "), b -> { saveOptions(); this.minecraft.setScreen(parent); }, 0L, PaperRender.INK_RED, null));
+        addRenderableWidget(PaperWidgets.paperButton(buttonsX + (btnW + BTN_GAP) * 3, buttonsY, btnW, BTN_H, Component.translatable("otbor.embeddium.save"), b -> { saveOptions(); this.minecraft.setScreen(parent); }, 0L, PaperRender.INK_RED, null));
 
         int contentX = cardX + PADDING;
         int contentW = CARD_W - PADDING * 2;
@@ -792,8 +792,8 @@ public class EmbeddiumOptionsScreen extends Screen {
             }
 
             Font font = this.font;
-            gfx.drawString(font, TAB_LABELS[i], 10, 8, selected ? PaperRender.INK : PaperRender.INK_FADED, false);
-            gfx.drawString(font, TAB_SUBTITLES[i], 10, 22, PaperRender.withAlpha(PaperRender.INK_SOFT, 0.6f), false);
+            gfx.drawString(font, Component.translatable(TAB_LABELS[i]), 10, 8, selected ? PaperRender.INK : PaperRender.INK_FADED, false);
+            gfx.drawString(font, Component.translatable(TAB_SUBTITLES[i]), 10, 22, PaperRender.withAlpha(PaperRender.INK_SOFT, 0.6f), false);
 
             if (selected) {
                 PaperRender.drawPin(gfx, TABS_W - 12, 8, true);
@@ -818,14 +818,13 @@ public class EmbeddiumOptionsScreen extends Screen {
         PaperRender.drawPin(gfx, CARD_W - 16, 8, true);
 
         Font font = this.font;
-        String head = "§ " + (tab + 1) + " · " + TAB_LABELS[tab];
-        gfx.drawString(font, head, 16, 8, PaperRender.INK_FADED, false);
+        gfx.drawString(font, "§ " + (tab + 1) + " · " + Component.translatable(TAB_LABELS[tab]).getString(), 16, 8, PaperRender.INK_FADED, false);
 
         float hs = 1.25f;
         gfx.pose().pushPose();
         gfx.pose().translate(16, 16, 0);
         gfx.pose().scale(hs, hs, 1f);
-        gfx.drawString(font, TAB_SUBTITLES[tab], 0, 0, PaperRender.INK, false);
+        gfx.drawString(font, Component.translatable(TAB_SUBTITLES[tab]), 0, 0, PaperRender.INK, false);
         gfx.pose().popPose();
 
         PaperRender.drawHandDivider(gfx, 16, 16 + (int)(9 * hs) + 4, CARD_W - 32, PaperRender.withAlpha(PaperRender.INK_SOFT, 0.7f));

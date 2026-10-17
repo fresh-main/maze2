@@ -185,7 +185,7 @@ public class NoteCard extends Button {
         }
 
         if (hoverAnim > 0.05f) {
-            String cta = "-> ОТКРЫТЬ <-";
+            String cta = Component.translatable("otbor.card.open").getString();
             int a = (int) (hoverAnim * 255);
             int ctaColor = (a << 24) | 0x7A1F1F;
             float ctaScale = 1.2f;

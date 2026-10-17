@@ -18,7 +18,7 @@ public class ConfirmWorldDeleteScreen extends Screen {
     private long openedAt = -1L;
 
     protected ConfirmWorldDeleteScreen(Screen parent, LevelSummary summary) {
-        super(Component.literal("УДАЛИТЬ МИР?"));
+        super(Component.translatable("otbor.delete.title"));
         this.parent = parent;
         this.summary = summary;
     }
@@ -46,7 +46,7 @@ public class ConfirmWorldDeleteScreen extends Screen {
 
         addRenderableWidget(PaperWidgets.paperButton(
                 btnsStart, btnsY, btnW, btnH,
-                Component.literal("УДАЛИТЬ"),
+                Component.translatable("otbor.delete.confirm"),
                 b -> {
                     // В 1.20.1 удаление происходит через LevelStorageAccess
                     try (LevelStorageSource.LevelStorageAccess access = minecraft.getLevelSource().createAccess(summary.getLevelId())) {
@@ -60,7 +60,7 @@ public class ConfirmWorldDeleteScreen extends Screen {
 
         addRenderableWidget(PaperWidgets.paperButton(
                 btnsStart + btnW + gap, btnsY, btnW, btnH,
-                Component.literal("ОТМЕНА"),
+                Component.translatable("otbor.common.cancel"),
                 b -> minecraft.setScreen(parent),
                 0L, PaperRender.INK_SOFT, null));
     }
@@ -89,7 +89,7 @@ public class ConfirmWorldDeleteScreen extends Screen {
 
         var font = this.font;
 
-        String title = "ПОДТВЕРЖДЕНИЕ";
+        String title = Component.translatable("otbor.delete.heading").getString();
         float ts = 2.0f;
         int tw = (int) (font.width(title) * ts);
         gfx.pose().pushPose();
@@ -103,9 +103,9 @@ public class ConfirmWorldDeleteScreen extends Screen {
                 PaperRender.withAlpha(PaperRender.INK_SOFT, 0.7f));
 
         String worldName = summary.getLevelName();
-        if (worldName.isEmpty()) worldName = "Безымянный мир";
+        if (worldName.isEmpty()) worldName = Component.translatable("otbor.delete.unnamed").getString();
 
-        String confirmText = "Вы уверены, что хотите удалить мир?";
+        String confirmText = Component.translatable("otbor.delete.prompt").getString();
         gfx.drawString(font, confirmText, paperW / 2 - font.width(confirmText) / 2, lineY + 14,
                 PaperRender.INK, false);
 
@@ -113,7 +113,7 @@ public class ConfirmWorldDeleteScreen extends Screen {
         gfx.drawString(font, quotedName, paperW / 2 - font.width(quotedName) / 2, lineY + 28,
                 PaperRender.INK_RED, false);
 
-        String warningText = "Это действие нельзя отменить!";
+        String warningText = Component.translatable("otbor.delete.warning").getString();
         gfx.drawString(font, warningText, paperW / 2 - font.width(warningText) / 2, lineY + 44,
                 PaperRender.INK_FADED, false);
 

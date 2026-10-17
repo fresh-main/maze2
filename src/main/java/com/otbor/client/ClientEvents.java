@@ -306,7 +306,7 @@ public class ClientEvents {
 
         net.minecraft.client.gui.components.AbstractWidget ours = PaperWidgets.paperButton(
                 btnX, btnY, btnW, btnH,
-                Component.literal("ОТМЕНА"),
+                net.minecraft.network.chat.CommonComponents.GUI_CANCEL,
                 b -> captured.onPress(),
                 0L, PaperRender.INK_RED, null);
 

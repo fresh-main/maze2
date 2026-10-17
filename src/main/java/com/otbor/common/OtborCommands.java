@@ -37,7 +37,7 @@ public final class OtborCommands {
     private static int startCreditsForAll(CommandContext<CommandSourceStack> ctx) {
         OtborNetwork.CHANNEL.send(PacketDistributor.ALL.noArg(), new S2COpenCreditsPacket());
         ctx.getSource().sendSuccess(
-                () -> Component.literal("§eТитры запущены для всех игроков"), true);
+                () -> Component.translatable("otbor.message.credits_started"), true);
         return 1;
     }
 }

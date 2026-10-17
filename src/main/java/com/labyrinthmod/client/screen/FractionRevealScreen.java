@@ -114,7 +114,7 @@ public class FractionRevealScreen extends Screen {
 
         // 3) Кикер-надпись «РОЛЬ ВЫДАНА» (мелкая, поверх затемнения)
         if (fadeIn >= 0.6f) {
-            String kicker = "РОЛЬ · ВЫДАНА";
+            String kicker = Component.translatable("labyrinthmod.fraction_reveal.kicker").getString();
             float kAlpha = clamp01((fadeIn - 0.6f) / 0.4f) * fadeOutSmooth;
             int kColor = colorWithAlpha(0xCCCCCC, kAlpha);
             int kx = w / 2 - this.font.width(kicker) / 2;
@@ -126,7 +126,7 @@ public class FractionRevealScreen extends Screen {
 
         // 4) Название роли — анимация раскрытия по буквам
         FractionType visibleFraction = (maskFraction != null) ? maskFraction : fraction;
-        String name = visibleFraction.displayName.toUpperCase();
+        String name = visibleFraction.displayNameComponent().getString().toUpperCase(java.util.Locale.ROOT);
         long roleStart = FADE_IN_MS + ROLE_DELAY_MS;
         if (elapsed >= roleStart) {
             // Один раз на всю анимацию — pechat.ogg как сплошной фон-звук печати,
@@ -238,7 +238,7 @@ public class FractionRevealScreen extends Screen {
     }
 
     private void renderStamp(GuiGraphics gfx, int cx, int cy, float alpha) {
-        String stampText = (fraction == FractionType.IMPOSTER) ? "СЕКРЕТНО" : "ПОДТВЕРЖДЕНО";
+        String stampText = Component.translatable(fraction == FractionType.IMPOSTER ? "labyrinthmod.fraction_reveal.secret" : "labyrinthmod.fraction_reveal.confirmed").getString();
         int color = (fraction == FractionType.IMPOSTER) ? 0x9C1B1B : 0xA85A1F;
         int colorAlpha = colorWithAlpha(color, alpha);
 
@@ -268,7 +268,7 @@ public class FractionRevealScreen extends Screen {
     }
 
     private static String getDescription(FractionType f) {
-        return com.labyrinthmod.common.event.FractionEvents.getFractionDescription(f);
+        return Component.translatable("labyrinthmod.fraction_description." + f.name().toLowerCase(java.util.Locale.ROOT)).getString();
     }
 
     private static int colorWithAlpha(int rgb, float a) {

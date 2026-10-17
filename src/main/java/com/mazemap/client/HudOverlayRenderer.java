@@ -154,7 +154,8 @@ public final class HudOverlayRenderer {
         }
         Font font = Minecraft.getInstance().font;
         String keyName = MazeMapKeyBindings.TOGGLE_NOTE.getKey().getDisplayName().getString();
-        Component hint = Component.literal("§7[ " + keyName + " ] передать ");
+        Component hint = Component.literal("§7[ " + keyName + " ] ")
+                .append(Component.translatable("mazemap.hud.transfer_hint"));
         int tw = font.width(hint);
         int hintX = Math.max(2, Math.min(x + NOTE_W / 2 - tw / 2, screenW - tw - 2));
         gfx.drawString(font, hint, hintX, y - 10, 0xFFFFFF, true);

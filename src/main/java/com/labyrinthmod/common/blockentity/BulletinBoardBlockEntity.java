@@ -307,7 +307,7 @@ public class BulletinBoardBlockEntity extends BlockEntity implements Container, 
 
         // Если инвентарь полный — не забираем задание, чтобы не потерять квест.
         if (!player.getInventory().add(scroll)) {
-            player.sendSystemMessage(Component.literal("§cНет места в инвентаре! Задание не забрано."));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.quest.error.inventory_full"));
             return false;
         }
 
@@ -325,7 +325,7 @@ public class BulletinBoardBlockEntity extends BlockEntity implements Container, 
         }
         sendTasksToNear();
 
-        player.sendSystemMessage(Component.literal("§aЗадание взято! Свиток добавлен в инвентарь."));
+        player.sendSystemMessage(Component.translatable("labyrinthmod.quest.taken"));
 
         return true;
     }
@@ -435,33 +435,33 @@ public class BulletinBoardBlockEntity extends BlockEntity implements Container, 
         }
 
         if (!stillValid(player)) {
-            player.sendSystemMessage(Component.literal("§cВы слишком далеко от доски заданий."));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.quest.error.too_far"));
             return false;
         }
 
         ItemStack task = tasks.get(slot);
 
         if (task.isEmpty() || !task.hasTag()) {
-            player.sendSystemMessage(Component.literal("§cЭто задание уже недоступно."));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.quest.error.unavailable"));
             sendTasksToPlayer(player);
             return false;
         }
 
         if (isTaskTaken(slot)) {
-            player.sendSystemMessage(Component.literal("§cЭто задание уже выполнено или забрано."));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.quest.error.already_taken"));
             sendTasksToPlayer(player);
             return false;
         }
 
         CompoundTag taskTag = task.getTag();
         if (taskTag == null) {
-            player.sendSystemMessage(Component.literal("§cОшибка чтения данных задания."));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.quest.error.read"));
             return false;
         }
 
         String questTitle = taskTag.getString("Title");
         if (questTitle.isEmpty()) {
-            questTitle = "Без названия";
+            questTitle = Component.translatable("labyrinthmod.quest.unnamed").getString();
         }
 
         if (!taskTag.contains("RequiredItems", Tag.TAG_LIST)) {
@@ -479,19 +479,19 @@ public class BulletinBoardBlockEntity extends BlockEntity implements Container, 
             int count = getRequiredItemCount(itemTag);
 
             if (itemId.isEmpty()) {
-                player.sendSystemMessage(Component.literal("§cВ задании указан пустой предмет."));
+                player.sendSystemMessage(Component.translatable("labyrinthmod.scroll.error.empty_item"));
                 return false;
             }
 
             ResourceLocation rl = ResourceLocation.tryParse(itemId);
             if (rl == null) {
-                player.sendSystemMessage(Component.literal("§cНекорректный ID предмета: " + itemId));
+                player.sendSystemMessage(Component.translatable("labyrinthmod.quest.error.invalid_item_id", itemId));
                 return false;
             }
 
             Item item = ForgeRegistries.ITEMS.getValue(rl);
             if (item == null || item == Items.AIR) {
-                player.sendSystemMessage(Component.literal("§cНеизвестный предмет: " + itemId));
+                player.sendSystemMessage(Component.translatable("labyrinthmod.scroll.error.unknown_item", itemId));
                 return false;
             }
 
@@ -499,7 +499,7 @@ public class BulletinBoardBlockEntity extends BlockEntity implements Container, 
 
             if (has < count) {
                 player.sendSystemMessage(
-                        Component.literal("§cНе хватает предметов для задания \"" + questTitle + "\".")
+                        Component.translatable("labyrinthmod.quest.error.missing_items", questTitle)
                 );
                 return false;
             }
@@ -533,7 +533,7 @@ public class BulletinBoardBlockEntity extends BlockEntity implements Container, 
         setChanged();
         com.labyrinthmod.common.quest.QuestCompletionTracker.markQuestCompleted(slot);
 
-        player.sendSystemMessage(Component.literal("§aЗадание \"" + questTitle + "\" выполнено!"));
+        player.sendSystemMessage(Component.translatable("labyrinthmod.quest.completed", questTitle));
 
         // Если вдруг в NБТ есть награда опытом — можно выдать
         ItemStack task = tasks.get(slot);
@@ -643,7 +643,7 @@ public class BulletinBoardBlockEntity extends BlockEntity implements Container, 
 
         // Совсем нет мест
         if (targetSlot == -1) {
-            player.sendSystemMessage(Component.literal("§cНа доске нет свободных мест!"));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.quest.error.board_full"));
             return false;
         }
 
@@ -661,7 +661,7 @@ public class BulletinBoardBlockEntity extends BlockEntity implements Container, 
         }
         sendTasksToNear();
 
-        player.sendSystemMessage(Component.literal("§aЗадание размещено на доске!"));
+        player.sendSystemMessage(Component.translatable("labyrinthmod.quest.placed"));
         return true;
     }
 

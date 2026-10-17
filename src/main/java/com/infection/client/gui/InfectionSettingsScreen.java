@@ -30,7 +30,7 @@ public class InfectionSettingsScreen extends Screen {
     private final List<Row> rows = new ArrayList<>();
 
     public InfectionSettingsScreen(Screen parent) {
-        super(Component.literal("НАСТРОЙКИ ЗАРАЖЕНИЯ"));
+        super(Component.translatable("infection.settings.title"));
         this.parent = parent;
     }
 
@@ -48,51 +48,51 @@ public class InfectionSettingsScreen extends Screen {
 
         int y = topY;
 
-        addRow("min_level — % с которого идут галлюцинации", s.minLevel,
+        addRow("infection.settings.min_level", s.minLevel,
                 (res, v) -> res.minLevel = v, panelX, y, labelW, fieldX, fieldW); y += ROW_H;
 
-        addRow("terminal_start_level — % c которого интервал = терминальный", s.terminalStartLevel,
+        addRow("infection.settings.terminal_start_level", s.terminalStartLevel,
                 (res, v) -> res.terminalStartLevel = v, panelX, y, labelW, fieldX, fieldW); y += ROW_H;
 
-        addRow("start_interval (тики) — интервал на min_level", s.startIntervalTicks,
+        addRow("infection.settings.start_interval", s.startIntervalTicks,
                 (res, v) -> res.startIntervalTicks = v, panelX, y, labelW, fieldX, fieldW); y += ROW_H;
 
-        addRow("terminal_interval (тики) — интервал на 100%+", s.terminalIntervalTicks,
+        addRow("infection.settings.terminal_interval", s.terminalIntervalTicks,
                 (res, v) -> res.terminalIntervalTicks = v, panelX, y, labelW, fieldX, fieldW); y += ROW_H;
 
-        addRow("reduction_per_percent (тики) — спад за каждый %", s.reductionPerPercentTicks,
+        addRow("infection.settings.reduction_per_percent", s.reductionPerPercentTicks,
                 (res, v) -> res.reductionPerPercentTicks = v, panelX, y, labelW, fieldX, fieldW); y += ROW_H;
 
-        addRow("attack_min_duration (тики)", s.attackMinDurationTicks,
+        addRow("infection.settings.attack_min_duration", s.attackMinDurationTicks,
                 (res, v) -> res.attackMinDurationTicks = v, panelX, y, labelW, fieldX, fieldW); y += ROW_H;
 
-        addRow("attack_max_duration (тики)", s.attackMaxDurationTicks,
+        addRow("infection.settings.attack_max_duration", s.attackMaxDurationTicks,
                 (res, v) -> res.attackMaxDurationTicks = v, panelX, y, labelW, fieldX, fieldW); y += ROW_H;
 
-        addRow("growth_interval (тики на +1%) — 0 выкл.", s.growthIntervalTicks,
+        addRow("infection.settings.growth_interval", s.growthIntervalTicks,
                 (res, v) -> res.growthIntervalTicks = v, panelX, y, labelW, fieldX, fieldW); y += ROW_H;
 
-        addRow("terminal_damage_interval (тики) — 0 без смерти", s.terminalDamageIntervalTicks,
+        addRow("infection.settings.terminal_damage_interval", s.terminalDamageIntervalTicks,
                 (res, v) -> res.terminalDamageIntervalTicks = v, panelX, y, labelW, fieldX, fieldW); y += ROW_H;
 
-        addRow("ambience_start_level (%) — с какого % играет эмбиент (101 = выкл.)", s.ambienceStartLevel,
+        addRow("infection.settings.ambience_start_level", s.ambienceStartLevel,
                 (res, v) -> res.ambienceStartLevel = v, panelX, y, labelW, fieldX, fieldW); y += ROW_H;
 
         int btnY = y + 12;
-        addRenderableWidget(Button.builder(Component.literal("Сохранить"), b -> applyAndClose())
+        addRenderableWidget(Button.builder(Component.translatable("infection.gui.save"), b -> applyAndClose())
                 .bounds(this.width / 2 - 104, btnY, 100, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("Отмена"), b -> onClose())
+        addRenderableWidget(Button.builder(Component.translatable("infection.gui.cancel"), b -> onClose())
                 .bounds(this.width / 2 + 4, btnY, 100, 20).build());
     }
 
     private void addRow(String label, int initial,
                         BiConsumer<InfectionSettings, Integer> setter,
                         int panelX, int y, int labelW, int fieldX, int fieldW) {
-        EditBox box = new EditBox(this.font, fieldX, y + 2, fieldW, 18, Component.literal(label));
+        EditBox box = new EditBox(this.font, fieldX, y + 2, fieldW, 18, Component.translatable(label));
         box.setMaxLength(8);
         box.setValue(Integer.toString(initial));
         addRenderableWidget(box);
-        rows.add(new Row(label, panelX, y, labelW, box, setter));
+        rows.add(new Row(Component.translatable(label).getString(), panelX, y, labelW, box, setter));
     }
 
     private void applyAndClose() {
@@ -141,7 +141,7 @@ public class InfectionSettingsScreen extends Screen {
 
         // Подсказка с рассчитанными значениями.
         int infoY = rows.isEmpty() ? 0 : rows.get(rows.size() - 1).y + ROW_H + 40;
-        gfx.drawString(this.font, "(1 секунда = 20 тиков. 300 = 15 сек, 6000 = 5 мин.)",
+        gfx.drawString(this.font, Component.translatable("infection.settings.ticks_hint").getString(),
                 panelX, infoY, 0xFF777777, false);
     }
 

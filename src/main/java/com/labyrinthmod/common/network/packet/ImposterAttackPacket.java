@@ -46,7 +46,7 @@ public class ImposterAttackPacket {
             if (!isImposter) return;
 
             if (ImposterTabletItem.isAttackActive()) {
-                attacker.sendSystemMessage(Component.literal("§cГриверы уже атакуют кого-то!"));
+                attacker.sendSystemMessage(Component.translatable("labyrinthmod.imposter_attack.already_active"));
                 return;
             }
 
@@ -54,13 +54,13 @@ public class ImposterAttackPacket {
             if (remaining > 0) {
                 long minutes = remaining / 60000;
                 long seconds = (remaining % 60000) / 1000;
-                attacker.sendSystemMessage(Component.literal("§cДо следующей атаки: " + minutes + "м " + seconds + "с"));
+                attacker.sendSystemMessage(Component.translatable("labyrinthmod.imposter_attack.cooldown", minutes, seconds));
                 return;
             }
 
             ServerPlayer target = attacker.server.getPlayerList().getPlayer(p.targetId);
             if (target == null) {
-                attacker.sendSystemMessage(Component.literal("§cИгрок не найден!"));
+                attacker.sendSystemMessage(Component.translatable("labyrinthmod.imposter_attack.player_missing"));
                 return;
             }
 
@@ -73,7 +73,7 @@ public class ImposterAttackPacket {
                     .orElse(false);
 
             if (isOperator || isTargetImposter) {
-                attacker.sendSystemMessage(Component.literal("§cНельзя атаковать оператора или другого предателя!"));
+                attacker.sendSystemMessage(Component.translatable("labyrinthmod.imposter_attack.invalid_target"));
                 return;
             }
 
@@ -98,7 +98,7 @@ public class ImposterAttackPacket {
             ModLogger.admin(attacker.getName().getString(), "IMPOSTER_ATTACK",
                     "target=" + target.getName().getString() + " grivers=" + griverCount);
 
-            attacker.sendSystemMessage(Component.literal("§aГриверы начали охоту на " + target.getName().getString() + "!"));
+            attacker.sendSystemMessage(Component.translatable("labyrinthmod.imposter_attack.hunt_started", target.getName()));
         });
         ctx.setPacketHandled(true);
     }

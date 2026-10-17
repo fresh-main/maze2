@@ -16,7 +16,7 @@ public class OtborPauseScreen extends Screen {
     private float scaleMultiplier = 1.0f;
 
     public OtborPauseScreen(boolean showMenu) {
-        super(showMenu ? Component.literal("ПАУЗА ") : Component.literal("СОХРАНЕНИЕ... "));
+        super(Component.translatable(showMenu ? "otbor.pause.title" : "otbor.pause.saving"));
         this.showMenu = showMenu;
     }
 
@@ -48,14 +48,14 @@ public class OtborPauseScreen extends Screen {
         addRenderableWidget(PaperWidgets.paperButton(
                 cx - btnW / 2, startY + (btnH + gap) * row++,
                 btnW, btnH,
-                Component.literal("▶ ВЕРНУТЬСЯ В ИГРУ "),
+                Component.translatable("otbor.pause.resume"),
                 b -> resumeGame(),
                 delay * 0, PaperRender.INK_RED, null));
 
         addRenderableWidget(PaperWidgets.paperButton(
                 cx - btnW / 2, startY + (btnH + gap) * row++,
                 btnW, btnH,
-                Component.literal("⚙ НАСТРОЙКИ "),
+                Component.translatable("otbor.pause.settings"),
                 b -> this.minecraft.setScreen(new OptionsScreen(this, this.minecraft.options)),
                 delay * 1, null, null));
 
@@ -63,7 +63,7 @@ public class OtborPauseScreen extends Screen {
             addRenderableWidget(PaperWidgets.paperButton(
                     cx - btnW / 2, startY + (btnH + gap) * row++,
                     btnW, btnH,
-                    Component.literal("⇅ ОТКРЫТЬ МИР ДЛЯ СЕТИ "),
+                    Component.translatable("otbor.pause.open_lan"),
                     b -> this.minecraft.setScreen(new ShareToLanScreen(this)),
                     delay * 2, PaperRender.INK_RED_DIM, null));
         }
@@ -71,7 +71,7 @@ public class OtborPauseScreen extends Screen {
         addRenderableWidget(PaperWidgets.paperButton(
                 cx - btnW / 2, startY + (btnH + gap) * row++,
                 btnW, btnH,
-                Component.literal(singleplayer ? "◀ ВЫЙТИ ИЗ МИРА " : "◀ ОТКЛЮЧИТЬСЯ ОТ СЕРВЕРА "),
+                Component.translatable(singleplayer ? "otbor.pause.exit_world" : "otbor.pause.disconnect"),
                 b -> disconnect(),
                 delay * 3, PaperRender.INK_SOFT, null));
     }
@@ -82,7 +82,7 @@ public class OtborPauseScreen extends Screen {
             this.minecraft.level.disconnect();
         }
         if (singleplayer) {
-            this.minecraft.clearLevel(new GenericDirtMessageScreen(Component.translatable("menu.savingLevel ")));
+            this.minecraft.clearLevel(new GenericDirtMessageScreen(Component.translatable("menu.savingLevel")));
         } else {
             this.minecraft.clearLevel();
         }
@@ -119,7 +119,7 @@ public class OtborPauseScreen extends Screen {
         float appear = PaperRender.easeOut(Math.min(1f, age / 450f));
 
         int cx = this.width / 2;
-        String title = showMenu ? "АНТРАКТ " : "СОХРАНЕНИЕ... ";
+        String title = Component.translatable(showMenu ? "otbor.pause.intermission" : "otbor.pause.saving").getString();
         float baseScale = this.width < 500 ? 2.4f : 3.2f;
         float scale = baseScale * scaleMultiplier;
         int titleW = (int) (this.font.width(title) * scale);
@@ -143,7 +143,7 @@ public class OtborPauseScreen extends Screen {
         gfx.fill(cx - half, lineY, cx + half, lineY + 1, lineColor);
 
         if (showMenu) {
-            String sub = "Испытание приостановлено · ожидание кандидата ";
+            String sub = Component.translatable("otbor.pause.subtitle").getString();
             gfx.drawString(this.font, sub, cx - this.font.width(sub) / 2, lineY + (int)(8 * scaleMultiplier),
                     PaperRender.withAlpha(0xEFE3C2, 0.6f * appear), false);
         }

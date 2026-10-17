@@ -141,7 +141,7 @@ public final class BackpackScreenOverlay {
         // Header — typewriter
         float headerProg = PaperContainerRender.phase(t, 0.22f, 0.50f);
         if (headerProg > 0f) {
-            String head = "РЮКЗАК · ОПИСЬ ИМУЩЕСТВА";
+            String head = net.minecraft.network.chat.Component.translatable("otbor.inventory.title").getString();
             int headW = font.width(head);
             PaperContainerRender.typewriter(gfx, font, head,
                     fullX + fullW / 2 - headW / 2, topPos - 14,

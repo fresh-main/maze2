@@ -7,6 +7,7 @@ import com.infection.sound.InfectionModSounds;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.network.chat.Component;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.util.Mth;
 import net.minecraftforge.client.gui.overlay.IGuiOverlay;
@@ -27,21 +28,14 @@ public final class HallucinationOverlay implements IGuiOverlay {
 
     public static final HallucinationOverlay INSTANCE = new HallucinationOverlay();
 
-    public static final List<String> MESSAGES = List.of(
-            "УБЕЙ ВСЕХ",
-            "ТЕБЕ ЭТО НЕ НУЖНО",
-            "ОНИ СМОТРЯТ",
-            "ТЫ ОДИН ИЗ НАС",
-            "БЕГИ",
-            "НЕТ СМЫСЛА",
-            "УЖЕ ПОЗДНО",
-            "ТЫ НЕ ТЫ",
-            "ОНИ ВСЕ ЗНАЮТ",
-            "СПРЯЧЬСЯ",
-            "ОТКРОЙ ГЛАЗА",
-            "ПОСМОТРИ НАЗАД",
-            "СЛЫШИШЬ?",
-            "ВЫХОДА НЕТ"
+    private static final List<String> MESSAGE_KEYS = List.of(
+            "infection.hallucination.phrase.01", "infection.hallucination.phrase.02",
+            "infection.hallucination.phrase.03", "infection.hallucination.phrase.04",
+            "infection.hallucination.phrase.05", "infection.hallucination.phrase.06",
+            "infection.hallucination.phrase.07", "infection.hallucination.phrase.08",
+            "infection.hallucination.phrase.09", "infection.hallucination.phrase.10",
+            "infection.hallucination.phrase.11", "infection.hallucination.phrase.12",
+            "infection.hallucination.phrase.13", "infection.hallucination.phrase.14"
     );
 
     private static final int HEARTBEAT_INTERVAL_TICKS = 20; // 1 удар в секунду
@@ -84,7 +78,7 @@ public final class HallucinationOverlay implements IGuiOverlay {
             }
         }
         if (useDefaults || pool.isEmpty()) {
-            pool.addAll(MESSAGES);
+            MESSAGE_KEYS.forEach(key -> pool.add(Component.translatable(key).getString()));
         }
         if (pool.isEmpty()) return;
 
@@ -179,7 +173,7 @@ public final class HallucinationOverlay implements IGuiOverlay {
         int count = countFor(level);
         List<FloatingText> texts = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
-            String msg = MESSAGES.get(rng.nextInt(MESSAGES.size()));
+            String msg = Component.translatable(MESSAGE_KEYS.get(rng.nextInt(MESSAGE_KEYS.size()))).getString();
             float x = screenW * (0.15f + rng.nextFloat() * 0.7f);
             float y = screenH * (0.15f + rng.nextFloat() * 0.7f);
             float angle = (rng.nextFloat() - 0.5f) * 0.9f;

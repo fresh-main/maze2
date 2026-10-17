@@ -33,12 +33,12 @@ public class DebugStickHandler {
 
             if (event.getTarget() instanceof GriverEntity g) {
                 event.setCanceled(true);
-                player.sendSystemMessage(Component.literal("§6=== Гривер ==="));
-                player.sendSystemMessage(Component.literal("§eID: §f" + g.getId()));
-                player.sendSystemMessage(Component.literal("§eПозиция: §f" + (int) g.getX() + " " + (int) g.getY() + " " + (int) g.getZ()));
-                player.sendSystemMessage(Component.literal("§eЗдоровье: §f" + (int) g.getHealth() + "/" + (int) g.getMaxHealth()));
-                player.sendSystemMessage(Component.literal("§eПатрулирует: §f" + g.isPatrolling()));
-                player.sendSystemMessage(Component.literal("§7Для управления используйте §fпатрульную палочку §7или §f/griver admin"));
+                player.sendSystemMessage(Component.translatable("labyrinthmod.debug.griver.heading"));
+                player.sendSystemMessage(Component.translatable("labyrinthmod.debug.griver.id", g.getId()));
+                player.sendSystemMessage(Component.translatable("labyrinthmod.debug.griver.position", (int) g.getX(), (int) g.getY(), (int) g.getZ()));
+                player.sendSystemMessage(Component.translatable("labyrinthmod.debug.griver.health", (int) g.getHealth(), (int) g.getMaxHealth()));
+                player.sendSystemMessage(Component.translatable("labyrinthmod.debug.griver.patrolling", g.isPatrolling()));
+                player.sendSystemMessage(Component.translatable("labyrinthmod.debug.griver.help"));
             }
         }
     }

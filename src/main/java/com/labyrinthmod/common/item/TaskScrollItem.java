@@ -139,7 +139,7 @@ public class TaskScrollItem extends Item {
             boolean completed = tag.getBoolean("Completed");
 
             if (completed) {
-                tooltipComponents.add(Component.literal("§6" + title + " §7(выполнено)"));
+                tooltipComponents.add(Component.translatable("labyrinthmod.scroll.tooltip.completed", title));
             } else {
                 tooltipComponents.add(Component.literal("§6" + title));
 
@@ -147,17 +147,17 @@ public class TaskScrollItem extends Item {
                 if (tag.contains("RequiredItems", Tag.TAG_LIST)) {
                     ListTag reqItems = tag.getList("RequiredItems", Tag.TAG_COMPOUND);
                     if (!reqItems.isEmpty()) {
-                        tooltipComponents.add(Component.literal("§7Требуется:"));
+                        tooltipComponents.add(Component.translatable("labyrinthmod.scroll.tooltip.required"));
                         for (int i = 0; i < reqItems.size(); i++) {
                             CompoundTag itemTag = reqItems.getCompound(i);
                             tooltipComponents.add(Component.literal("  §8" + itemTag.getInt("Count") + "x " + itemTag.getString("ItemId")));
                         }
                     }
                 }
-                tooltipComponents.add(Component.literal("§7ПКМ чтобы прочитать"));
+                tooltipComponents.add(Component.translatable("labyrinthmod.scroll.tooltip.read"));
             }
         } else {
-            tooltipComponents.add(Component.literal("§7Пустой свиток"));
+            tooltipComponents.add(Component.translatable("labyrinthmod.scroll.tooltip.empty"));
         }
         super.appendHoverText(stack, level, tooltipComponents, isAdvanced);
     }

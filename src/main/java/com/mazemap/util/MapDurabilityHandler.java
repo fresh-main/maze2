@@ -60,16 +60,16 @@ public final class MapDurabilityHandler {
     /** Вспомогательный метод для тултипа */
     public static void appendTooltip(ItemStack stack, List<Component> tooltip, TooltipFlag flag) {
         if (isInfinite(stack)) {
-            tooltip.add(Component.literal("§6Бесконечная карта"));
-            tooltip.add(Component.literal("§7Чернила не расходуются"));
+            tooltip.add(Component.translatable("mazemap.tooltip.infinite"));
+            tooltip.add(Component.translatable("mazemap.tooltip.no_ink_cost"));
             return;
         }
         int dur = getDurability(stack);
         if (dur < MAX_DURABILITY) {
             String color = dur <= 0 ? "§4" : (dur <= 25 ? "§c" : (dur <= 50 ? "§e" : "§a"));
-            tooltip.add(Component.literal("§7Прочность: " + color + dur + "§7/" + MAX_DURABILITY));
+            tooltip.add(Component.translatable("mazemap.tooltip.durability", color + dur, MAX_DURABILITY));
             if (dur <= 0) {
-                tooltip.add(Component.literal("§4Карта сломана. Новые чанки не отрисовываются."));
+                tooltip.add(Component.translatable("mazemap.tooltip.broken"));
             }
         }
     }

@@ -30,7 +30,7 @@ public class C2STransferFragmentsPacket {
 
             ServerPlayer recipient = sender.serverLevel().getServer().getPlayerList().getPlayer(p.targetUuid);
             if (recipient == null || recipient.level() != sender.level() || recipient.distanceToSqr(sender) > MAX_TRANSFER_RANGE_SQ) {
-                sender.displayClientMessage(Component.literal("§eИгрок не найден"), true);
+                sender.displayClientMessage(Component.translatable("mazemap.message.player_not_found"), true);
                 return;
             }
 
@@ -72,8 +72,8 @@ public class C2STransferFragmentsPacket {
 
             String recipientName = recipient.getName().getString();
             String senderName = sender.getName().getString();
-            sender.displayClientMessage(Component.literal("§aПередано §e" + updated + "§a фрагментов §e" + recipientName), true);
-            recipient.displayClientMessage(Component.literal("§e" + senderName + "§a показал(а) §6" + updated + "§a фрагмент(ов)"), true);
+            sender.displayClientMessage(Component.translatable("mazemap.message.fragments_sent", updated, recipientName), true);
+            recipient.displayClientMessage(Component.translatable("mazemap.message.fragments_received", senderName, updated), true);
         });
         ctx.setPacketHandled(true);
     }

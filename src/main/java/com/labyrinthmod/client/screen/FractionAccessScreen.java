@@ -35,7 +35,7 @@ public class FractionAccessScreen extends Screen {
     private final Map<FractionType, Button> rowButtons = new EnumMap<>(FractionType.class);
 
     public FractionAccessScreen(Screen parent, Map<FractionType, Boolean> initial) {
-        super(Component.literal("Доступ фракций в лабиринт"));
+        super(Component.translatable("labyrinthmod.fraction_access.title"));
         this.parent = parent;
         if (initial != null) state.putAll(initial);
     }
@@ -80,7 +80,7 @@ public class FractionAccessScreen extends Screen {
         }
 
         addRenderableWidget(Button.builder(
-                        Component.literal("Назад"),
+                        Component.translatable("gui.back"),
                         b -> this.minecraft.setScreen(parent))
                 .bounds(this.width / 2 - 50, this.height - 28, 100, 20)
                 .build());
@@ -88,7 +88,7 @@ public class FractionAccessScreen extends Screen {
 
     private Component buttonLabel(FractionType f) {
         boolean canLeave = state.getOrDefault(f, false);
-        return Component.literal(canLeave ? "✓ Может выходить" : "✗ Заперт в зоне");
+        return Component.translatable(canLeave ? "labyrinthmod.fraction_access.allowed" : "labyrinthmod.fraction_access.locked");
     }
 
     private void toggle(FractionType f) {
@@ -115,17 +115,17 @@ public class FractionAccessScreen extends Screen {
         gfx.drawString(this.font, title, this.width / 2 - tw / 2, 18, 0xFFDDDDDD, false);
 
         gfx.drawString(this.font,
-                "Кто из фракций может покидать safe-зону и выходить в лабиринт.",
+                Component.translatable("labyrinthmod.fraction_access.description"),
                 panelX, 36, 0xFF999999, false);
         gfx.drawString(this.font,
-                "Запрет = игрок этой фракции выкидывается обратно при попытке.",
+                Component.translatable("labyrinthmod.fraction_access.explanation"),
                 panelX, 46, 0xFF999999, false);
 
         // Имена фракций — отдельным столбцом слева.
         int rowY = 60;
         for (FractionType f : FractionType.values()) {
             int color = 0xFF000000 | (f.color & 0xFFFFFF);
-            gfx.drawString(this.font, f.displayName, panelX + 4, rowY + 6, color, false);
+            gfx.drawString(this.font, f.displayNameComponent(), panelX + 4, rowY + 6, color, false);
             rowY += ROW_H;
         }
 

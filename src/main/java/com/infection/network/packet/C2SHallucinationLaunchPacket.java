@@ -68,11 +68,11 @@ public record C2SHallucinationLaunchPacket(boolean useDefaults,
             ServerPlayer sender = ctx.get().getSender();
             if (sender == null) return;
             if (!sender.hasPermissions(2)) {
-                sender.sendSystemMessage(Component.literal("Требуются права оператора"));
+                sender.sendSystemMessage(Component.translatable("infection.message.op_required"));
                 return;
             }
             if (pkt.targets.isEmpty()) {
-                sender.displayClientMessage(Component.literal("Не выбрано ни одного игрока."), true);
+                sender.displayClientMessage(Component.translatable("infection.message.no_players_selected"), true);
                 return;
             }
 
@@ -89,8 +89,7 @@ public record C2SHallucinationLaunchPacket(boolean useDefaults,
             }
 
             int finalHits = hits;
-            sender.displayClientMessage(Component.literal(
-                    "Приступ запущен (" + finalHits + " цел" + (finalHits == 1 ? "ь" : "ей") + ")"), true);
+            sender.displayClientMessage(Component.translatable("infection.message.attack_launched", finalHits), true);
         });
         ctx.get().setPacketHandled(true);
     }

@@ -30,7 +30,7 @@ public class TaskViewScreen extends Screen {
     }
 
     public TaskViewScreen(ItemStack taskStack, Runnable onCompleteCallback, int slotIndex) {
-        super(Component.literal("Задание"));
+        super(Component.translatable("labyrinthmod.task.title"));
         this.taskStack = taskStack;
         this.onTakeCallback = null;
         this.onCompleteCallback = onCompleteCallback;
@@ -39,7 +39,7 @@ public class TaskViewScreen extends Screen {
 
     public TaskViewScreen(ItemStack taskStack, Runnable onTakeCallback,
                           Runnable onCompleteCallback, int slotIndex) {
-        super(Component.literal("Задание"));
+        super(Component.translatable("labyrinthmod.task.title"));
         this.taskStack = taskStack;
         this.onTakeCallback = onTakeCallback;
         this.onCompleteCallback = onCompleteCallback;
@@ -60,7 +60,7 @@ public class TaskViewScreen extends Screen {
         if (onTakeCallback != null && taskSlotIndex >= 0) {
             this.addRenderableWidget(new PaperButton(
                     x + 30, buttonY, 240, 24,
-                    Component.literal("Взять свиток"),
+                    Component.translatable("labyrinthmod.task.take_scroll"),
                     btn -> {
                         onTakeCallback.run();
                         this.onClose();
@@ -75,7 +75,7 @@ public class TaskViewScreen extends Screen {
                     buttonY,
                     240,
                     24,
-                    Component.literal("Выполнить задание"),
+                    Component.translatable("labyrinthmod.task.complete"),
                     btn -> {
                         onCompleteCallback.run();
                         this.onClose();
@@ -90,7 +90,7 @@ public class TaskViewScreen extends Screen {
                 y + paperH - 35,
                 240,
                 24,
-                Component.literal("Закрыть"),
+                Component.translatable("gui.close"),
                 btn -> this.onClose()
         );
         this.addRenderableWidget(closeButton);
@@ -117,9 +117,9 @@ public class TaskViewScreen extends Screen {
         guiGraphics.fill(paperX, paperY, paperX + 2, paperY + paperH, borderColor);
         guiGraphics.fill(paperX + paperW - 2, paperY, paperX + paperW, paperY + paperH, borderColor);
 
-        String title = "Без названия";
-        String description = "Нет описания";
-        String author = "Неизвестно";
+        String title = Component.translatable("labyrinthmod.quest.unnamed").getString();
+        String description = Component.translatable("labyrinthmod.task.no_description").getString();
+        String author = Component.translatable("labyrinthmod.quest.unknown_author").getString();
         boolean isCompleted = false;
         ListTag requiredItemsTag = null;
 
@@ -143,7 +143,7 @@ public class TaskViewScreen extends Screen {
         int padX = 20;
         int textY = paperY + 20;
 
-        String displayTitle = title + (isCompleted ? " §7(выполнено)" : "");
+        String displayTitle = isCompleted ? Component.translatable("labyrinthmod.task.title_completed", title).getString() : title;
         int titleWidth = this.font.width(displayTitle);
         int titleColor = isCompleted ? 0xFF6B5842 : 0xFF7A1F1F;
         guiGraphics.drawString(
@@ -167,11 +167,11 @@ public class TaskViewScreen extends Screen {
         guiGraphics.fill(paperX + padX, textY, paperX + paperW - padX, textY + 1, 0xFF6B5842);
         textY += 15;
 
-        guiGraphics.drawString(this.font, "Автор: " + author, paperX + padX, textY, 0xFF6B5842, false);
+        guiGraphics.drawString(this.font, Component.translatable("labyrinthmod.task.author", author), paperX + padX, textY, 0xFF6B5842, false);
 
         if (requiredItemsTag != null && !requiredItemsTag.isEmpty()) {
             textY += 15;
-            guiGraphics.drawString(this.font, "Требуемые предметы:", paperX + padX, textY, 0xFF7A1F1F, false);
+            guiGraphics.drawString(this.font, Component.translatable("labyrinthmod.task.required_items"), paperX + padX, textY, 0xFF7A1F1F, false);
             textY += 12;
             for (int i = 0; i < requiredItemsTag.size(); i++) {
                 CompoundTag itemTag = requiredItemsTag.getCompound(i);
@@ -254,7 +254,7 @@ public class TaskViewScreen extends Screen {
 
     private String[] wrapText(String text, int maxCharsPerLine) {
         if (text == null || text.isEmpty()) {
-            return new String[]{"Нет описания"};
+            return new String[]{Component.translatable("labyrinthmod.task.no_description").getString()};
         }
         String[] words = text.split(" ");
         List<String> lines = new ArrayList<>();

@@ -21,7 +21,7 @@ public class DirectConnectMazeScreen extends Screen {
     private boolean hoverEnter = false, hoverCancel = false;
 
     public DirectConnectMazeScreen(Screen parent) {
-        super(Component.literal("Прямое подключение"));
+        super(Component.translatable("otbor.direct.title"));
         this.parent = parent;
     }
 
@@ -41,7 +41,7 @@ public class DirectConnectMazeScreen extends Screen {
         int boxX = paperX + 30;
         int boxY = paperY + 90;
 
-        ipEditBox = new EditBox(this.font, boxX, boxY, boxW, boxH, Component.literal("IP адрес"));
+        ipEditBox = new EditBox(this.font, boxX, boxY, boxW, boxH, Component.translatable("otbor.direct.address"));
         ipEditBox.setBordered(false); // Убираем стандартную рамку, будем рисовать свою линию
         ipEditBox.setTextColor(PaperRender.INK);
         ipEditBox.setMaxLength(64);
@@ -65,7 +65,7 @@ public class DirectConnectMazeScreen extends Screen {
         String ip = ipEditBox.getValue().trim();
         if (ip.isEmpty()) return;
 
-        ServerData serverData = new ServerData("Прямое подключение", ip, false);
+        ServerData serverData = new ServerData(Component.translatable("otbor.direct.title").getString(), ip, false);
         ConnectScreen.startConnecting(parent, this.minecraft, ServerAddress.parseString(ip), serverData, false);
     }
 
@@ -86,10 +86,10 @@ public class DirectConnectMazeScreen extends Screen {
         PaperRender.drawPin(gfx, 20, 14, false);
         PaperRender.drawPin(gfx, paperW - 20, 14, true);
 
-        String kicker = "ПРОТОКОЛ · ПРЯМОЙ ВХОД";
+        String kicker = Component.translatable("otbor.direct.kicker").getString();
         gfx.drawString(font, kicker, 20, 16, PaperRender.INK_FADED, false);
 
-        String title = "ВВОД КООРДИНАТ";
+        String title = Component.translatable("otbor.direct.heading").getString();
         float ts = 1.8f;
         gfx.pose().pushPose();
         gfx.pose().translate(20, 28, 0);
@@ -99,8 +99,8 @@ public class DirectConnectMazeScreen extends Screen {
 
         PaperRender.drawHandDivider(gfx, 20, 28 + (int)(9*ts) + 8, paperW - 40, PaperRender.withAlpha(PaperRender.INK_SOFT, 0.8f));
 
-        gfx.drawString(font, "укажи точку входа в лабиринт:", 30, 70, PaperRender.INK_SOFT, false);
-        gfx.drawString(font, "формат: ip:port (например, 127.0.0.1:25565)", 30, 118, PaperRender.INK_FADED, false);
+        gfx.drawString(font, Component.translatable("otbor.direct.prompt"), 30, 70, PaperRender.INK_SOFT, false);
+        gfx.drawString(font, Component.translatable("otbor.direct.format"), 30, 118, PaperRender.INK_FADED, false);
 
         gfx.pose().popPose(); // Закрываем поворот бумаги
 

@@ -78,7 +78,7 @@ public class EnterMazeScreen extends Screen {
     }
 
     public EnterMazeScreen(Screen parent) {
-        super(Component.literal("ВОЙТИ В ЛАБИРИНТ"));
+        super(Component.translatable("otbor.connect.title"));
         this.parent = parent;
     }
 
@@ -91,7 +91,7 @@ public class EnterMazeScreen extends Screen {
 
         String playerName = Minecraft.getInstance().getUser().getName();
         if (playerName == null || playerName.isEmpty()) {
-            playerName = "Бегущий";
+            playerName = Component.translatable("otbor.connect.default_name").getString();
         }
         currentNickname = playerName;
 
@@ -101,7 +101,7 @@ public class EnterMazeScreen extends Screen {
         int leftX = cx - leftW - 18;
         int leftY = 70;
 
-        nicknameBox = new EditBox(this.font, 0, 0, leftW - 32, 18, Component.literal("nickname"));
+        nicknameBox = new EditBox(this.font, 0, 0, leftW - 32, 18, Component.translatable("otbor.connect.nickname"));
         nicknameBox.setValue(currentNickname);
         nicknameBox.setBordered(false);
         nicknameBox.setTextColor(PaperRender.INK_RED);
@@ -293,23 +293,19 @@ public class EnterMazeScreen extends Screen {
     }
 
     private String getServerStatusText() {
-        if (isSliding) return "перелистывание...";
-        if (isPinging && !firstPingDone) return "проверка...";
-        if (isPinging && firstPingDone) return "обновление...";
-        if (pingFailed) return "недоступен";
-        if (currentServerData != null && currentServerData.status != null) return "онлайн";
-        if (ping >= 0) return "онлайн";
-        return "выключен";
+        if (isSliding) return Component.translatable("otbor.connect.status.sliding").getString();
+        if (isPinging && !firstPingDone) return Component.translatable("otbor.connect.status.checking").getString();
+        if (isPinging && firstPingDone) return Component.translatable("otbor.connect.status.refreshing").getString();
+        if (pingFailed) return Component.translatable("otbor.connect.status.unavailable").getString();
+        if (currentServerData != null && currentServerData.status != null) return Component.translatable("otbor.connect.status.online").getString();
+        if (ping >= 0) return Component.translatable("otbor.connect.status.online").getString();
+        return Component.translatable("otbor.connect.status.offline").getString();
     }
 
     private int getServerStatusColor() {
-        String status = getServerStatusText();
-        switch (status) {
-            case "онлайн": return PaperRender.INK;
-            case "выключен":
-            case "недоступен": return PaperRender.INK_RED;
-            default: return PaperRender.INK_FADED;
-        }
+        if (currentServerData != null && currentServerData.status != null || ping >= 0) return PaperRender.INK;
+        if (pingFailed || !isSliding && !isPinging && firstPingDone) return PaperRender.INK_RED;
+        return PaperRender.INK_FADED;
     }
 
     @Override
@@ -317,12 +313,12 @@ public class EnterMazeScreen extends Screen {
         PaperRender.drawBoardBackground(gfx, this.width, this.height);
 
         Font font = this.font;
-        String kicker = "ФАЙЛ №01 · ПРОТОКОЛ ПОДКЛЮЧЕНИЯ";
+        String kicker = Component.translatable("otbor.connect.kicker").getString();
         int kickerW = font.width(kicker);
         gfx.drawString(font, kicker, this.width / 2 - kickerW / 2, 34,
                 0xFFB8A581, false);
 
-        String title = "ВОЙТИ В ЛАБИРИНТ";
+        String title = Component.translatable("otbor.connect.title").getString();
         float ts = 2.2f;
         int tw = (int) (font.width(title) * ts);
         gfx.pose().pushPose();
@@ -338,9 +334,9 @@ public class EnterMazeScreen extends Screen {
         int leftY = 70;
 
         // ★ ИЗМЕНЕНО: Отрисовка двух кнопок рядом
-        renderCustomButton(gfx, btnBackX, btnBackY, btnBackW, btnBackH, " <- НАЗАД", hoverBack, PaperRender.INK_SOFT);
-        renderCustomButton(gfx, btnAddX, btnAddY, btnAddW, btnAddH, "+ ДОБАВИТЬ", hoverAdd, PaperRender.INK_RED);
-        renderCustomButton(gfx, btnDirectX, btnDirectY, btnDirectW, btnDirectH, "ВОЙТИ ПО IP", hoverDirect, PaperRender.INK_RED);
+        renderCustomButton(gfx, btnBackX, btnBackY, btnBackW, btnBackH, Component.translatable("otbor.common.back").getString(), hoverBack, PaperRender.INK_SOFT);
+        renderCustomButton(gfx, btnAddX, btnAddY, btnAddW, btnAddH, Component.translatable("otbor.connect.add").getString(), hoverAdd, PaperRender.INK_RED);
+        renderCustomButton(gfx, btnDirectX, btnDirectY, btnDirectW, btnDirectH, Component.translatable("otbor.connect.direct").getString(), hoverDirect, PaperRender.INK_RED);
 
         int rightW = 220;
         int rightH = 230;
@@ -426,10 +422,10 @@ public class EnterMazeScreen extends Screen {
 
         Font font = this.font;
 
-        String kick = "ПРИВЯЗАННЫЙ УЗЕЛ · ТОЛЬКО ОДИН";
+        String kick = Component.translatable("otbor.connect.bound_node").getString();
         gfx.drawString(font, kick, 14, 14, PaperRender.INK_FADED, false);
 
-        String heading = "СЕРВЕР \"" + entry.name + "\"";
+        String heading = Component.translatable("otbor.connect.server_heading", entry.name).getString();
         float hs = 1.7f;
         gfx.pose().pushPose();
         gfx.pose().translate(14, 26, 0);
@@ -449,19 +445,19 @@ public class EnterMazeScreen extends Screen {
         if (serverIndex == currentServerIndex || !isSliding) {
             String statusText = getServerStatusText();
             int statusColor = getServerStatusColor();
-            drawKvColored(gfx, font, "СТАТУС: ", statusText, 16, dy, statusColor);
+            drawKvColored(gfx, font, Component.translatable("otbor.connect.label.status").getString(), statusText, 16, dy, statusColor);
             dy += lineH;
 
             String onlineText = (firstPingDone && !pingFailed)
-                    ? (playerCount + "/" + maxPlayers + " игроков")
+                    ? Component.translatable("otbor.connect.players", playerCount, maxPlayers).getString()
                     : "—";
-            drawKv(gfx, font, "ОНЛАЙН: ", onlineText, 16, dy);
+            drawKv(gfx, font, Component.translatable("otbor.connect.label.players").getString(), onlineText, 16, dy);
             dy += lineH;
 
             String pingText = (firstPingDone && !pingFailed && ping >= 0)
                     ? (ping + " ms")
                     : "—";
-            drawKv(gfx, font, "ПИНГ: ", pingText, 16, dy);
+            drawKv(gfx, font, Component.translatable("otbor.connect.label.ping").getString(), pingText, 16, dy);
             dy += lineH;
         } else {
             dy += lineH * 3;
@@ -470,7 +466,7 @@ public class EnterMazeScreen extends Screen {
         PaperRender.drawHandDivider(gfx, 14, dy + 4, w - 28,
                 PaperRender.withAlpha(PaperRender.INK_SOFT, 0.8f));
 
-        gfx.drawString(font, "твоё имя, бегущий:", 16, dy + 14, PaperRender.INK, false);
+        gfx.drawString(font, Component.translatable("otbor.connect.name_prompt"), 16, dy + 14, PaperRender.INK, false);
 
         int nickY = h - 62;
         int nickX = 16;
@@ -504,7 +500,7 @@ public class EnterMazeScreen extends Screen {
         gfx.fill(btnX, btnY, btnX + 1, btnY + btnH, border);
         gfx.fill(btnX + btnW - 1, btnY, btnX + btnW, btnY + btnH, border);
 
-        String btnText = "-> ВОЙТИ В ЛАБИРИНТ <-";
+        String btnText = Component.translatable("otbor.connect.enter").getString();
         int tw = font.width(btnText);
         int color = hoverEnter ? PaperRender.INK_RED : PaperRender.INK;
         gfx.drawString(font, btnText, btnX + btnW / 2 - tw / 2, btnY + (btnH - 8) / 2, color, false);
@@ -550,9 +546,9 @@ public class EnterMazeScreen extends Screen {
         PaperRender.drawPaper(gfx, 0, 0, w, h, 1.0f, PaperRender.PAPER_LIGHT);
         PaperRender.drawTape(gfx, -6, 6, 48, 12, 0xB0);
 
-        gfx.drawString(font, "ПАМЯТКА БЕГУЩЕМУ", 12, 12, PaperRender.INK_FADED, false);
+        gfx.drawString(font, Component.translatable("otbor.connect.memo"), 12, 12, PaperRender.INK_FADED, false);
 
-        String t = "три правила";
+        String t = Component.translatable("otbor.connect.rules_title").getString();
         float ts = 1.6f;
         gfx.pose().pushPose();
         gfx.pose().translate(12, 22, 0);
@@ -562,13 +558,13 @@ public class EnterMazeScreen extends Screen {
 
         int ry = 22 + (int)(9*ts) + 10;
         String[] rules = {
-                "1) Никогда не выходи за стены",
-                "   до сигнала.",
+                Component.translatable("otbor.connect.rule.1a").getString(),
+                Component.translatable("otbor.connect.rule.1b").getString(),
                 "",
-                "2) Всегда будь готов бежать.",
+                Component.translatable("otbor.connect.rule.2").getString(),
                 "",
-                "3) НИКОГДА не трогай",
-                "   гриверов.",
+                Component.translatable("otbor.connect.rule.3a").getString(),
+                Component.translatable("otbor.connect.rule.3b").getString(),
         };
         for (String r : rules) {
             gfx.drawString(font, r, 14, ry, PaperRender.INK, false);
@@ -578,10 +574,10 @@ public class EnterMazeScreen extends Screen {
         PaperRender.drawHandDivider(gfx, 14, ry + 4, w - 28,
                 PaperRender.withAlpha(PaperRender.INK_SOFT, 0.7f));
 
-        gfx.drawString(font, "если читаешь это -", 14, ry + 14, PaperRender.INK_RED, false);
-        gfx.drawString(font, "ты один из нас.", 14, ry + 24, PaperRender.INK_RED, false);
+        gfx.drawString(font, Component.translatable("otbor.connect.memo_signoff.1"), 14, ry + 14, PaperRender.INK_RED, false);
+        gfx.drawString(font, Component.translatable("otbor.connect.memo_signoff.2"), 14, ry + 24, PaperRender.INK_RED, false);
 
-        gfx.drawString(font, "— Ньют", w - 60, h - 16, PaperRender.INK_FADED, false);
+        gfx.drawString(font, Component.translatable("otbor.connect.memo_signature"), w - 60, h - 16, PaperRender.INK_FADED, false);
 
         gfx.pose().popPose();
     }

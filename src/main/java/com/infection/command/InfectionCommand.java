@@ -56,7 +56,7 @@ public final class InfectionCommand {
             });
         }
         ctx.getSource().sendSuccess(() ->
-                Component.literal("Заражение установлено: " + value + "% для " + targets.size() + " игрок(ов)"), true);
+                Component.translatable("infection.command.set", value, targets.size()), true);
         return targets.size();
     }
 
@@ -70,7 +70,7 @@ public final class InfectionCommand {
             });
         }
         ctx.getSource().sendSuccess(() ->
-                Component.literal("Изменено заражение на " + value + " у " + targets.size() + " игрок(ов)"), true);
+                Component.translatable("infection.command.add", value, targets.size()), true);
         return targets.size();
     }
 
@@ -83,7 +83,7 @@ public final class InfectionCommand {
             });
         }
         ctx.getSource().sendSuccess(() ->
-                Component.literal("Вылечено: " + targets.size() + " игрок(ов)"), true);
+                Component.translatable("infection.command.cured", targets.size()), true);
         return targets.size();
     }
 
@@ -93,8 +93,8 @@ public final class InfectionCommand {
             int level = InfectionProvider.get(p).map(d -> d.getLevel()).orElse(0);
             String custom = InfectionProvider.get(p).map(d -> d.getCustomNoteText()).orElse("");
             ctx.getSource().sendSuccess(() ->
-                    Component.literal(p.getGameProfile().getName() + ": " + level + "%"
-                            + (custom.isEmpty() ? "" : " | custom: " + (custom.length() > 60 ? custom.substring(0, 60) + "..." : custom))), false);
+                    Component.translatable("infection.command.get", p.getGameProfile().getName(), level,
+                            custom.isEmpty() ? "" : Component.translatable("infection.command.custom_note", custom.length() > 60 ? custom.substring(0, 60) + "..." : custom)), false);
         }
         return targets.size();
     }
@@ -109,7 +109,7 @@ public final class InfectionCommand {
             });
         }
         ctx.getSource().sendSuccess(() ->
-                Component.literal("Кастомная записка обновлена у " + targets.size() + " игрок(ов)"), true);
+                Component.translatable("infection.command.note_updated", targets.size()), true);
         return targets.size();
     }
 
@@ -122,7 +122,7 @@ public final class InfectionCommand {
             });
         }
         ctx.getSource().sendSuccess(() ->
-                Component.literal("Кастомная записка стёрта у " + targets.size() + " игрок(ов)"), true);
+                Component.translatable("infection.command.note_cleared", targets.size()), true);
         return targets.size();
     }
 }

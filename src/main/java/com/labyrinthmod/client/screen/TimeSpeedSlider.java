@@ -28,7 +28,7 @@ public class TimeSpeedSlider extends AbstractSliderButton {
 
     @Override
     protected void updateMessage() {
-        this.setMessage(Component.literal(String.format("Скорость: %.1f x", currentValue)));
+        this.setMessage(Component.translatable("labyrinthmod.time_speed.value", String.format("%.1f", currentValue)));
     }
 
     @Override

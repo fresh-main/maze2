@@ -24,7 +24,7 @@ public class ImposterScreen extends Screen {
     private static final int PLAYERS_PER_PAGE = 10;
 
     public ImposterScreen(List<OpenImposterScreenPacket.PlayerInfo> players) {
-        super(Component.literal("Выбор жертвы"));
+        super(Component.translatable("labyrinthmod.imposter.title"));
         this.players = players;
     }
 
@@ -37,7 +37,7 @@ public class ImposterScreen extends Screen {
 
         // Заголовок
         addRenderableWidget(Button.builder(
-                        Component.literal("§c§lВЫБОР ЖЕРТВЫ"),
+                        Component.translatable("labyrinthmod.imposter.heading"),
                         b -> {})
                 .bounds(centerX - 100, startY - 20, 200, 20)
                 .build()
@@ -52,7 +52,8 @@ public class ImposterScreen extends Screen {
             final String fraction = info.fraction;
 
             addRenderableWidget(Button.builder(
-                            Component.literal("§e" + playerName + " §7(" + fraction + ")"),
+                            Component.translatable("labyrinthmod.imposter.player", playerName,
+                                    Component.translatable("labyrinthmod.fraction." + fraction.toLowerCase(java.util.Locale.ROOT))),
                             b -> {
                                 selectedPlayerId = playerId;
                                 selectedPlayerName = playerName;
@@ -65,7 +66,7 @@ public class ImposterScreen extends Screen {
 
         // Кнопка атаки
         attackButton = addRenderableWidget(Button.builder(
-                        Component.literal("§c§lНАПАСТЬ"),
+                        Component.translatable("labyrinthmod.imposter.attack"),
                         b -> {
                             if (selectedPlayerId != null) {
                                 NetworkHandler.CHANNEL.sendToServer(new ImposterAttackPacket(selectedPlayerId));
@@ -79,7 +80,7 @@ public class ImposterScreen extends Screen {
 
         // Кнопка закрытия
         addRenderableWidget(Button.builder(
-                                Component.literal("Закрыть"),
+                                Component.translatable("gui.close"),
                                 b -> onClose()
                         )
                         .bounds(centerX - 110, startY + PLAYERS_PER_PAGE * 25 + 20, 60, 20)
@@ -88,7 +89,7 @@ public class ImposterScreen extends Screen {
 
         // Кнопка обновления
         addRenderableWidget(Button.builder(
-                        Component.literal("§aОбновить"),
+                        Component.translatable("labyrinthmod.imposter.refresh"),
                         b -> {
                             
                         })
@@ -124,12 +125,12 @@ public class ImposterScreen extends Screen {
 
         if (selectedPlayerName != null) {
             gfx.drawString(this.font,
-                    "§aВыбрана цель: §e" + selectedPlayerName,
+                    Component.translatable("labyrinthmod.imposter.selected", selectedPlayerName),
                     this.width / 2 - 100, this.height - 60, 0xFFFFFF);
         }
 
         gfx.drawString(this.font,
-                "§c§lВНИМАНИЕ! После атаки будет кулдаун 1 час!",
+                Component.translatable("labyrinthmod.imposter.cooldown_warning"),
                 this.width / 2 - 150, this.height - 40, 0xFF5555);
 
         super.render(gfx, mouseX, mouseY, partialTick);

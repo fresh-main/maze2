@@ -139,7 +139,7 @@ public final class MazeMapKeyBindings {
         Player target = raycastPlayer(self);
         if (target == null) {
             self.displayClientMessage(
-                    Component.literal("§7Передача отменена"), true);
+                    Component.translatable("mazemap.message.transfer_cancelled"), true);
             ClientHudState.setNoteHeld(false);
             return;
         }

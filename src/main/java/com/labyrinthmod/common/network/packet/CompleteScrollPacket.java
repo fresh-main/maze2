@@ -44,26 +44,26 @@ public class CompleteScrollPacket {
 
             // Защита от неправильного слота
             if (slot < 0 || slot >= player.getInventory().getContainerSize()) {
-                player.sendSystemMessage(Component.literal("§cОшибка: неверный слот свитка."));
+                player.sendSystemMessage(Component.translatable("labyrinthmod.scroll.error.slot"));
                 return;
             }
 
             ItemStack scroll = player.getInventory().getItem(slot);
 
             if (scroll.isEmpty() || !(scroll.getItem() instanceof TaskScrollItem)) {
-                player.sendSystemMessage(Component.literal("§cСвиток задания не найден."));
+                player.sendSystemMessage(Component.translatable("labyrinthmod.scroll.error.not_found"));
                 return;
             }
 
             if (!scroll.hasTag()) {
-                player.sendSystemMessage(Component.literal("§cСвиток не содержит данных задания."));
+                player.sendSystemMessage(Component.translatable("labyrinthmod.scroll.error.no_data"));
                 return;
             }
 
             CompoundTag tag = scroll.getTag();
 
             if (tag.getBoolean("Completed")) {
-                player.sendSystemMessage(Component.literal("§cЭто задание уже выполнено."));
+                player.sendSystemMessage(Component.translatable("labyrinthmod.scroll.error.completed"));
                 return;
             }
 
@@ -72,7 +72,7 @@ public class CompleteScrollPacket {
                 tag.putBoolean("Completed", true);
                 markCompleted(tag);
                 player.getInventory().setItem(slot, ItemStack.EMPTY);
-                player.sendSystemMessage(Component.literal("§aЗадание выполнено!"));
+                player.sendSystemMessage(Component.translatable("labyrinthmod.scroll.completed"));
                 return;
             }
 
@@ -86,26 +86,26 @@ public class CompleteScrollPacket {
                 int count = getRequiredItemCount(itemTag);
 
                 if (itemId.isEmpty()) {
-                    player.sendSystemMessage(Component.literal("§cВ задании указан пустой предмет."));
+                    player.sendSystemMessage(Component.translatable("labyrinthmod.scroll.error.empty_item"));
                     return;
                 }
 
                 ResourceLocation rl = ResourceLocation.tryParse(itemId);
                 if (rl == null) {
-                    player.sendSystemMessage(Component.literal("§cНекорректный предмет: " + itemId));
+                    player.sendSystemMessage(Component.translatable("labyrinthmod.scroll.error.invalid_item", itemId));
                     return;
                 }
 
                 Item item = ForgeRegistries.ITEMS.getValue(rl);
                 if (item == null || item == Items.AIR) {
-                    player.sendSystemMessage(Component.literal("§cНеизвестный предмет: " + itemId));
+                    player.sendSystemMessage(Component.translatable("labyrinthmod.scroll.error.unknown_item", itemId));
                     return;
                 }
 
                 int has = countItem(player, item);
 
                 if (has < count) {
-                    player.sendSystemMessage(Component.literal("§cНе хватает предметов для выполнения задания."));
+                    player.sendSystemMessage(Component.translatable("labyrinthmod.scroll.error.missing_items"));
                     return;
                 }
             }
@@ -131,7 +131,7 @@ public class CompleteScrollPacket {
             markCompleted(tag);
             player.getInventory().setItem(slot, ItemStack.EMPTY);
 
-            player.sendSystemMessage(Component.literal("§aЗадание выполнено!"));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.scroll.completed"));
         });
 
         context.setPacketHandled(true);

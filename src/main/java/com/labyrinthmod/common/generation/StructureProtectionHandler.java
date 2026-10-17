@@ -40,7 +40,7 @@ public class StructureProtectionHandler {
             // Опционально: сообщение игроку
             if (player != null && !player.level().isClientSide) {
                 player.displayClientMessage(
-                        Component.literal("§c⚠ Этот блок является частью защищённой структуры!"),
+                        Component.translatable("labyrinthmod.structure.protected_block"),
                         true // true = action bar (ненавязчивое сообщение)
                 );
             }
@@ -62,7 +62,7 @@ public class StructureProtectionHandler {
         if (!isOperator) {
             event.setCanceled(true);
             if (!player.level().isClientSide) {
-                player.displayClientMessage(Component.literal("§c⚠ В защищённой структуре нельзя ставить блоки!"), true);
+                player.displayClientMessage(Component.translatable("labyrinthmod.structure.cannot_place"), true);
             }
         }
     }

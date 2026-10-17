@@ -51,10 +51,10 @@ public class OpenImposterScreenPacket {
 
             String fractionName = player.getCapability(FractionProvider.FRACTION)
                     .map(data -> {
-                        if (!data.hasFraction()) return "Без фракции";
-                        return data.getFraction().displayName;
+                        if (!data.hasFraction()) return FractionType.NONE.name();
+                        return data.getFraction().name();
                     })
-                    .orElse("Без фракции");
+                    .orElse(FractionType.NONE.name());
 
             result.add(new PlayerInfo(player.getUUID(), player.getName().getString(), fractionName));
         }

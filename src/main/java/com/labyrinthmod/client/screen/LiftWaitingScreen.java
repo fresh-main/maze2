@@ -10,21 +10,20 @@ import net.minecraft.network.chat.Component;
 public class LiftWaitingScreen extends Screen {
 
     public LiftWaitingScreen() {
-        super(Component.literal("Lift Lock"));
+        super(Component.translatable("labyrinthmod.lift_waiting.title"));
     }
 
     @Override
     protected void init() {
         super.init();
-        // Кнопка "ОТМЕНА" (Разрывает соединение и возвращает в главное меню)
         int btnW = 140;
         int btnH = 24;
         int btnX = (this.width - btnW) / 2;
         int btnY = (this.height / 2) + 80;
 
-        this.addRenderableWidget(Button.builder(Component.literal("ОТМЕНА"), (b) -> {
+        this.addRenderableWidget(Button.builder(Component.translatable("labyrinthmod.lift_waiting.cancel"), (b) -> {
             if (this.minecraft != null && this.minecraft.getConnection() != null) {
-                this.minecraft.getConnection().getConnection().disconnect(Component.literal("Ритуал отменен игроком"));
+                this.minecraft.getConnection().getConnection().disconnect(Component.translatable("labyrinthmod.lift_waiting.cancelled"));
             } else if (this.minecraft != null) {
                 this.minecraft.setScreen(null);
             }
@@ -49,11 +48,11 @@ public class LiftWaitingScreen extends Screen {
         PaperRender.drawTape(gfx, px + paperW - 70, py - 6, 58, 12, 0xC0);
 
         // ★ ТЕКСТ ★
-        String kicker = "О.Т.Б.О.Р · СТАТУС · ДЕЛО №047-Л";
+        String kicker = Component.translatable("labyrinthmod.lift_waiting.kicker").getString();
         int kickerW = this.font.width(kicker);
         gfx.drawString(this.font, kicker, px + paperW / 2 - kickerW / 2, py + 12, PaperRender.withAlpha(PaperRender.INK_FADED, 0.9f), false);
 
-        String title = "ЛИФТ НЕ ГОТОВ";
+        String title = Component.translatable("labyrinthmod.lift_waiting.heading").getString();
         float titleScale = 2.0f;
         int titleW = (int) (this.font.width(title) * titleScale);
         int titleY = py + 35;
@@ -64,7 +63,7 @@ public class LiftWaitingScreen extends Screen {
         PaperRender.drawInkText(gfx, this.font, title, 0, 0, PaperRender.INK_RED);
         gfx.pose().popPose();
 
-        String sub = "Р И Т У А Л   А К Т И В А Ц И И   И Д Е Т";
+        String sub = Component.translatable("labyrinthmod.lift_waiting.subheading").getString();
         int subW = this.font.width(sub);
         gfx.drawString(this.font, sub, px + paperW / 2 - subW / 2, titleY + 25, PaperRender.INK_SOFT, false);
 
@@ -74,9 +73,9 @@ public class LiftWaitingScreen extends Screen {
         PaperRender.drawInkStroke(gfx, px + paperW / 2 - lineW / 2, lineY, lineW, 1, PaperRender.withAlpha(PaperRender.INK_RED, 0.6f), 7L);
 
         // Описание
-        String desc1 = "Подождите завершения калибровки механизмов.";
-        String desc2 = "Как только лифт будет готов, вы автоматически";
-        String desc3 = "сможете продолжить погружение.";
+        String desc1 = Component.translatable("labyrinthmod.lift_waiting.description.1").getString();
+        String desc2 = Component.translatable("labyrinthmod.lift_waiting.description.2").getString();
+        String desc3 = Component.translatable("labyrinthmod.lift_waiting.description.3").getString();
 
         gfx.drawString(this.font, desc1, px + paperW / 2 - this.font.width(desc1) / 2, lineY + 15, PaperRender.INK, false);
         gfx.drawString(this.font, desc2, px + paperW / 2 - this.font.width(desc2) / 2, lineY + 28, PaperRender.INK_FADED, false);
@@ -87,7 +86,7 @@ public class LiftWaitingScreen extends Screen {
         gfx.pose().translate(px + paperW - 90, py + paperH - 60, 0);
         gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-12f));
         gfx.pose().scale(1.2f, 1.2f, 1f);
-        PaperRender.drawRectStamp(gfx, this.font, "ОЖИДАНИЕ", 0, 0, (0xDD << 24) | (PaperRender.INK_RED & 0x00FFFFFF));
+        PaperRender.drawRectStamp(gfx, this.font, Component.translatable("labyrinthmod.lift_waiting.stamp").getString(), 0, 0, (0xDD << 24) | (PaperRender.INK_RED & 0x00FFFFFF));
         gfx.pose().popPose();
 
         // Рендер кнопок

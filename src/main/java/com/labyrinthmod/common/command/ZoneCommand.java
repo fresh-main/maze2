@@ -58,7 +58,7 @@ public class ZoneCommand {
     private static int openAccessScreen(CommandContext<CommandSourceStack> ctx) {
         ServerPlayer player = ctx.getSource().getPlayer();
         if (player == null) {
-            ctx.getSource().sendFailure(Component.literal("Команда доступна только игрокам"));
+            ctx.getSource().sendFailure(Component.translatable("labyrinthmod.zone_command.players_only"));
             return 0;
         }
         com.labyrinthmod.common.zone.ZoneManager manager =
@@ -77,8 +77,7 @@ public class ZoneCommand {
 
         BlockPos pos = player.blockPosition();
         pos1Selections.put(player.getUUID(), pos);
-        player.sendSystemMessage(Component.literal("§aПозиция 1 установлена: " +
-                pos.getX() + " " + pos.getY() + " " + pos.getZ()));
+        player.sendSystemMessage(Component.translatable("labyrinthmod.zone_command.pos1_set", pos.getX(), pos.getY(), pos.getZ()));
         return 1;
     }
 
@@ -88,8 +87,7 @@ public class ZoneCommand {
 
         BlockPos pos = player.blockPosition();
         pos2Selections.put(player.getUUID(), pos);
-        player.sendSystemMessage(Component.literal("§aПозиция 2 установлена: " +
-                pos.getX() + " " + pos.getY() + " " + pos.getZ()));
+        player.sendSystemMessage(Component.translatable("labyrinthmod.zone_command.pos2_set", pos.getX(), pos.getY(), pos.getZ()));
         return 1;
     }
 
@@ -103,7 +101,7 @@ public class ZoneCommand {
         BlockPos pos2 = pos2Selections.get(player.getUUID());
 
         if (pos1 == null || pos2 == null) {
-            player.sendSystemMessage(Component.literal("§cСначала установите позиции 1 и 2 с помощью /zone pos1 и /zone pos2"));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.zone_command.set_positions_first"));
             return 0;
         }
 
@@ -111,16 +109,15 @@ public class ZoneCommand {
         if (manager == null) return 0;
 
         if (manager.getZone(name) != null) {
-            player.sendSystemMessage(Component.literal("§cЗона с именем " + name + " уже существует!"));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.zone_command.exists", name));
             return 0;
         }
 
         Zone zone = new Zone(name, pos1, pos2);
         manager.addZone(zone);
 
-        player.sendSystemMessage(Component.literal("§aЗона §e" + name + " §aсоздана!"));
-        player.sendSystemMessage(Component.literal("§7Размер: от " + zone.minX + "," + zone.minY + "," + zone.minZ +
-                " до " + zone.maxX + "," + zone.maxY + "," + zone.maxZ));
+        player.sendSystemMessage(Component.translatable("labyrinthmod.zone_command.created", name));
+        player.sendSystemMessage(Component.translatable("labyrinthmod.zone_command.bounds", zone.minX, zone.minY, zone.minZ, zone.maxX, zone.maxY, zone.maxZ));
 
         return 1;
     }
@@ -131,12 +128,12 @@ public class ZoneCommand {
         if (manager == null) return 0;
 
         if (manager.getZone(name) == null) {
-            ctx.getSource().sendFailure(Component.literal("§cЗона " + name + " не найдена!"));
+            ctx.getSource().sendFailure(Component.translatable("labyrinthmod.zone_command.not_found", name));
             return 0;
         }
 
         manager.removeZone(name);
-        ctx.getSource().sendSuccess(() -> Component.literal("§aЗона §e" + name + " §aудалена!"), true);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.zone_command.removed", name), true);
         return 1;
     }
 
@@ -147,14 +144,13 @@ public class ZoneCommand {
         var zones = manager.getAllZones();
 
         if (zones.isEmpty()) {
-            ctx.getSource().sendSuccess(() -> Component.literal("§eНет созданных зон"), false);
+            ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.zone_command.none"), false);
             return 1;
         }
 
-        ctx.getSource().sendSuccess(() -> Component.literal("§6=== Список зон ==="), false);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.zone_command.list_heading"), false);
         for (Zone zone : zones) {
-            ctx.getSource().sendSuccess(() -> Component.literal("§e- " + zone.name +
-                    " §7(" + zone.minX + ".." + zone.maxX + ", " + zone.minY + ".." + zone.maxY + ", " + zone.minZ + ".." + zone.maxZ + ")"), false);
+            ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.zone_command.list_item", zone.name, zone.minX, zone.maxX, zone.minY, zone.maxY, zone.minZ, zone.maxZ), false);
         }
         return 1;
     }
@@ -164,7 +160,7 @@ public class ZoneCommand {
         if (manager == null) return 0;
 
         manager.clearZones();
-        ctx.getSource().sendSuccess(() -> Component.literal("§aВсе зоны удалены!"), true);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.zone_command.cleared"), true);
         return 1;
     }
 
@@ -178,9 +174,9 @@ public class ZoneCommand {
         Zone currentZone = manager.getZoneAt(player.blockPosition());
 
         if (currentZone == null) {
-            player.sendSystemMessage(Component.literal("§eВы не находитесь ни в одной зоне"));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.zone_command.outside"));
         } else {
-            player.sendSystemMessage(Component.literal("§aВы находитесь в зоне: §e" + currentZone.name));
+            player.sendSystemMessage(Component.translatable("labyrinthmod.zone_command.inside", currentZone.name));
         }
         return 1;
     }
@@ -208,9 +204,9 @@ public class ZoneCommand {
         manager.toggleZones();
         boolean enabled = manager.isZonesEnabled();
         if (enabled) {
-            ctx.getSource().sendSuccess(() -> Component.literal("§aЗоны §eВКЛЮЧЕНЫ§a! Теперь не-бегуны не могут их покидать"), true);
+            ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.zone_command.enabled"), true);
         } else {
-            ctx.getSource().sendSuccess(() -> Component.literal("§cЗоны §eВЫКЛЮЧЕНЫ§c! Теперь все могут свободно перемещаться"), true);
+            ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.zone_command.disabled"), true);
         }
         return 1;
     }
@@ -222,9 +218,9 @@ public class ZoneCommand {
         boolean enabled = manager.isZonesEnabled();
         int zoneCount = manager.getAllZones().size();
 
-        ctx.getSource().sendSuccess(() -> Component.literal("§6=== Статус зон ==="), false);
-        ctx.getSource().sendSuccess(() -> Component.literal("§eСостояние: " + (enabled ? "§aВКЛЮЧЕНЫ" : "§cВЫКЛЮЧЕНЫ")), false);
-        ctx.getSource().sendSuccess(() -> Component.literal("§eКоличество зон: §f" + zoneCount), false);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.zone_command.status_heading"), false);
+        ctx.getSource().sendSuccess(() -> Component.translatable(enabled ? "labyrinthmod.zone_command.status_enabled" : "labyrinthmod.zone_command.status_disabled"), false);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.zone_command.status_count", zoneCount), false);
         return 1;
     }
 }

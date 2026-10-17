@@ -5,6 +5,7 @@ import net.minecraft.client.AttackIndicatorStatus;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.food.FoodData;
@@ -110,7 +111,7 @@ public final class OtborHudOverlay {
         // Per-frame HUD — drawPaperCard, не drawPaper, во избежание ~470 fill-вызовов на кадр.
         PaperRender.drawPaperCard(gfx, 0, 0, w, h, 1.0f, PaperRender.PAPER_LIGHT);
         PaperRender.drawPin(gfx, w / 2, 2, true);
-        gfx.drawString(font, "оф", 2, 2, PaperRender.INK_FADED, false);
+        gfx.drawString(font, Component.translatable("otbor.hud.offhand"), 2, 2, PaperRender.INK_FADED, false);
         gfx.pose().popPose();
 
         if (!offhand.isEmpty()) {
@@ -150,23 +151,23 @@ public final class OtborHudOverlay {
         PaperRender.drawPaperCard(gfx, 0, 0, cardW, cardH, 1.0f, PaperRender.PAPER_LIGHT);
         PaperRender.drawPin(gfx, cardW - 12, 6, true);
 
-        gfx.drawString(font, "СОСТОЯНИЕ", 6, 4, PaperRender.INK_FADED, false);
+        gfx.drawString(font, Component.translatable("otbor.hud.status"), 6, 4, PaperRender.INK_FADED, false);
 
         FoodData food = p.getFoodData();
         int hunger = food.getFoodLevel();
-        String hungerLbl = "ГОЛОД " + hunger + "/20";
+        String hungerLbl = Component.translatable("otbor.hud.hunger", hunger).getString();
         gfx.drawString(font, hungerLbl, 6, 14, PaperRender.INK, false);
         PaperRender.drawHatchedBar(gfx, 6, 24, cardW - 12, 7, hunger / 20f, PaperRender.INK);
 
         int stamY = 36;
         Float staminaRatio = readStamina(p);
         if (staminaRatio != null) {
-            String stamLbl = "ВЫНОСЛИВОСТЬ " + Math.round(staminaRatio * 100) + "%";
+            String stamLbl = Component.translatable("otbor.hud.stamina", Math.round(staminaRatio * 100)).getString();
             int stamColor = staminaRatio < 0.25f ? PaperRender.INK_RED : PaperRender.INK;
             gfx.drawString(font, stamLbl, 6, stamY, stamColor, false);
             PaperRender.drawHatchedBar(gfx, 6, stamY + 10, cardW - 12, 7, staminaRatio, stamColor);
         } else {
-            gfx.drawString(font, "(паркур не активен)", 6, stamY, PaperRender.INK_FADED, false);
+            gfx.drawString(font, Component.translatable("otbor.hud.parkour_inactive"), 6, stamY, PaperRender.INK_FADED, false);
         }
 
         gfx.pose().popPose();

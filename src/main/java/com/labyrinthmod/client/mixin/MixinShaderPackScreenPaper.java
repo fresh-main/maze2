@@ -358,13 +358,13 @@ public abstract class MixinShaderPackScreenPaper extends Screen {
         PaperRender.drawTape(gfx, (CARD_W / 2) - 35, -6, 70, 14, 0x90);
         PaperRender.drawPin(gfx, 16, 8, false);
         PaperRender.drawPin(gfx, CARD_W - 16, 8, true);
-        String head = "§l      " + (this.optionMenuOpen ? 2 : 1) + " ·      " + (this.optionMenuOpen ? "НАСТРОЙКИ" : "ВЫБОР ПАКА");
+        String head = "§l      " + (this.optionMenuOpen ? 2 : 1) + " ·      " + Component.translatable(this.optionMenuOpen ? "labyrinthmod.shader.settings" : "labyrinthmod.shader.pack_selection").getString();
         gfx.drawString(this.font, head, 16, 8, PaperRender.INK_FADED, false);
         gfx.pose().popPose();
     }
 
     private void renderTabsDecor(GuiGraphics gfx, int x, int y) {
-        String[] labels = {"ВЫБОР ПАКА", "НАСТРОЙКИ"};
+        String[] labels = {Component.translatable("labyrinthmod.shader.pack_selection").getString(), Component.translatable("labyrinthmod.shader.settings").getString()};
         for (int i = 0; i < 2; i++) {
             int ty = y + i * (TAB_H + TAB_GAP);
             boolean selected = (i == 0 && !this.optionMenuOpen) || (i == 1 && this.optionMenuOpen);

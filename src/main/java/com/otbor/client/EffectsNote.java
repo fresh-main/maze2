@@ -56,11 +56,11 @@ public final class EffectsNote {
         PaperRender.drawPin(gfx, 12, 6, true);
         PaperRender.drawPin(gfx, WIDTH - 12, 6, false);
 
-        String kicker = "АНОМАЛИИ";
+        String kicker = Component.translatable("otbor.effects.kicker").getString();
         gfx.drawString(font, kicker, WIDTH / 2 - font.width(kicker) / 2, 5,
                 PaperRender.INK_FADED, false);
 
-        String head = "СТАТУС";
+        String head = Component.translatable("otbor.effects.status").getString();
         float headScale = 1.4f;
         int headW = (int) (font.width(head) * headScale);
         gfx.pose().pushPose();
@@ -73,7 +73,7 @@ public final class EffectsNote {
                 PaperRender.withAlpha(PaperRender.INK_RED, 0.7f));
 
         if (effects.isEmpty()) {
-            String none = "норма · чисто";
+            String none = Component.translatable("otbor.effects.none").getString();
             gfx.drawString(font, none, WIDTH / 2 - font.width(none) / 2, HEADER_H + 6,
                     PaperRender.INK_FADED, false);
         } else {
@@ -91,7 +91,7 @@ public final class EffectsNote {
         gfx.pose().pushPose();
         gfx.pose().translate(WIDTH / 2f, stampY, 0);
         gfx.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-3f));
-        PaperRender.drawRectStamp(gfx, font, "ОТДЕЛ ЗДОРОВЬЯ", 0, 0,
+        PaperRender.drawRectStamp(gfx, font, Component.translatable("otbor.effects.stamp").getString(), 0, 0,
                 PaperRender.withAlpha(PaperRender.INK_RED, 0.85f));
         gfx.pose().popPose();
 

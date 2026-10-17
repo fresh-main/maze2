@@ -32,20 +32,20 @@ public class WritableTaskScreen extends AbstractContainerScreen<WritableTaskMenu
         int y = (this.height - this.paperH) / 2;
 
         // Поля ввода без рамок (имитация письма на бумаге)
-        titleEditBox = new EditBox(this.font, x + 20, y + 45, 260, 20, Component.literal("Title"));
+        titleEditBox = new EditBox(this.font, x + 20, y + 45, 260, 20, Component.translatable("labyrinthmod.task.title_placeholder"));
         titleEditBox.setMaxLength(50);
         titleEditBox.setTextColor(0xFF2A1810);
         titleEditBox.setBordered(false);
         this.addWidget(titleEditBox);
         this.setInitialFocus(titleEditBox);
 
-        descriptionEditBox = new EditBox(this.font, x + 20, y + 85, 260, 60, Component.literal("Description"));
+        descriptionEditBox = new EditBox(this.font, x + 20, y + 85, 260, 60, Component.translatable("labyrinthmod.task.description_placeholder"));
         descriptionEditBox.setMaxLength(500);
         descriptionEditBox.setTextColor(0xFF2A1810);
         descriptionEditBox.setBordered(false);
         this.addWidget(descriptionEditBox);
 
-        rewardEditBox = new EditBox(this.font, x + 20, y + 175, 260, 20, Component.literal("XpReward"));
+        rewardEditBox = new EditBox(this.font, x + 20, y + 175, 260, 20, Component.translatable("labyrinthmod.task.reward_placeholder"));
         rewardEditBox.setMaxLength(10);
         rewardEditBox.setFilter(s -> s.matches("\\d*")); // Только цифры
         rewardEditBox.setTextColor(0xFF2A1810);
@@ -55,7 +55,7 @@ public class WritableTaskScreen extends AbstractContainerScreen<WritableTaskMenu
         // Кнопка "Сохранить" в стиле бумаги
         PaperButton saveButton = new PaperButton(
                 x + 30, y + 230, 110, 24,
-                Component.literal("Сохранить"),
+                Component.translatable("gui.done"),
                 btn -> saveTask()
         );
         this.addRenderableWidget(saveButton);
@@ -63,7 +63,7 @@ public class WritableTaskScreen extends AbstractContainerScreen<WritableTaskMenu
         // Кнопка "Отмена" в стиле бумаги
         PaperButton cancelButton = new PaperButton(
                 x + 160, y + 230, 110, 24,
-                Component.literal("Отмена"),
+                Component.translatable("gui.cancel"),
                 btn -> this.onClose()
         );
         this.addRenderableWidget(cancelButton);
@@ -111,7 +111,7 @@ public class WritableTaskScreen extends AbstractContainerScreen<WritableTaskMenu
         int padX = 20;
 
         // Заголовок экрана
-        String screenTitle = "Создание задания";
+        String screenTitle = Component.translatable("labyrinthmod.task.create_title").getString();
         int titleWidth = this.font.width(screenTitle);
         guiGraphics.drawString(this.font, screenTitle, x + (this.paperW - titleWidth) / 2, y + 20, 0xFF7A1F1F, false);
 
@@ -119,9 +119,9 @@ public class WritableTaskScreen extends AbstractContainerScreen<WritableTaskMenu
         guiGraphics.fill(x + padX, y + 36, x + this.paperW - padX, y + 37, 0xFF7A1F1F);
 
         // Подписи к полям ввода (цвет чернил)
-        guiGraphics.drawString(this.font, "Название задания:", x + padX, y + 30, 0xFF2A1810, false);
-        guiGraphics.drawString(this.font, "Описание:", x + padX, y + 70, 0xFF2A1810, false);
-        guiGraphics.drawString(this.font, "Награда (уровни опыта):", x + padX, y + 160, 0xFF2A1810, false);
+        guiGraphics.drawString(this.font, Component.translatable("labyrinthmod.task.title_label"), x + padX, y + 30, 0xFF2A1810, false);
+        guiGraphics.drawString(this.font, Component.translatable("labyrinthmod.task.description_label"), x + padX, y + 70, 0xFF2A1810, false);
+        guiGraphics.drawString(this.font, Component.translatable("labyrinthmod.task.reward_label"), x + padX, y + 160, 0xFF2A1810, false);
 
         // Рендерим поля ввода и кнопки поверх бумаги
         super.render(guiGraphics, mouseX, mouseY, partialTick);
