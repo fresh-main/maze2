@@ -3,6 +3,7 @@ package com.infection.client.render;
 import com.labyrinthmod.LabyrinthMod;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import net.minecraft.client.renderer.ShaderInstance;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RegisterShadersEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -34,7 +35,7 @@ public final class InfectedSensesShaderRegistry {
     public static void onRegisterShaders(RegisterShadersEvent event) throws IOException {
         event.registerShader(
                 new ShaderInstance(event.getResourceProvider(),
-                        LabyrinthMod.id("infected_silhouette"),
+                        new ResourceLocation("infection", "infected_silhouette"),
                         DefaultVertexFormat.NEW_ENTITY),
                 inst -> shader = inst
         );

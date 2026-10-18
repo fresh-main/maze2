@@ -204,6 +204,10 @@ public class OtborInstructionScreen extends Screen {
         }
     }
 
+    private static String tr(String key) {
+        return Component.translatable(key).getString();
+    }
+
     private void buildGameplay(int cx, int y) {
         Options o = Minecraft.getInstance().options;
         int cardW = 360;
@@ -214,7 +218,7 @@ public class OtborInstructionScreen extends Screen {
 
         addRenderableWidget(PaperWidgets.paperSlider(
                 inX, sy, inW, 22,
-                "угол обзора (FOV) ",
+                tr("otbor.instructions.option.fov"),
                 (o.fov().get() - 30) / 80.0,
                 v -> o.fov().set((int) Math.round(30 + v * 80)),
                 v -> Math.round(30 + v * 80) + "° "
@@ -223,7 +227,7 @@ public class OtborInstructionScreen extends Screen {
 
         addRenderableWidget(PaperWidgets.paperCheckbox(
                 inX, sy, inW, 16,
-                "автопрыжок ",
+                tr("otbor.instructions.option.auto_jump"),
                 () -> o.autoJump().get(),
                 o.autoJump()::set
         ));
@@ -231,7 +235,7 @@ public class OtborInstructionScreen extends Screen {
 
         addRenderableWidget(PaperWidgets.paperCheckbox(
                 inX, sy, inW, 16,
-                "субтитры ",
+                tr("otbor.instructions.option.subtitles"),
                 () -> o.showSubtitles().get(),
                 o.showSubtitles()::set
         ));
@@ -247,16 +251,16 @@ public class OtborInstructionScreen extends Screen {
 
         addRenderableWidget(PaperWidgets.paperSliderDeferred(
                 inX, sy, inW, 22,
-                "дальность прорисовки ",
+                tr("otbor.instructions.option.render_distance"),
                 (o.renderDistance().get() - 2) / 30.0,
                 v -> o.renderDistance().set((int) Math.round(2 + v * 30)),
-                v -> Math.round(2 + v * 30) + " чанков "
+                v -> Component.translatable("otbor.instructions.value.chunks", Math.round(2 + v * 30)).getString()
         ));
         sy += 28;
 
         addRenderableWidget(PaperWidgets.paperSliderDeferred(
                 inX, sy, inW, 22,
-                "яркость (гамма) ",
+                tr("otbor.instructions.option.gamma"),
                 Math.min(1.0, Math.max(0.0, o.gamma().get())),
                 v -> o.gamma().set(v),
                 v -> Math.round(v * 100) + "% "
@@ -265,26 +269,26 @@ public class OtborInstructionScreen extends Screen {
 
         addRenderableWidget(PaperWidgets.paperSliderDeferred(
                 inX, sy, inW, 22,
-                "макс. FPS ",
+                tr("otbor.instructions.option.max_fps"),
                 (o.framerateLimit().get() - 10) / 250.0,
                 v -> o.framerateLimit().set((int) Math.round(10 + v * 250)),
                 v -> {
                     int f = (int) Math.round(10 + v * 250);
-                    return f >= 260 ? "макс " : f + " к/с ";
+                    return f >= 260 ? tr("otbor.instructions.value.max") : Component.translatable("otbor.instructions.value.fps", f).getString();
                 }
         ));
         sy += 28;
 
         addRenderableWidget(PaperWidgets.paperCheckbox(
                 inX, sy, inW / 2 - 4, 16,
-                "VSync ",
+                tr("otbor.instructions.option.vsync"),
                 () -> o.enableVsync().get(),
                 o.enableVsync()::set
         ));
 
         addRenderableWidget(PaperWidgets.paperCheckbox(
                 inX + inW / 2 + 4, sy, inW / 2 - 4, 16,
-                "тени сущностей ",
+                tr("otbor.instructions.option.entity_shadows"),
                 () -> o.entityShadows().get(),
                 o.entityShadows()::set
         ));
@@ -295,7 +299,7 @@ public class OtborInstructionScreen extends Screen {
         }
         addRenderableWidget(PaperWidgets.paperSegment(
                 inX, sy, inW, 18,
-                new String[]{"быстро ", "красиво "},
+                new String[]{tr("otbor.instructions.value.fast"), tr("otbor.instructions.value.fancy")},
                 () -> Math.min(1, o.graphicsMode().get().getId()),
                 i -> o.graphicsMode().set(GraphicsStatus.byId(Math.min(1, i)))
         ));
@@ -303,7 +307,7 @@ public class OtborInstructionScreen extends Screen {
 
         addRenderableWidget(PaperWidgets.paperSegment(
                 inX, sy, inW, 18,
-                new String[]{"все частицы ", "меньше ", "минимум "},
+                new String[]{tr("otbor.instructions.value.particles_all"), tr("otbor.instructions.value.decreased"), tr("otbor.instructions.value.minimal")},
                 () -> o.particles().get().getId(),
                 i -> o.particles().set(ParticleStatus.byId(i))
         ));
@@ -311,7 +315,7 @@ public class OtborInstructionScreen extends Screen {
 
         addRenderableWidget(PaperWidgets.paperSegment(
                 inX, sy, inW, 18,
-                new String[]{"облака выкл ", "быстро ", "красиво "},
+                new String[]{tr("otbor.instructions.value.clouds_off"), tr("otbor.instructions.value.fast"), tr("otbor.instructions.value.fancy")},
                 () -> o.cloudStatus().get().ordinal(),
                 i -> {
                     o.cloudStatus().set(CloudStatus.values()[Math.max(0, Math.min(CloudStatus.values().length - 1, i))]);
@@ -348,7 +352,7 @@ public class OtborInstructionScreen extends Screen {
 
         addRenderableWidget(PaperWidgets.paperSlider(
                 inX, sy, inW, 22,
-                "чувствительность мыши ",
+                tr("otbor.instructions.option.sensitivity"),
                 o.sensitivity().get(),
                 v -> o.sensitivity().set(v),
                 v -> Math.round(v * 200) + "% "
@@ -357,7 +361,7 @@ public class OtborInstructionScreen extends Screen {
 
         addRenderableWidget(PaperWidgets.paperCheckbox(
                 inX, sy, inW, 16,
-                "инверсия взгляда ",
+                tr("otbor.instructions.option.invert_mouse"),
                 () -> o.invertYMouse().get(),
                 o.invertYMouse()::set
         ));
@@ -365,7 +369,7 @@ public class OtborInstructionScreen extends Screen {
 
         addRenderableWidget(PaperWidgets.paperCheckbox(
                 inX, sy, inW, 16,
-                "дрожание камеры ",
+                tr("otbor.instructions.option.view_bobbing"),
                 () -> o.bobView().get(),
                 o.bobView()::set
         ));
@@ -386,11 +390,11 @@ public class OtborInstructionScreen extends Screen {
         int inW = cardW - 40;
         int sy = y + 46;
 
-        sy = addVolumeSlider(inX, sy, inW, o, SoundSource.MASTER, "общая громкость ");
-        sy = addVolumeSlider(inX, sy, inW, o, SoundSource.MUSIC, "музыка ");
-        sy = addVolumeSlider(inX, sy, inW, o, SoundSource.AMBIENT, "окружение ");
-        sy = addVolumeSlider(inX, sy, inW, o, SoundSource.BLOCKS, "эффекты ");
-        sy = addVolumeSlider(inX, sy, inW, o, SoundSource.PLAYERS, "шаги (важно!) ");
+        sy = addVolumeSlider(inX, sy, inW, o, SoundSource.MASTER, tr("otbor.instructions.option.volume_master"));
+        sy = addVolumeSlider(inX, sy, inW, o, SoundSource.MUSIC, tr("otbor.instructions.option.volume_music"));
+        sy = addVolumeSlider(inX, sy, inW, o, SoundSource.AMBIENT, tr("otbor.instructions.option.volume_ambient"));
+        sy = addVolumeSlider(inX, sy, inW, o, SoundSource.BLOCKS, tr("otbor.instructions.option.volume_blocks"));
+        sy = addVolumeSlider(inX, sy, inW, o, SoundSource.PLAYERS, tr("otbor.instructions.option.volume_players"));
     }
 
     private void buildResources(int cx, int y) {

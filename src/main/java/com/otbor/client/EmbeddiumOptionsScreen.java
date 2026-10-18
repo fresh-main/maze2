@@ -233,10 +233,101 @@ public class EmbeddiumOptionsScreen extends Screen {
     }
 
     // ===== ENTRY КЛАССЫ =====
+    private static String optionText(String title) {
+        String key = switch (title.trim()) {
+            case "ПОЛНОЭКРАННЫЙ" -> "fullscreen";
+            case "МАСШТАБ GUI" -> "gui_scale";
+            case "ЯРКОСТЬ" -> "brightness";
+            case "МАКС. FPS" -> "max_fps";
+            case "VSYNC" -> "vsync";
+            case "ПОКАЧИВАНИЕ" -> "view_bobbing";
+            case "ИНДИКАТОР АТАКИ" -> "attack_indicator";
+            case "ИНДИКАТОР СОХРАНЕНИЯ" -> "autosave_indicator";
+            case "ГРАФИКА" -> "graphics";
+            case "ДАЛЬНОСТЬ ЧАНКОВ" -> "render_distance";
+            case "СИМУЛЯЦИЯ" -> "simulation_distance";
+            case "МИПМАППИНГ" -> "mipmap";
+            case "ОБЛАКА" -> "clouds";
+            case "ЧАСТИЦЫ" -> "particles";
+            case "ПЛАВНОЕ ОСВЕЩЕНИЕ" -> "smooth_lighting";
+            case "СМЕШЕНИЕ БИОМОВ" -> "biome_blend";
+            case "ДАЛЬНОСТЬ СУЩНОСТЕЙ" -> "entity_distance";
+            case "ТЕНИ СУЩНОСТЕЙ" -> "entity_shadows";
+            case "ПОГОДА" -> "weather";
+            case "ЛИСТВА" -> "leaves";
+            case "ВИНЬЕТКА" -> "vignette";
+            case "ТУМАН" -> "fog";
+            case "ДАЛЬНОСТЬ СУЩНОСТЕЙ (EMBEDDIUM)" -> "entity_distance_embeddium";
+            case "ПОТОКИ ЧАНКОВ" -> "chunk_threads";
+            case "ОТКЛАДЫВАТЬ ОБНОВЛЕНИЯ" -> "defer_updates";
+            case "ПЕРЕИСПОЛЬЗОВАНИЕ ПАМЯТИ" -> "memory_reuse";
+            case "ОТСЕЧЕНИЕ ГРАНЕЙ" -> "block_face_culling";
+            case "ОТСЕЧЕНИЕ СУЩНОСТЕЙ" -> "entity_culling";
+            case "ОТСЕЧЕНИЕ ТУМАНОМ" -> "fog_occlusion";
+            case "АНИМАЦИЯ ТОЛЬКО ВИДИМЫХ" -> "visible_animations";
+            case "КОМПАКТНЫЙ ФОРМАТ" -> "compact_vertex_format";
+            case "СОРТИРОВКА ПРОЗРАЧНЫХ" -> "translucent_sorting";
+            case "ОПТИМИЗАЦИЯ PASS'ОВ" -> "render_pass_optimization";
+            case "ПРЕДВАРИТЕЛЬНАЯ КОМПИЛЯЦИЯ" -> "precompile_shaders";
+            case "ПЛАВНЫЙ FPS" -> "smooth_fps";
+            case "ПРЯМОЙ ДОСТУП К ПАМЯТИ" -> "direct_memory";
+            case "ЗАПАС КАДРОВ CPU" -> "cpu_render_ahead";
+            case "ПРОДВИНУТЫЕ БУФЕРЫ" -> "advanced_buffers";
+            case "ОТКЛЮЧИТЬ ПРЕДУПРЕЖДЕНИЯ" -> "disable_mod_warnings";
+            case "ОТКЛЮЧИТЬ ЧЁРНЫЙ СПИСОК" -> "disable_driver_blacklist";
+            case "БЕЗ ОШИБОК GL КОНТЕКСТ" -> "no_error_gl";
+            case "GL DEBUG" -> "gl_debug";
+            case "ПРОВЕРКА ОШИБОК GL" -> "check_gl_errors";
+            case "ОТКЛЮЧИТЬ ДОНАТЫ" -> "disable_donations";
+            case "СКРЫТЬ КНОПКУ ДОНАТОВ" -> "hide_donation_button";
+            case "СКРЫТЬ КНОПКУ (ALT)" -> "hide_donation_button_alt";
+            case "СКРЫТЬ ПРЕДУПРЕЖДЕНИЯ О ПАМЯТИ" -> "hide_memory_warning";
+            default -> null;
+        };
+        return key == null ? title : Component.translatable("otbor.embeddium.option." + key).getString();
+    }
+
+    private static String[] optionValues(String[] values) {
+        String[] translated = new String[values.length];
+        for (int i = 0; i < values.length; i++) {
+            String key = switch (values[i].trim()) {
+                case "ВКЛ" -> "on";
+                case "ВЫКЛ" -> "off";
+                case "ПРИЦЕЛ" -> "crosshair";
+                case "ПАНЕЛЬ" -> "hotbar";
+                case "БЫСТРО" -> "fast";
+                case "КРАСИВО" -> "fancy";
+                case "ВСЕ" -> "all";
+                case "УМЕНЬШ." -> "decreased";
+                case "МИНИМУМ" -> "minimal";
+                case "ДЕФОЛТ" -> "default";
+                default -> null;
+            };
+            translated[i] = key == null ? values[i] : Component.translatable("otbor.embeddium.value." + key).getString();
+        }
+        return translated;
+    }
+
+    private static String optionValue(String value) {
+        String trimmed = value.trim();
+        if (trimmed.equals("АВТО")) return Component.translatable("otbor.embeddium.value.auto").getString();
+        if (trimmed.equals("МАКС")) return Component.translatable("otbor.embeddium.value.unlimited").getString();
+        if (trimmed.equals("ВЫКЛ")) return Component.translatable("otbor.embeddium.value.off").getString();
+        if (trimmed.endsWith("к/с")) {
+            return trimmed.substring(0, trimmed.length() - 3).trim() + " "
+                    + Component.translatable("otbor.embeddium.unit.fps").getString();
+        }
+        if (trimmed.endsWith("ч")) {
+            return trimmed.substring(0, trimmed.length() - 1).trim() + " "
+                    + Component.translatable("otbor.embeddium.unit.chunks").getString();
+        }
+        return value;
+    }
+
     private class BoolEntry implements SettingEntry {
         final Object section; final String field; final String title; final boolean def; final String tooltip;
         BoolEntry(Object section, String field, String title, boolean def, String tooltip) {
-            this.section = section; this.field = field; this.title = title; this.def = def; this.tooltip = tooltip;
+            this.section = section; this.field = field; this.title = optionText(title); this.def = def; this.tooltip = tooltip;
         }
         @Override public float height() { return 22; }
         @Override public AbstractWidget createWidget(int x, int y, int w) {
@@ -248,7 +339,7 @@ public class EmbeddiumOptionsScreen extends Screen {
     private class EnumEntry implements SettingEntry {
         final Object section; final String field; final String title; final String[] labels; final String tooltip;
         EnumEntry(Object section, String field, String title, String[] labels, String tooltip) {
-            this.section = section; this.field = field; this.title = title; this.labels = labels; this.tooltip = tooltip;
+            this.section = section; this.field = field; this.title = optionText(title); this.labels = optionValues(labels); this.tooltip = tooltip;
         }
         @Override public float height() { return 38; }
         @Override public AbstractWidget createWidget(int x, int y, int w) {
@@ -266,11 +357,11 @@ public class EmbeddiumOptionsScreen extends Screen {
     private class IntEntry implements SettingEntry {
         final Object section; final String field; final String title; final int min, max; final IntFunction<String> fmt; final String tooltip;
         IntEntry(Object section, String field, String title, int min, int max, IntFunction<String> fmt, String tooltip) {
-            this.section = section; this.field = field; this.title = title; this.min = min; this.max = max; this.fmt = fmt; this.tooltip = tooltip;
+            this.section = section; this.field = field; this.title = optionText(title); this.min = min; this.max = max; this.fmt = fmt; this.tooltip = tooltip;
         }
         @Override public float height() { return 30; }
         @Override public AbstractWidget createWidget(int x, int y, int w) {
-            AbstractWidget widget = PaperWidgets.paperSliderDeferred(x, y, w, 19, title, (getInt(section, field, min) - min) / (float) (max - min), v -> setFieldValue(section, field, (int) Math.round(min + v * (max - min))), v -> fmt.apply((int) Math.round(min + v * (max - min))));
+            AbstractWidget widget = PaperWidgets.paperSliderDeferred(x, y, w, 19, title, (getInt(section, field, min) - min) / (float) (max - min), v -> setFieldValue(section, field, (int) Math.round(min + v * (max - min))), v -> optionValue(fmt.apply((int) Math.round(min + v * (max - min)))));
             return tooltip != null ? new TooltipWrapper(widget, tooltip) : widget;
         }
     }
@@ -279,7 +370,7 @@ public class EmbeddiumOptionsScreen extends Screen {
     private class FloatEntry implements SettingEntry {
         final Object section; final String field; final String title; final float min, max; final Function<Float, String> fmt; final String tooltip;
         FloatEntry(Object section, String field, String title, float min, float max, Function<Float, String> fmt, String tooltip) {
-            this.section = section; this.field = field; this.title = title; this.min = min; this.max = max; this.fmt = fmt; this.tooltip = tooltip;
+            this.section = section; this.field = field; this.title = optionText(title); this.min = min; this.max = max; this.fmt = fmt; this.tooltip = tooltip;
         }
         @Override public float height() { return 30; }
         @Override public AbstractWidget createWidget(int x, int y, int w) {
@@ -287,7 +378,7 @@ public class EmbeddiumOptionsScreen extends Screen {
             float progress = (current - min) / (max - min);
             AbstractWidget widget = PaperWidgets.paperSliderDeferred(x, y, w, 19, title, progress,
                     v -> setFieldValue(section, field, min + v * (max - min)),
-                    v -> fmt.apply((float) (min + v * (max - min))));
+                    v -> optionValue(fmt.apply((float) (min + v * (max - min)))));
             return tooltip != null ? new TooltipWrapper(widget, tooltip) : widget;
         }
     }
@@ -295,7 +386,7 @@ public class EmbeddiumOptionsScreen extends Screen {
     private class VanillaBoolEntry implements SettingEntry {
         final String title; final java.util.function.BooleanSupplier getter; final java.util.function.Consumer<Boolean> setter; final String tooltip;
         VanillaBoolEntry(String title, java.util.function.BooleanSupplier getter, java.util.function.Consumer<Boolean> setter, String tooltip) {
-            this.title = title; this.getter = getter; this.setter = setter; this.tooltip = tooltip;
+            this.title = optionText(title); this.getter = getter; this.setter = setter; this.tooltip = tooltip;
         }
         @Override public float height() { return 22; }
         @Override public AbstractWidget createWidget(int x, int y, int w) {
@@ -307,7 +398,7 @@ public class EmbeddiumOptionsScreen extends Screen {
     private class VanillaEnumEntry implements SettingEntry {
         final String title; final String[] labels; final java.util.function.IntSupplier getter; final java.util.function.IntConsumer setter; final String tooltip;
         VanillaEnumEntry(String title, String[] labels, java.util.function.IntSupplier getter, java.util.function.IntConsumer setter, String tooltip) {
-            this.title = title; this.labels = labels; this.getter = getter; this.setter = setter; this.tooltip = tooltip;
+            this.title = optionText(title); this.labels = optionValues(labels); this.getter = getter; this.setter = setter; this.tooltip = tooltip;
         }
         @Override public float height() { return 38; }
         @Override public AbstractWidget createWidget(int x, int y, int w) {
@@ -325,11 +416,11 @@ public class EmbeddiumOptionsScreen extends Screen {
     private class VanillaIntEntry implements SettingEntry {
         final String title; final int min, max; final java.util.function.IntSupplier getter; final java.util.function.IntConsumer setter; final IntFunction<String> fmt; final String tooltip;
         VanillaIntEntry(String title, int min, int max, java.util.function.IntSupplier getter, java.util.function.IntConsumer setter, IntFunction<String> fmt, String tooltip) {
-            this.title = title; this.min = min; this.max = max; this.getter = getter; this.setter = setter; this.fmt = fmt; this.tooltip = tooltip;
+            this.title = optionText(title); this.min = min; this.max = max; this.getter = getter; this.setter = setter; this.fmt = fmt; this.tooltip = tooltip;
         }
         @Override public float height() { return 30; }
         @Override public AbstractWidget createWidget(int x, int y, int w) {
-            AbstractWidget widget = PaperWidgets.paperSliderDeferred(x, y, w, 19, title, (getter.getAsInt() - min) / (float) (max - min), v -> setter.accept((int) Math.round(min + v * (max - min))), v -> fmt.apply((int) Math.round(min + v * (max - min))));
+            AbstractWidget widget = PaperWidgets.paperSliderDeferred(x, y, w, 19, title, (getter.getAsInt() - min) / (float) (max - min), v -> setter.accept((int) Math.round(min + v * (max - min))), v -> optionValue(fmt.apply((int) Math.round(min + v * (max - min)))));
             return tooltip != null ? new TooltipWrapper(widget, tooltip) : widget;
         }
     }
