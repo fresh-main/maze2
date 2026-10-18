@@ -45,7 +45,7 @@ public class SetBiomeCommand {
                                     LabyrinthBiomeSource.clearOverride();
 
                                     context.getSource().sendSuccess(
-                                            () -> Component.literal("[SetBiome] Override очищен."),
+                                            () -> Component.translatable("labyrinthmod.set_biome.override_cleared"),
                                             true
                                     );
 
@@ -110,17 +110,12 @@ public class SetBiomeCommand {
         LabyrinthBiomeSource.setOverride(from, to, holder);
 
         source.sendSuccess(
-                () -> Component.literal(
-                        "[SetBiome] Override установлен. Новые чанки в этой зоне будут получать биом " +
-                                biomeName + "."
-                ),
+                () -> Component.translatable("labyrinthmod.set_biome.override_set", biomeName),
                 true
         );
 
         source.sendSuccess(
-                () -> Component.literal(
-                        "[SetBiome] Уже сгенерированные чанки не изменятся, пока ты не сделаешь /setbiome regen."
-                ),
+                () -> Component.translatable("labyrinthmod.set_biome.override_hint"),
                 false
         );
 
@@ -133,9 +128,7 @@ public class SetBiomeCommand {
         int changedChunks = regenerateBiomesFromGenerator(source.getLevel(), from, to);
 
         source.sendSuccess(
-                () -> Component.literal(
-                        "[SetBiome] Биомы перезаполнены из генератора. Чанков обработано: " + changedChunks + "."
-                ),
+                () -> Component.translatable("labyrinthmod.set_biome.regenerated", changedChunks),
                 true
         );
 
@@ -155,17 +148,12 @@ public class SetBiomeCommand {
         int changedChunks = regenerateBiomesFromGenerator(level, from, to);
 
         source.sendSuccess(
-                () -> Component.literal(
-                        "[SetBiome] Биом " + biomeName + " установлен через генератор. Чанков обработано: " +
-                                changedChunks + "."
-                ),
+                () -> Component.translatable("labyrinthmod.set_biome.set_and_regenerated", biomeName, changedChunks),
                 true
         );
 
         source.sendSuccess(
-                () -> Component.literal(
-                        "[SetBiome] Если не видно изменений, перезагрузи чанки или перезайди в мир."
-                ),
+                () -> Component.translatable("labyrinthmod.set_biome.reload_hint"),
                 false
         );
 

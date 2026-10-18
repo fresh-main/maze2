@@ -1011,8 +1011,8 @@ public class FractionEvents {
 
             // Формируем сообщение с иконкой предмета при наведении
             ItemStack icon = FractionSwitcherData.getIcon(newFraction);
-            Component msg = Component.literal("§7[§eF3+F6§7] §aФракция изменена на: ")
-                    .append(Component.literal("[" + newFraction.displayName + "]").withStyle(style ->
+            Component msg = Component.translatable("labyrinthmod.fraction.changed")
+                    .append(Component.literal("[").append(newFraction.displayNameComponent()).append("]").withStyle(style ->
                             style.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_ITEM, new HoverEvent.ItemStackInfo(icon)))
                     ));
 

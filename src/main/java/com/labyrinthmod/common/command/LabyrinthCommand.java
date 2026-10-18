@@ -135,11 +135,8 @@ public class LabyrinthCommand {
         final int finalFailed = failed;
         final String direction = anyVariantB ? "B → A" : "A → B";
 
-        source.sendSuccess(() -> Component.literal(
-                "§aСдвиг лабиринта: §e" + direction +
-                        " §a| Перемещено: §f" + finalMoved +
-                        " §7Пропущено: §f" + finalSkipped +
-                        " §cОшибок: §f" + finalFailed), true);
+        source.sendSuccess(() -> Component.translatable("labyrinthmod.command.shift_result",
+                direction, finalMoved, finalSkipped, finalFailed), true);
 
         LabyrinthMod.LOGGER.info(
                 "[LabyrinthCommand] Labyrinth shift {} executed by {}. Moved: {}, Skipped: {}, Failed: {}",
@@ -158,8 +155,7 @@ public class LabyrinthCommand {
             level = source.getServer().overworld();
             generator = level.getChunkSource().getGenerator();
             if (!(generator instanceof LabyrinthChunkGenerator)) {
-                source.sendFailure(Component.literal(
-                        "§cЭто измерение не использует LabyrinthChunkGenerator!"));
+                source.sendFailure(Component.translatable("labyrinthmod.command.not_labyrinth_dimension"));
                 return 0;
             }
         }
@@ -176,34 +172,26 @@ public class LabyrinthCommand {
         final int fVariantB = variantB;
         final int fAssembled = assembled;
 
-        source.sendSuccess(() -> Component.literal("§6=== Labyrinth Shift Status ==="), false);
-        source.sendSuccess(() -> Component.literal(
-                "§7Всего зон: §f" + total), false);
-        source.sendSuccess(() -> Component.literal(
-                "§7В варианте B: §f" + fVariantB + " §7/ в варианте A: §f" + (total - fVariantB)), false);
-        source.sendSuccess(() -> Component.literal(
-                "§7Собрано контрапций: §f" + fAssembled + " §7/ " + total), false);
+        source.sendSuccess(() -> Component.translatable("labyrinthmod.command.shift_status.header"), false);
+        source.sendSuccess(() -> Component.translatable("labyrinthmod.command.shift_status.total", total), false);
+        source.sendSuccess(() -> Component.translatable("labyrinthmod.command.shift_status.variants", fVariantB, total - fVariantB), false);
+        source.sendSuccess(() -> Component.translatable("labyrinthmod.command.shift_status.assembled", fAssembled, total), false);
 
         return 1;
     }
 
     private static int showHelp(CommandSourceStack source) {
         source.sendSuccess(() -> Component.literal(""), false);
-        source.sendSuccess(() -> Component.literal("§6§l=== LABYRINTH MOD COMMANDS ==="), false);
+        source.sendSuccess(() -> Component.translatable("labyrinthmod.command.help.header"), false);
         source.sendSuccess(() -> Component.literal(""), false);
         source.sendSuccess(() -> Component.translatable("labyrinthmod.command.help.shift"), false);
-        source.sendSuccess(() -> Component.literal(
-                "§7/labyrinth shift §8- §fПереключить все стены A ↔ B"), false);
-        source.sendSuccess(() -> Component.literal(
-                "§7/labyrinth shift toggle §8- §fТо же самое"), false);
-        source.sendSuccess(() -> Component.literal(
-                "§7/labyrinth shift status §8- §fПоказать состояние зон"), false);
+        source.sendSuccess(() -> Component.translatable("labyrinthmod.command.help.shift_run"), false);
+        source.sendSuccess(() -> Component.translatable("labyrinthmod.command.help.shift_toggle"), false);
+        source.sendSuccess(() -> Component.translatable("labyrinthmod.command.help.shift_status"), false);
         source.sendSuccess(() -> Component.literal(""), false);
         source.sendSuccess(() -> Component.translatable("labyrinthmod.command.help.general"), false);
-        source.sendSuccess(() -> Component.literal(
-                "§7/labyrinth help §8- §fПоказать эту справку"), false);
-        source.sendSuccess(() -> Component.literal(
-                "§7/labyrinth reloadconfig §8- §fПерезагрузить конфиг"), false);
+        source.sendSuccess(() -> Component.translatable("labyrinthmod.command.help.help"), false);
+        source.sendSuccess(() -> Component.translatable("labyrinthmod.command.help.reload"), false);
         return 1;
     }
 

@@ -73,7 +73,7 @@ public class FractionCraftCommand {
         if (source.getEntity() instanceof net.minecraft.server.level.ServerPlayer sp) {
             sp.openMenu(new net.minecraft.world.SimpleMenuProvider((id, inv, p) ->
                     new com.labyrinthmod.gui.CraftRestrictionMenu(id, inv, net.minecraft.world.item.ItemStack.EMPTY),
-                    Component.literal("Настройка крафта")
+                    Component.translatable("labyrinthmod.fraction_craft.title")
             ));
         }
         return 1;
@@ -82,7 +82,7 @@ public class FractionCraftCommand {
     private static int forbidCrafting(CommandSourceStack source, String fraction, ResourceLocation itemId) {
         Item item = ForgeRegistries.ITEMS.getValue(itemId);
         if (item == null) {
-            source.sendFailure(Component.literal("§cПредмет не найден: " + itemId));
+            source.sendFailure(Component.translatable("labyrinthmod.fraction_craft.item_not_found", itemId));
             return 0;
         }
 
@@ -91,14 +91,14 @@ public class FractionCraftCommand {
         currentForbidden.add(fractionUpper);
         CraftRestrictionManager.setRestrictions(item, currentForbidden);
 
-        source.sendSuccess(() -> Component.literal("§aФракция §e" + fractionUpper + " §aтеперь НЕ может крафтить §e" + item.getDescription().getString() + "§a!"), true);
+        source.sendSuccess(() -> Component.translatable("labyrinthmod.fraction_craft.forbidden", fractionUpper, item.getDescription()), true);
         return 1;
     }
 
     private static int allowCrafting(CommandSourceStack source, String fraction, ResourceLocation itemId) {
         Item item = ForgeRegistries.ITEMS.getValue(itemId);
         if (item == null) {
-            source.sendFailure(Component.literal("§cПредмет не найден: " + itemId));
+            source.sendFailure(Component.translatable("labyrinthmod.fraction_craft.item_not_found", itemId));
             return 0;
         }
 
@@ -107,7 +107,7 @@ public class FractionCraftCommand {
         currentForbidden.remove(fractionUpper);
         CraftRestrictionManager.setRestrictions(item, currentForbidden);
 
-        source.sendSuccess(() -> Component.literal("§aФракции §e" + fractionUpper + " §aтеперь РАЗРЕШЕНО крафтить §e" + item.getDescription().getString() + "§a!"), true);
+        source.sendSuccess(() -> Component.translatable("labyrinthmod.fraction_craft.allowed", fractionUpper, item.getDescription()), true);
         return 1;
     }
 
@@ -115,16 +115,16 @@ public class FractionCraftCommand {
         var restrictions = CraftRestrictionManager.getAllRestrictions();
 
         if (restrictions.isEmpty()) {
-            source.sendSuccess(() -> Component.literal("§eНет активных ограничений на крафт!"), false);
+            source.sendSuccess(() -> Component.translatable("labyrinthmod.fraction_craft.no_restrictions"), false);
             return 1;
         }
 
-        source.sendSuccess(() -> Component.literal("§6=== Ограничения крафта ==="), false);
+        source.sendSuccess(() -> Component.translatable("labyrinthmod.fraction_craft.header"), false);
 
         for (var entry : restrictions.entrySet()) {
             String itemName = entry.getKey().getDescription().getString();
             Set<String> forbidden = entry.getValue();
-            source.sendSuccess(() -> Component.literal("§e- " + itemName + " §c(запрещено для: " + String.join(", ", forbidden) + ")"), false);
+            source.sendSuccess(() -> Component.translatable("labyrinthmod.fraction_craft.entry", itemName, String.join(", ", forbidden)), false);
         }
 
         return 1;
@@ -132,7 +132,7 @@ public class FractionCraftCommand {
 
     private static int clearAllRestrictions(CommandSourceStack source) {
         CraftRestrictionManager.clearAll();
-        source.sendSuccess(() -> Component.literal("§aВсе ограничения на крафт очищены!"), true);
+        source.sendSuccess(() -> Component.translatable("labyrinthmod.fraction_craft.cleared"), true);
         return 1;
     }
 }

@@ -75,7 +75,7 @@ public class FractionCommand {
             if (fraction == FractionType.NONE || fraction == FractionType.IMPOSTER
                     || fraction == FractionType.OPERATOR || fraction == FractionType.RUNNER
                     || fraction == FractionType.BUTCHER) {
-                ctx.getSource().sendFailure(Component.literal("§cНедоступная фракция. Предатель: /fraction traitor; Оператор: F3+F6."));
+                ctx.getSource().sendFailure(Component.translatable("labyrinthmod.fraction_command.unavailable"));
                 return 0;
             }
 
@@ -86,10 +86,10 @@ public class FractionCommand {
                 FractionEvents.onFractionChanged(target, oldFraction, fraction);
             });
 
-            ctx.getSource().sendSuccess(() -> Component.literal("§aИгроку " + target.getName().getString() + " выдана фракция: " + fraction.displayName), true);
+            ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.fraction_command.assigned", target.getDisplayName(), fraction.displayNameComponent()), true);
             return 1;
         } catch (Exception e) {
-            ctx.getSource().sendFailure(Component.literal("§cОшибка: " + e.getMessage()));
+            ctx.getSource().sendFailure(Component.translatable("labyrinthmod.command.error", e.getMessage()));
             return 0;
         }
     }
@@ -106,7 +106,7 @@ public class FractionCommand {
                 // Проверяем, что маскировка валидна
                 FractionType maskType = FractionType.fromName(finalMask);
                 if (maskType == null || maskType == FractionType.NONE || maskType == FractionType.OPERATOR || maskType == FractionType.IMPOSTER) {
-                    ctx.getSource().sendFailure(Component.literal("§cНеверная маскировка! Доступны: FARMER, BUTCHER, RUNNER, COOK, MEDIC"));
+                    ctx.getSource().sendFailure(Component.translatable("labyrinthmod.fraction_command.invalid_mask"));
                     return 0;
                 }
             } else {
@@ -125,10 +125,10 @@ public class FractionCommand {
                 ImposterTabletItem.giveTabletIfNotExists(target);
             });
 
-            ctx.getSource().sendSuccess(() -> Component.literal("§aИгроку " + target.getName().getString() + " выдана фракция ПРЕДАТЕЛЬ с маскировкой " + finalMask), true);
+            ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.fraction_command.imposter_assigned", target.getDisplayName(), finalMask), true);
             return 1;
         } catch (Exception e) {
-            ctx.getSource().sendFailure(Component.literal("§cОшибка: " + e.getMessage()));
+            ctx.getSource().sendFailure(Component.translatable("labyrinthmod.command.error", e.getMessage()));
             return 0;
         }
     }
@@ -151,25 +151,16 @@ public class FractionCommand {
                 );
             });
 
-            ctx.getSource().sendSuccess(() -> Component.literal("§aУ игрока " + target.getName().getString() + " удалена фракция"), true);
+            ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.fraction_command.removed", target.getDisplayName()), true);
             return 1;
         } catch (Exception e) {
-            ctx.getSource().sendFailure(Component.literal("§cОшибка: " + e.getMessage()));
+            ctx.getSource().sendFailure(Component.translatable("labyrinthmod.command.error", e.getMessage()));
             return 0;
         }
     }
 
     private static int listFractions(CommandContext<CommandSourceStack> ctx) {
-        ctx.getSource().sendSuccess(() -> Component.literal("§6=== Доступные фракции ==="), false);
-        ctx.getSource().sendSuccess(() -> Component.literal("§e- FARMER §7(Фермер) - работа с грядками"), false);
-        ctx.getSource().sendSuccess(() -> Component.literal("§f- COOK §7(Повар) - готовка еды"), false);
-        ctx.getSource().sendSuccess(() -> Component.literal("§d- MEDIC §7(Медик)"), false);
-        ctx.getSource().sendSuccess(() -> Component.literal("§b- GLIDER §7(Глейдер)"), false);
-        ctx.getSource().sendSuccess(() -> Component.literal("§a- SCIENTIST §7(Учёный)"), false);
-        ctx.getSource().sendSuccess(() -> Component.literal("§2- SURVIVOR §7(Выживший)"), false);
-        ctx.getSource().sendSuccess(() -> Component.literal("§9- SOLDIER §7(Военный)"), false);
-        ctx.getSource().sendSuccess(() -> Component.literal("§7- OPERATOR §7(Оператор) - нет ограничений"), false);
-        ctx.getSource().sendSuccess(() -> Component.literal("§c- IMPOSTER §7(Предатель) - скрытая фракция"), false);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.fraction_command.list"), false);
         return 1;
     }
 
@@ -180,17 +171,17 @@ public class FractionCommand {
                 if (data.hasFraction()) {
                     FractionType fraction = data.getFraction();
                     if (fraction == FractionType.IMPOSTER && data.hasImposterMask()) {
-                        ctx.getSource().sendSuccess(() -> Component.literal("§aУ игрока " + target.getName().getString() + " фракция: ПРЕДАТЕЛЬ (маскировка: " + data.getImposterMask() + ")"), false);
+                        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.fraction_command.current_imposter", target.getDisplayName(), data.getImposterMask()), false);
                     } else {
-                        ctx.getSource().sendSuccess(() -> Component.literal("§aУ игрока " + target.getName().getString() + " фракция: " + fraction.displayName), false);
+                        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.fraction_command.current", target.getDisplayName(), fraction.displayNameComponent()), false);
                     }
                 } else {
-                    ctx.getSource().sendSuccess(() -> Component.literal("§eУ игрока " + target.getName().getString() + " нет фракции"), false);
+                    ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.fraction_command.none", target.getDisplayName()), false);
                 }
             });
             return 1;
         } catch (Exception e) {
-            ctx.getSource().sendFailure(Component.literal("§cОшибка: " + e.getMessage()));
+            ctx.getSource().sendFailure(Component.translatable("labyrinthmod.command.error", e.getMessage()));
             return 0;
         }
     }

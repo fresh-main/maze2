@@ -134,17 +134,16 @@ public class GriverCommand {
 
             final int finalGriverCount = griverCount; // <-- СОЗДАЁМ FINAL ПЕРЕМЕННУЮ
 
-            ctx.getSource().sendSuccess(() -> Component.literal(
-                    "§aИгрок " + target.getName().getString() + " помечен для атаки гриверами на 30 секунд! §7(" + finalGriverCount + " гриверов)"), true);
+            ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.attack_marked", target.getDisplayName(), finalGriverCount), true);
 
-            target.sendSystemMessage(Component.literal("§c§lВНИМАНИЕ! §cГриверы начали охоту на вас! Бегите!"));
+            target.sendSystemMessage(Component.translatable("labyrinthmod.griver_command.attack_warning"));
 
             ModLogger.admin(ctx.getSource().getTextName(), "ATTACK_PLAYER",
                     "target=" + target.getName().getString() + " duration=30s grivers=" + finalGriverCount);
 
             return 1;
         } catch (Exception e) {
-            ctx.getSource().sendFailure(Component.literal("§cОшибка: " + e.getMessage()));
+            ctx.getSource().sendFailure(Component.translatable("labyrinthmod.command.error", e.getMessage()));
             return 0;
         }
     }
@@ -185,10 +184,10 @@ public class GriverCommand {
             griver.setPos(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
             level.addFreshEntity(griver);
             int id = griver.getId();
-            ctx.getSource().sendSuccess(() -> Component.literal("§aГривер спавнен (ID: " + id + ")"), true);
+            ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.spawned", id), true);
             return 1;
         }
-        ctx.getSource().sendFailure(Component.literal("§cНе удалось спавнить гривера"));
+        ctx.getSource().sendFailure(Component.translatable("labyrinthmod.griver_command.spawn_failed"));
         return 0;
     }
 
@@ -202,10 +201,10 @@ public class GriverCommand {
             if (entity instanceof GriverEntity g) grivers.add(g);
         }
         if (grivers.isEmpty()) {
-            ctx.getSource().sendSuccess(() -> Component.literal("§eНет гриверов"), false);
+            ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.none"), false);
             return 1;
         }
-        ctx.getSource().sendSuccess(() -> Component.literal("§6=== Гриверы (" + grivers.size() + ") ==="), false);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.list_header", grivers.size()), false);
         for (int i = 0; i < grivers.size(); i++) {
             GriverEntity g = grivers.get(i);
             final int idx = i;
@@ -220,7 +219,7 @@ public class GriverCommand {
     private static int teleportToNearestGriver(CommandContext<CommandSourceStack> ctx) {
         ServerPlayer player = ctx.getSource().getPlayer();
         if (player == null) {
-            ctx.getSource().sendFailure(Component.literal("§cКоманду должен выполнить игрок"));
+            ctx.getSource().sendFailure(Component.translatable("labyrinthmod.command.players_only"));
             return 0;
         }
         ServerLevel level = player.serverLevel();
@@ -236,7 +235,7 @@ public class GriverCommand {
             }
         }
         if (nearest == null) {
-            ctx.getSource().sendFailure(Component.literal("§cВ этом измерении нет загруженных гриверов"));
+            ctx.getSource().sendFailure(Component.translatable("labyrinthmod.griver_command.none_loaded"));
             return 0;
         }
 
@@ -244,8 +243,7 @@ public class GriverCommand {
         player.teleportTo(destination.getX() + 0.5D, destination.getY(), destination.getZ() + 0.5D);
         GriverEntity target = nearest;
         int distance = (int) Math.sqrt(nearestDistance);
-        ctx.getSource().sendSuccess(() -> Component.literal("§aТелепорт к ближайшему гриверу §7(ID: "
-                + target.getId() + ", расстояние: " + distance + ")"), false);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.teleported", target.getId(), distance), false);
         return 1;
     }
 
@@ -271,7 +269,7 @@ public class GriverCommand {
             if (entity instanceof GriverEntity g) { g.kill(); count++; }
         }
         final int c = count;
-        ctx.getSource().sendSuccess(() -> Component.literal("§cУбито гриверов: " + c), true);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.killed", c), true);
         return 1;
     }
 
@@ -300,7 +298,7 @@ public class GriverCommand {
         }
         final BlockPos fp = pos;
         m.addPatrolPoint(fp);
-        ctx.getSource().sendSuccess(() -> Component.literal("§aТочка добавлена: " + fp.getX() + " " + fp.getY() + " " + fp.getZ()), true);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.point_added", fp.getX(), fp.getY(), fp.getZ()), true);
         return 1;
     }
 
@@ -308,7 +306,7 @@ public class GriverCommand {
         PatrolManager m = PatrolManager.get(ctx.getSource().getLevel());
         if (m == null) return 0;
         m.clearPatrolPoints();
-        ctx.getSource().sendSuccess(() -> Component.literal("§aТочки очищены"), true);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.points_cleared"), true);
         return 1;
     }
 
@@ -317,10 +315,10 @@ public class GriverCommand {
         if (m == null) return 0;
         List<BlockPos> pts = m.getPatrolPoints();
         if (pts.isEmpty()) {
-            ctx.getSource().sendSuccess(() -> Component.literal("§eТочек нет"), false);
+            ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.no_points"), false);
             return 1;
         }
-        ctx.getSource().sendSuccess(() -> Component.literal("§6=== Точки (" + pts.size() + ") ==="), false);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.points_header", pts.size()), false);
         for (int i = 0; i < pts.size(); i++) {
             BlockPos p = pts.get(i);
             final int idx = i;
@@ -334,7 +332,7 @@ public class GriverCommand {
         if (m == null) return 0;
         BlockPos pos = BlockPosArgument.getBlockPos(ctx, "pos");
         m.setSpawnPoint(pos);
-        ctx.getSource().sendSuccess(() -> Component.literal("§aТочка спавна: " + pos.getX() + " " + pos.getY() + " " + pos.getZ()), true);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.spawn_point", pos.getX(), pos.getY(), pos.getZ()), true);
         return 1;
     }
 
@@ -349,7 +347,7 @@ public class GriverCommand {
 
         List<BlockPos> points = m.getPatrolPoints();
         if (points.isEmpty()) {
-            ctx.getSource().sendFailure(Component.literal("§cНет точек патрулирования! Используйте /griver patrol autogen"));
+            ctx.getSource().sendFailure(Component.translatable("labyrinthmod.griver_command.no_patrol_points"));
             return 0;
         }
 
@@ -368,7 +366,7 @@ public class GriverCommand {
         }
 
         if (grivers.isEmpty()) {
-            ctx.getSource().sendFailure(Component.literal("§cНет гриверов для патрулирования! Используйте спавнер"));
+            ctx.getSource().sendFailure(Component.translatable("labyrinthmod.griver_command.no_patrol_grivers"));
             return 0;
         }
 
@@ -388,7 +386,7 @@ public class GriverCommand {
 
         final int finalCount = count;
         final int pointSize = points.size();
-        ctx.getSource().sendSuccess(() -> Component.literal("§aПатруль запущен для " + finalCount + " гриверов (точек: " + pointSize + ")"), true);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.patrol_started", finalCount, pointSize), true);
         return 1;
     }
 
@@ -410,8 +408,7 @@ public class GriverCommand {
 
         final int finalCount = count;
 
-        ctx.getSource().sendSuccess(() -> Component.literal(
-                "§cПатруль остановлен. " + finalCount + " гриверов возвращаются домой и НЕ БУДУТ АТАКОВАТЬ!"), true);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.patrol_stopped", finalCount), true);
 
         return 1;
     }
@@ -422,7 +419,7 @@ public class GriverCommand {
         PatrolManager m = PatrolManager.get(ctx.getSource().getLevel());
         if (m == null) return 0;
         m.setMinDistanceBetweenGrivers(v);
-        ctx.getSource().sendSuccess(() -> Component.literal("§aМин. дистанция: " + v), true);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.min_distance", v), true);
         return 1;
     }
 
@@ -430,7 +427,7 @@ public class GriverCommand {
         PatrolManager m = PatrolManager.get(ctx.getSource().getLevel());
         if (m == null) return 0;
         m.setMaxTargetDistance(v);
-        ctx.getSource().sendSuccess(() -> Component.literal("§aРадиус цели: " + v), true);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.target_radius", v), true);
         return 1;
     }
 
@@ -446,7 +443,7 @@ public class GriverCommand {
         PatrolManager m = PatrolManager.get(ctx.getSource().getLevel());
         if (m == null) return 0;
         m.setEmergenceTime(t);
-        ctx.getSource().sendSuccess(() -> Component.literal("§aВремя выхода: " + t), true);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.emergence_time", t), true);
         return 1;
     }
 
@@ -454,7 +451,7 @@ public class GriverCommand {
         PatrolManager m = PatrolManager.get(ctx.getSource().getLevel());
         if (m == null) return 0;
         m.setTimeBasedEmergenceEnabled(v);
-        ctx.getSource().sendSuccess(() -> Component.literal("§aВыход по времени: " + (v ? "ON" : "OFF")), true);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.time_based", v), true);
         return 1;
     }
 
@@ -464,7 +461,7 @@ public class GriverCommand {
         PatrolManager m = PatrolManager.get(ctx.getSource().getLevel());
         if (m == null) return 0;
         m.setBoundsMin(pos);
-        ctx.getSource().sendSuccess(() -> Component.literal("§aMin угол: " + pos.getX() + " " + pos.getY() + " " + pos.getZ()), true);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.bounds_min", pos.getX(), pos.getY(), pos.getZ()), true);
         return 1;
     }
 
@@ -472,7 +469,7 @@ public class GriverCommand {
         PatrolManager m = PatrolManager.get(ctx.getSource().getLevel());
         if (m == null) return 0;
         m.setBoundsMax(pos);
-        ctx.getSource().sendSuccess(() -> Component.literal("§aMax угол: " + pos.getX() + " " + pos.getY() + " " + pos.getZ()), true);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.bounds_max", pos.getX(), pos.getY(), pos.getZ()), true);
         return 1;
     }
 
@@ -480,7 +477,7 @@ public class GriverCommand {
         PatrolManager m = PatrolManager.get(ctx.getSource().getLevel());
         if (m == null) return 0;
         m.clearBounds();
-        ctx.getSource().sendSuccess(() -> Component.literal("§aГраницы сброшены"), true);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.bounds_cleared"), true);
         return 1;
     }
 
@@ -488,14 +485,14 @@ public class GriverCommand {
         PatrolManager m = PatrolManager.get(ctx.getSource().getLevel());
         if (m == null) return 0;
         if (!m.hasBounds()) {
-            ctx.getSource().sendSuccess(() -> Component.literal("§eГраницы не заданы"), false);
+            ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.bounds_missing"), false);
             return 1;
         }
         BlockPos a = m.getBoundsMin();
         BlockPos b = m.getBoundsMax();
         int sx = Math.abs(a.getX() - b.getX()) + 1;
         int sz = Math.abs(a.getZ() - b.getZ()) + 1;
-        ctx.getSource().sendSuccess(() -> Component.literal("§6Границы: §f" + a + " → " + b + " §7(" + sx + "×" + sz + ")"), false);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.bounds_info", a, b, sx, sz), false);
         return 1;
     }
 
@@ -505,7 +502,7 @@ public class GriverCommand {
         PatrolManager m = PatrolManager.get(ctx.getSource().getLevel());
         if (m == null) return 0;
         m.clearExclusionZones();
-        ctx.getSource().sendSuccess(() -> Component.literal("§aЗоны исключения очищены"), true);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.exclusions_cleared"), true);
         return 1;
     }
 
@@ -514,10 +511,10 @@ public class GriverCommand {
         if (m == null) return 0;
         var zones = m.getExclusionZones();
         if (zones.isEmpty()) {
-            ctx.getSource().sendSuccess(() -> Component.literal("§eНет зон исключения"), false);
+            ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.no_exclusions"), false);
             return 1;
         }
-        ctx.getSource().sendSuccess(() -> Component.literal("§6=== Зоны исключения (" + zones.size() + ") ==="), false);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.exclusions_header", zones.size()), false);
         for (int i = 0; i < zones.size(); i++) {
             var z = zones.get(i);
             final int idx = i;
@@ -535,7 +532,7 @@ public class GriverCommand {
         PatrolManager m = PatrolManager.get(level);
         if (m == null) return 0;
         if (!m.hasBounds()) {
-            ctx.getSource().sendFailure(Component.literal("§cСначала задайте границы: /griver bounds min/max"));
+            ctx.getSource().sendFailure(Component.translatable("labyrinthmod.griver_command.set_bounds_first"));
             return 0;
         }
         ServerPlayer p = ctx.getSource().getPlayer();
@@ -544,7 +541,7 @@ public class GriverCommand {
         int before = m.getPatrolPoints().size();
         int added = m.autogeneratePoints(level, spacing, floorY, yRadius);
         if (added < 0) {
-            ctx.getSource().sendFailure(Component.literal("§cОшибка автогенерации"));
+            ctx.getSource().sendFailure(Component.translatable("labyrinthmod.griver_command.autogen_failed"));
             return 0;
         }
         ctx.getSource().sendSuccess(() -> Component.literal("§aАвтогенерация: §f+" + added
@@ -555,14 +552,14 @@ public class GriverCommand {
     private static int showSettings(CommandContext<CommandSourceStack> ctx) {
         PatrolManager m = PatrolManager.get(ctx.getSource().getLevel());
         if (m == null) return 0;
-        ctx.getSource().sendSuccess(() -> Component.literal("§6=== Настройки патруля ==="), false);
-        ctx.getSource().sendSuccess(() -> Component.literal("§eТочек: §f" + m.getPatrolPoints().size()), false);
-        ctx.getSource().sendSuccess(() -> Component.literal("§eМин. дистанция: §f" + m.getMinDistanceBetweenGrivers()), false);
-        ctx.getSource().sendSuccess(() -> Component.literal("§eРадиус цели: §f" + m.getMaxTargetDistance()), false);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.settings_header"), false);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.settings_points", m.getPatrolPoints().size()), false);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.settings_min_distance", m.getMinDistanceBetweenGrivers()), false);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.settings_target_radius", m.getMaxTargetDistance()), false);
         ctx.getSource().sendSuccess(() -> Component.literal("§eCooldown: §f" + m.getRevisitCooldown()), false);
-        ctx.getSource().sendSuccess(() -> Component.literal("§eВремя выхода: §f" + m.getEmergenceTime()), false);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.settings_emergence_time", m.getEmergenceTime()), false);
         ctx.getSource().sendSuccess(() -> Component.literal("§eTimeBased: §f" + m.isTimeBasedEmergenceEnabled()), false);
-        ctx.getSource().sendSuccess(() -> Component.literal("§eАктивен: §f" + m.isGlobalPatrolActive()), false);
+        ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.settings_active", m.isGlobalPatrolActive()), false);
         return 1;
     }
     // Статический метод для вызова из TraitorAttackPacket
@@ -592,12 +589,11 @@ public class GriverCommand {
 
             final int finalGriverCount = griverCount;
 
-            ctx.getSource().sendSuccess(() -> Component.literal(
-                    "§aИгрок " + target.getName().getString() + " помечен для атаки гриверами на 30 секунд! §7(" + finalGriverCount + " гриверов)"), true);
+            ctx.getSource().sendSuccess(() -> Component.translatable("labyrinthmod.griver_command.attack_marked", target.getDisplayName(), finalGriverCount), true);
 
             return 1;
         } catch (Exception e) {
-            ctx.getSource().sendFailure(Component.literal("§cОшибка: " + e.getMessage()));
+            ctx.getSource().sendFailure(Component.translatable("labyrinthmod.command.error", e.getMessage()));
             return 0;
         }
     }

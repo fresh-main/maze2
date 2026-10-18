@@ -22,7 +22,7 @@ public class BiomeDebugCommand {
                                 .executes(context -> {
                                     BiomeDebugChat.setEnabled(true);
                                     context.getSource().sendSuccess(
-                                            () -> Component.literal("[LabyDebug] Отладка включена."),
+                                            () -> Component.translatable("labyrinthmod.biome_debug.enabled"),
                                             false
                                     );
                                     return 1;
@@ -33,7 +33,7 @@ public class BiomeDebugCommand {
                                 .executes(context -> {
                                     BiomeDebugChat.setEnabled(false);
                                     context.getSource().sendSuccess(
-                                            () -> Component.literal("[LabyDebug] Отладка выключена."),
+                                            () -> Component.translatable("labyrinthmod.biome_debug.disabled"),
                                             false
                                     );
                                     return 1;
